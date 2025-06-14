@@ -18,7 +18,8 @@ export class CoreEngine extends EventEmitter {
   private prManager?: PRManager;
   private openaiManager: OpenAIManager;
   private isInitialized = false;
-  private processingInterval?: NodeJS.Timeout;
+  private taskProcessingTimeout?: NodeJS.Timeout;
+  private reviewProcessingTimeout?: NodeJS.Timeout;
 
   constructor(db: DatabaseManager, repoPath: string = process.cwd()) {
     super();
@@ -140,29 +141,104 @@ export class CoreEngine extends EventEmitter {
   }
 
   private startTaskProcessing(): void {
-    // Process tasks every 10 seconds based on their state
-    this.processingInterval = setInterval(async () => {
+    // Start task processing cycle
+    this.scheduleTaskProcessing();
+    
+    // Start review processing cycle
+    this.scheduleReviewProcessing();
+  }
+
+  private scheduleTaskProcessing(): void {
+    this.taskProcessingTimeout = setTimeout(async () => {
       try {
-        await this.processTasksByState();
+        await this.processPendingTasks();
       } catch (error) {
         logger.error(`Error in task processing: ${error}`);
       }
-    }, 10000);
+      
+      // Schedule next processing cycle
+      this.scheduleTaskProcessing();
+    }, 60000); // 1 minute
   }
 
-  private async processTasksByState(): Promise<void> {
+  private scheduleReviewProcessing(): void {
+    this.reviewProcessingTimeout = setTimeout(async () => {
+      try {
+        await this.processReviews();
+      } catch (error) {
+        logger.error(`Error in review processing: ${error}`);
+      }
+      
+      // Schedule next processing cycle
+      this.scheduleReviewProcessing();
+    }, 300000); // 5 minutes
+  }
+
+  private async processPendingTasks(): Promise<void> {
     // Process pending tasks
     const pendingTasks = this.db.getTasks({ status: 'pending' });
 
     for (const task of pendingTasks) {
       await this.processTask(task.id);
     }
+  }
 
-    // Poll PR comments for awaiting-review tasks
+  private async processReviews(): Promise<void> {
+    // Collect all new comments for all awaiting-review tasks first
     const awaitingReviewTasks = this.db.getTasks({ status: 'awaiting-review' });
+    const allNewComments: Array<{ taskId: number; comments: Array<{ id: string; body: string }> }> = [];
+    const taskStatusUpdates: Array<{ taskId: number; status: 'completed' | 'cancelled' }> = [];
+
+    // First pass: collect all new comments and check PR statuses
     for (const task of awaitingReviewTasks) {
       if (task.pr_number) {
-        await this.pollPRComments(task.id, task.pr_number);
+        try {
+          const result = await this.collectPRComments(task.id, task.pr_number);
+          if (result.comments.length > 0) {
+            allNewComments.push({ taskId: task.id, comments: result.comments });
+          }
+          if (result.statusUpdate) {
+            taskStatusUpdates.push({ taskId: task.id, status: result.statusUpdate });
+          }
+        } catch (error: any) {
+          this.db.addTaskLog({
+            task_id: task.id,
+            level: 'error',
+            message: `Error collecting PR comments: ${error.message}`
+          });
+        }
+      }
+    }
+
+    // Second pass: handle all collected comments
+    for (const { taskId, comments } of allNewComments) {
+      for (const comment of comments) {
+        try {
+          await this.handlePRComment(taskId, comment.body);
+          // Update last processed comment ID
+          this.db.setSetting(`last_comment_${taskId}`, comment.id.toString(), 'system');
+        } catch (error: any) {
+          this.db.addTaskLog({
+            task_id: taskId,
+            level: 'error',
+            message: `Error handling PR comment: ${error.message}`
+          });
+        }
+      }
+    }
+
+    // Third pass: update task statuses based on PR status
+    for (const { taskId, status } of taskStatusUpdates) {
+      if (status === 'completed') {
+        this.db.updateTask(taskId, {
+          status: 'completed',
+          current_stage: 'completed',
+          completed_at: new Date().toISOString()
+        });
+        this.emitTaskUpdate(taskId, 'completed');
+      } else if (status === 'cancelled') {
+        this.db.updateTask(taskId, { status: 'cancelled', current_stage: 'cancelled' });
+        this.emitTaskUpdate(taskId, 'cancelled');
       }
     }
   }
@@ -395,68 +471,45 @@ export class CoreEngine extends EventEmitter {
     }
   }
 
-  private async pollPRComments(taskId: number, prNumber: number): Promise<void> {
-    logger.info(`Polling PR comments for task: ${taskId} ${prNumber}`);
+  private async collectPRComments(taskId: number, prNumber: number): Promise<{ comments: Array<{ id: string; body: string }>; statusUpdate?: 'completed' | 'cancelled' }> {
+    logger.info(`Collecting PR comments for task: ${taskId} ${prNumber}`);
     const task = this.db.getTask(taskId);
     if (!task || task.status !== 'awaiting-review') {
-      return; // Task completed or cancelled
+      return { comments: [] }; // Task completed or cancelled
     }
 
-    try {
-      const prManager = this.getPRManager();
-      const githubUsername = this.db.getSetting('githubUsername')?.value;
-      if (!githubUsername) return;
+    const prManager = this.getPRManager();
+    const githubUsername = this.db.getSetting('githubUsername')?.value;
+    if (!githubUsername) return { comments: [] };
 
-      // Get last commit timestamp for the branch
-      let lastCommitTimestamp: string | null = null;
-      if (task.branch_name) {
-        await this.gitManager.switchToBranch(task.branch_name, taskId);
+    // Get last commit timestamp for the branch
+    let lastCommitTimestamp: string | null = null;
+    if (task.branch_name) {
+      await this.gitManager.switchToBranch(task.branch_name, taskId);
 
-        try {
-          lastCommitTimestamp = await this.gitManager.getLastCommitTimestamp(task.branch_name);
-          logger.info(`last commit timestamp for branch ${task.branch_name}: ${lastCommitTimestamp}`);
-        } catch (error) {
-          // If we can't get commit timestamp, continue with null (will get all comments)
-          console.warn(`Could not get last commit timestamp for branch ${task.branch_name}:`, error);
-        }
+      try {
+        lastCommitTimestamp = await this.gitManager.getLastCommitTimestamp(task.branch_name);
+        logger.info(`last commit timestamp for branch ${task.branch_name}: ${lastCommitTimestamp}`);
+      } catch (error) {
+        // If we can't get commit timestamp, continue with null (will get all comments)
+        console.warn(`Could not get last commit timestamp for branch ${task.branch_name}:`, error);
       }
-
-      // Poll for new comments since last commit
-      const newComments = await prManager.pollForComments(prNumber, lastCommitTimestamp, githubUsername);
-
-      for (const comment of newComments) {
-        // Process each new comment directly
-        await this.handlePRComment(taskId, comment.body);
-
-        // Update last processed comment ID
-        this.db.setSetting(`last_comment_${taskId}`, comment.id.toString(), 'system');
-      }
-
-      // Check PR status
-      const prStatus = await prManager.getPRStatus(prNumber);
-      if (prStatus.merged) {
-        this.db.updateTask(taskId, {
-          status: 'completed',
-          current_stage: 'completed',
-          completed_at: new Date().toISOString()
-        });
-        this.emitTaskUpdate(taskId, 'completed');
-        return;
-      } else if (prStatus.state === 'closed') {
-        this.db.updateTask(taskId, { status: 'cancelled', current_stage: 'cancelled' });
-        this.emitTaskUpdate(taskId, 'cancelled');
-        return;
-      }
-
-      // No need to schedule next poll - will be handled by periodic processing
-
-    } catch (error: any) {
-      this.db.addTaskLog({
-        task_id: taskId,
-        level: 'error',
-        message: `Error polling PR comments: ${error.message}`
-      });
     }
+
+    // Poll for new comments since last commit
+    const newComments = await prManager.pollForComments(prNumber, lastCommitTimestamp, githubUsername);
+
+    // Check PR status
+    const prStatus = await prManager.getPRStatus(prNumber);
+    let statusUpdate: 'completed' | 'cancelled' | undefined;
+    
+    if (prStatus.merged) {
+      statusUpdate = 'completed';
+    } else if (prStatus.state === 'closed') {
+      statusUpdate = 'cancelled';
+    }
+
+    return { comments: newComments, statusUpdate };
   }
 
   private async handlePRComment(taskId: number, comment: string): Promise<void> {
@@ -530,10 +583,15 @@ export class CoreEngine extends EventEmitter {
   shutdown(): void {
     console.log('🔄 Shutting down engine...');
 
-    // Clear processing interval
-    if (this.processingInterval) {
-      clearInterval(this.processingInterval);
-      this.processingInterval = undefined;
+    // Clear processing timeouts
+    if (this.taskProcessingTimeout) {
+      clearTimeout(this.taskProcessingTimeout);
+      this.taskProcessingTimeout = undefined;
+    }
+
+    if (this.reviewProcessingTimeout) {
+      clearTimeout(this.reviewProcessingTimeout);
+      this.reviewProcessingTimeout = undefined;
     }
 
     // Remove all event listeners
