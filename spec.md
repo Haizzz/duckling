@@ -290,8 +290,6 @@ graph TD
 | `/api/settings` | GET | Get all settings | None | SettingsMap |
 | `/api/settings` | PUT | Update multiple settings | SettingsUpdateRequest | StatusResponse |
 | `/api/settings/:category` | GET | Get settings by category | None | SettingsMap |
-| `/api/settings/onboarding` | GET | Check onboarding status | None | OnboardingStatus |
-| `/api/settings/onboarding` | POST | Complete onboarding | OnboardingData | StatusResponse |
 
 #### System Management
 | Endpoint | Method | Purpose | Request Body | Response |

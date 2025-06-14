@@ -54,10 +54,10 @@ export class APIServer {
 
     // HTML page routes
     this.app.get('/', (req, res) => {
-      // Check if onboarding is complete
-      const onboardingCompleted = this.db.getSetting('onboarding_completed');
-      if (!onboardingCompleted || onboardingCompleted.value !== 'true') {
-        return res.redirect('/onboard');
+      // Check if basic configuration is present
+      const githubToken = this.db.getSetting('github_token');
+      if (!githubToken) {
+        return res.redirect('/settings');
       }
       res.sendFile(path.join(__dirname, '../../public/index.html'));
     });
@@ -70,9 +70,7 @@ export class APIServer {
       res.sendFile(path.join(__dirname, '../../public/settings.html'));
     });
 
-    this.app.get('/onboard', (req, res) => {
-      res.sendFile(path.join(__dirname, '../../public/onboard.html'));
-    });
+
 
     // Fallback for any other routes
     this.app.get('*', (req, res) => {

@@ -37,8 +37,8 @@ program
       const db = new DatabaseManager();
 
       // Check if already configured
-      const onboardingCompleted = db.getSetting('onboarding_completed');
-      if (onboardingCompleted?.value === 'true') {
+      const githubToken = db.getSetting('github_token');
+      if (githubToken) {
         console.log('✅ Intern is already configured. Use "intern start" to run the server.');
         console.log('💡 You can modify settings through the web interface at http://localhost:5050/settings');
         return;
@@ -229,9 +229,9 @@ program
 
       console.log('🔧 Intern System Status\n');
 
-      // Check onboarding
-      const onboardingCompleted = db.getSetting('onboarding_completed');
-      const isConfigured = onboardingCompleted?.value === 'true';
+      // Check configuration
+      const githubToken = db.getSetting('github_token');
+      const isConfigured = !!githubToken;
 
       console.log(`Configuration: ${isConfigured ? '✅ Complete' : '❌ Incomplete'}`);
 

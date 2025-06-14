@@ -43,7 +43,7 @@ npx intern start
 ### First-Time Setup
 
 1. Visit http://localhost:3000
-2. Complete the 3-step onboarding process:
+2. Configure your settings:
    - **API Keys**: Configure your GitHub token and coding assistant API key
    - **GitHub Settings**: Set repository URL and username
    - **Preferences**: Customize branch prefixes, retry limits, etc.
@@ -240,11 +240,3 @@ public/
 - No secrets are transmitted over the network unnecessarily
 - All external API calls use secure HTTPS connections
 - Input validation on all user-provided data
-
-## License
-
-MIT License - see LICENSE file for details
-
-## Contributing
-
-Contributions welcome! Please read the development guide in AGENT.md and submit pull requests.

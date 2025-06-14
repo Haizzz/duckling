@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { DatabaseManager } from '../core/database';
 import { CoreEngine } from '../core/engine';
-import { ApiResponse, CreateTaskRequest, OnboardingStatus } from '../types';
+import { ApiResponse, CreateTaskRequest } from '../types';
 
 export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
   const router = Router();

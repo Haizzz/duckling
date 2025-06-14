@@ -120,7 +120,7 @@ export class DatabaseManager {
       { key: 'maxRetries', value: DEFAULT_SETTINGS.maxRetries.toString(), category: 'general' },
       { key: 'baseBranch', value: DEFAULT_SETTINGS.baseBranch, category: 'general' },
       
-      { key: 'onboarding_completed', value: 'false', category: 'general' },
+
     ];
 
     const insertSetting = this.db.prepare(`

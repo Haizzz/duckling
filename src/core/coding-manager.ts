@@ -48,7 +48,6 @@ export class CodingManager {
         env: {
           ...process.env,
           AMP_API_KEY: apiKeySetting.value,
-          NODE_ENV: 'production' // Use Node 22 for amp
         }
       });
 

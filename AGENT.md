@@ -94,14 +94,13 @@ intern task cancel <taskId>
 
 ### Manual Testing Flow
 1. Start Intern: `intern start`
-2. Complete onboarding at http://localhost:3000
+2. Configure settings at http://localhost:3000/settings
 3. Create a test task through the web interface
 4. Monitor task progress in real-time
 5. Check logs and task details
 6. Verify GitHub integration (branch creation, PR creation)
 
 ### Key Test Scenarios
-- **Onboarding**: First-time setup flow
 - **Task Creation**: Web and CLI task creation
 - **Code Generation**: Integration with coding tools
 - **Precommit Checks**: Running and handling failures

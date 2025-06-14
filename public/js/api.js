@@ -93,16 +93,12 @@ window.API = {
     });
   },
 
-  // Onboarding endpoints
-  async getOnboardingStatus() {
-    return this.request('/settings/onboarding');
-  },
-
-  async completeOnboarding(settings) {
-    return this.request('/settings/onboarding', {
-      method: 'POST',
-      body: JSON.stringify({ settings })
-    });
+  // Configuration check
+  async checkConfiguration() {
+    const settings = await this.getSettings();
+    return {
+      configured: !!(settings.github_token && (settings.openai_api_key || settings.amp_api_key))
+    };
   },
 
   // Health check

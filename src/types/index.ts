@@ -121,7 +121,4 @@ export interface CreateTaskRequest {
   autoMerge?: boolean;
 }
 
-export interface OnboardingStatus {
-  completed: boolean;
-  step?: number;
-}
+
