@@ -341,7 +341,6 @@ export class DatabaseManager {
     const stmt = this.db.prepare(`
       SELECT * FROM jobs 
       WHERE type = ? AND status = 'pending' 
-      AND scheduled_at <= datetime('now')
       AND attempts < max_attempts
       ORDER BY created_at ASC 
       LIMIT 1

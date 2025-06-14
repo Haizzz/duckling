@@ -239,9 +239,9 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
       // Convert array to object for easier frontend usage
       const settingsObj: Record<string, any> = {};
       settings.forEach(setting => {
-        // Mask sensitive API keys and tokens for security
+        // For password fields, return a special indicator if value exists
         if (setting.key.toLowerCase().includes('token') || setting.key.toLowerCase().includes('apikey')) {
-          settingsObj[setting.key] = setting.value ? '••••••••••••••••' : '';
+          settingsObj[setting.key] = setting.value ? '***CONFIGURED***' : '';
         } else {
           settingsObj[setting.key] = setting.value;
         }
@@ -267,22 +267,31 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
 
       // Define category mappings
       const categoryMap: Record<string, string> = {
-        github_token: 'api_keys',
-        openai_api_key: 'api_keys',
-        claude_api_key: 'api_keys',
-        amp_api_key: 'api_keys',
-        default_coding_tool: 'general',
-        branch_prefix: 'general',
-        pr_prefix: 'general',
-        auto_merge: 'general',
-        max_retries: 'general',
-        github_repo_url: 'github',
-        github_username: 'github',
-        poll_interval_seconds: 'github'
+        githubToken: 'api_keys',
+        openaiApiKey: 'api_keys',
+        claudeApiKey: 'api_keys',
+        ampApiKey: 'api_keys',
+        defaultCodingTool: 'general',
+        branchPrefix: 'general',
+        prTitlePrefix: 'general',
+        baseBranch: 'general',
+        commitSuffix: 'general',
+        autoMerge: 'general',
+        maxRetries: 'general',
+        pollInterval: 'github',
+        taskCheckInterval: 'general',
+        reviewCheckInterval: 'general',
+        githubUsername: 'github'
       };
 
       // Update each setting
       for (const [key, value] of Object.entries(settings)) {
+        // Skip empty API keys/tokens (means don't change the existing value)
+        if ((key.toLowerCase().includes('token') || key.toLowerCase().includes('apikey')) && 
+            (!value || value === '' || value === '***CONFIGURED***')) {
+          continue;
+        }
+        
         const category = categoryMap[key] || 'general';
         db.setSetting(key, value as string, category);
       }

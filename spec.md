@@ -1014,7 +1014,7 @@ AMP_API_KEY=amp_xxxx
   <div class="flex items-center justify-between pt-2 border-t border-gray-100">
     <div class="flex items-center space-x-4 text-sm text-gray-500">
       <span>Updated 5 min ago</span>
-      <span>•</span>
+      <span>.</span>
       <span>3 attempts</span>
     </div>
     <div class="flex items-center space-x-2">
@@ -1144,9 +1144,9 @@ AMP_API_KEY=amp_xxxx
         <h1 class="text-3xl font-bold text-gray-900 mb-2">Implement user authentication</h1>
         <div class="flex items-center space-x-4 text-sm text-gray-500">
           <span>Created 3 hours ago</span>
-          <span>•</span>
+          <span>.</span>
           <span>Last updated 2 minutes ago</span>
-          <span>•</span>
+          <span>.</span>
           <span>Task ID: task-123</span>
         </div>
       </div>
@@ -1363,7 +1363,7 @@ AMP_API_KEY=amp_xxxx
       </div>
       <div class="text-sm text-gray-400">
         <span id="log-count">247 entries</span>
-        <span class="mx-2">•</span>
+        <span class="mx-2">.</span>
         <span id="last-updated">Updated 2s ago</span>
       </div>
     </div>
@@ -1424,7 +1424,7 @@ AMP_API_KEY=amp_xxxx
           <div class="flex space-x-2">
             <input type="password" id="github-token" 
                    class="flex-1 px-3 py-2 border border-gray-300 rounded-md"
-                   placeholder="ghp_xxxxxxxxxxxx" value="••••••••••••••••">
+                   placeholder="ghp_xxxxxxxxxxxx" value="ghp_xxxxxxxxxxxx">
             <button class="px-3 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50">
               Test
             </button>
@@ -1439,7 +1439,7 @@ AMP_API_KEY=amp_xxxx
           <div class="flex space-x-2">
             <input type="password" id="openai-key" 
                    class="flex-1 px-3 py-2 border border-gray-300 rounded-md"
-                   placeholder="sk-xxxxxxxxxxxx" value="••••••••••••••••">
+                   placeholder="sk-xxxxxxxxxxxx" value="sk-xxxxxxxxxxxx">
             <button class="px-3 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50">
               Test
             </button>
@@ -1467,7 +1467,7 @@ AMP_API_KEY=amp_xxxx
           <div class="flex space-x-2">
             <input type="password" id="amp-key" 
                    class="flex-1 px-3 py-2 border border-gray-300 rounded-md"
-                   placeholder="amp_xxxxxxxxxxxx" value="••••••••••••••••">
+                   placeholder="amp_xxxxxxxxxxxx" value="amp_xxxxxxxxxxxx">
             <button class="px-3 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50">
               Test
             </button>

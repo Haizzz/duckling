@@ -12,14 +12,15 @@ export class SQLiteJobQueue {
   }
 
   enqueue(
-    type: string, 
-    data: any, 
+    type: string,
+    data: any,
     options: { delay?: number; maxAttempts?: number } = {}
   ): string {
     return this.db.enqueueJob(type, data, options);
   }
 
   process(type: string, handler: (data: any) => Promise<void>): void {
+    logger.info(`Starting worker for type ${type}`);
     if (this.workers.has(type)) {
       return; // Worker already running for this type
     }
@@ -28,16 +29,17 @@ export class SQLiteJobQueue {
       if (this.isShuttingDown) {
         return;
       }
-      
+
       try {
         const job = this.getNextJob(type);
         if (job) {
+          logger.info(`Worker for type ${type} found job: ${job?.id}`);
           await this.executeJob(job, handler);
         }
       } catch (error) {
-        console.error(`Worker error for type ${type}:`, error);
+        logger.error(`Worker error for type ${type}: ${error}`);
       }
-    }, 1000); // Poll every second
+    }, 5000);
 
     this.workers.set(type, worker);
   }
@@ -49,12 +51,12 @@ export class SQLiteJobQueue {
   private async executeJob(job: Job, handler: (data: any) => Promise<void>): Promise<void> {
     // Mark as processing
     this.db.updateJobStatus(job.id, 'processing');
-    
+
     try {
       await handler(JSON.parse(job.data));
       // Mark as completed
       this.db.updateJobStatus(job.id, 'completed');
-      
+
     } catch (error) {
       await this.handleJobFailure(job, error as Error);
     }
@@ -62,7 +64,7 @@ export class SQLiteJobQueue {
 
   private async handleJobFailure(job: Job, error: Error): Promise<void> {
     const nextAttempt = job.attempts + 1;
-    
+
     if (nextAttempt >= job.max_attempts) {
       // Max attempts reached
       this.db.updateJobStatus(job.id, 'failed', error.message);
@@ -85,23 +87,23 @@ export class SQLiteJobQueue {
     let query = 'SELECT * FROM jobs';
     const params: any[] = [];
     const conditions: string[] = [];
-    
+
     if (type) {
       conditions.push('type = ?');
       params.push(type);
     }
-    
+
     if (status) {
       conditions.push('status = ?');
       params.push(status);
     }
-    
+
     if (conditions.length > 0) {
       query += ' WHERE ' + conditions.join(' AND ');
     }
-    
+
     query += ' ORDER BY created_at DESC';
-    
+
     const stmt = this.db['db'].prepare(query);
     return stmt.all(...params) as Job[];
   }
@@ -123,7 +125,7 @@ export class SQLiteJobQueue {
 
   shutdown(): void {
     this.isShuttingDown = true;
-    
+
     // Clear all workers
     for (const [type, worker] of this.workers) {
       clearInterval(worker);

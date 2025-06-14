@@ -21,26 +21,25 @@ export class OpenAIManager {
     }
   }
 
-  private async callOpenAI(prompt: string, maxTokens: number = 100): Promise<string> {
+  private async callOpenAI(prompt: string): Promise<string> {
     if (!this.openai) {
       throw new Error('OpenAI client not initialized. Please configure OpenAI API key in settings.');
     }
 
     return await withRetry(async () => {
+      logger.info(prompt);
       const response = await this.openai!.chat.completions.create({
-        model: 'gpt-3.5-turbo',
+        model: 'gpt-4o',
         messages: [
           {
             role: 'user',
             content: prompt
           }
         ],
-        max_tokens: maxTokens,
-        temperature: 0.3, // Lower temperature for more deterministic results
-        stop: ['\n', '.', '!', '?']
       });
 
       const content = response.choices[0]?.message?.content?.trim();
+      logger.info(content || 'No response from OpenAI');
       if (!content) {
         throw new Error('No response from OpenAI');
       }
@@ -66,8 +65,8 @@ Rules:
 
 Branch name:`;
 
-      const result = await this.callOpenAI(prompt, 50);
-      
+      const result = await this.callOpenAI(prompt);
+
       // Clean up the result to ensure it's a valid branch name
       const cleanBranchName = result
         .toLowerCase()
@@ -90,7 +89,7 @@ Branch name:`;
 
   async generatePRTitle(taskDescription: string, branchName: string): Promise<string> {
     const prefix = this.db.getSetting('prTitlePrefix')?.value || '[INTERN]';
-    
+
     if (!this.openai) {
       // Fallback to simple generation if OpenAI not available
       return `${prefix} ${taskDescription.substring(0, 50)}${taskDescription.length > 50 ? '...' : ''}`;
@@ -107,12 +106,12 @@ Rules:
 
 PR title:`;
 
-      const result = await this.callOpenAI(prompt, 80);
-      
+      const result = await this.callOpenAI(prompt);
+
       // Clean up the result
       const cleanTitle = result.replace(/^["']|["']$/g, '').trim();
       const fullTitle = `${prefix} ${cleanTitle}`;
-      
+
       if (fullTitle.length <= 100) {
         logger.info(`Generated PR title via OpenAI: ${fullTitle}`);
         return fullTitle;
@@ -142,8 +141,8 @@ Format as markdown. Keep it concise but informative.
 
 PR description:`;
 
-      const result = await this.callOpenAI(prompt, 300);
-      
+      const result = await this.callOpenAI(prompt);
+
       if (result.length > 0) {
         const description = result.trim();
         logger.info(`Generated PR description via OpenAI`);
@@ -173,11 +172,11 @@ Rules:
 
 Summary:`;
 
-      const result = await this.callOpenAI(prompt, 80);
-      
+      const result = await this.callOpenAI(prompt);
+
       // Clean up the result
       const cleanSummary = result.replace(/^["']|["']$/g, '').trim();
-      
+
       if (cleanSummary.length > 0 && cleanSummary.length <= 80) {
         logger.info(`Generated task summary via OpenAI: ${cleanSummary}`);
         return cleanSummary;
@@ -192,7 +191,7 @@ Summary:`;
 
   async generateCommitMessage(taskDescription: string, changes: string[]): Promise<string> {
     const suffix = this.db.getSetting('commitSuffix')?.value || ' [i]';
-    
+
     if (!this.openai) {
       // Fallback to simple generation if OpenAI not available
       return `${taskDescription.substring(0, 50)}${taskDescription.length > 50 ? '...' : ''}${suffix}`;
@@ -200,7 +199,7 @@ Summary:`;
 
     try {
       const changesText = changes.length > 0 ? `\nFiles changed: ${changes.slice(0, 5).join(', ')}` : '';
-      
+
       const prompt = `Generate a concise git commit message for this task: "${taskDescription}".${changesText}
 Rules:
 - Maximum 50 characters (excluding suffix)
@@ -211,12 +210,12 @@ Rules:
 
 Commit message:`;
 
-      const result = await this.callOpenAI(prompt, 60);
-      
+      const result = await this.callOpenAI(prompt);
+
       // Clean up the result
       const cleanMessage = result.replace(/^["']|["']$/g, '').replace(/\.$/, '').trim();
       const fullMessage = `${cleanMessage}${suffix}`;
-      
+
       if (cleanMessage.length > 0 && cleanMessage.length <= 50) {
         logger.info(`Generated commit message via OpenAI: ${fullMessage}`);
         return fullMessage;

@@ -38,13 +38,13 @@ class Settings {
 
   populateForm(settings) {
     // GitHub settings
-    document.getElementById('github-token').value = settings.githubToken || '';
+    this.setSecureField('github-token', settings.githubToken);
     document.getElementById('github-username').value = settings.githubUsername || '';
     
     // Coding tools
     document.getElementById('default-coding-tool').value = settings.defaultCodingTool || 'amp';
-    document.getElementById('amp-api-key').value = settings.ampApiKey || '';
-    document.getElementById('openai-api-key').value = settings.openaiApiKey || '';
+    this.setSecureField('amp-api-key', settings.ampApiKey);
+    this.setSecureField('openai-api-key', settings.openaiApiKey);
     
     // Task configuration
     document.getElementById('branch-prefix').value = settings.branchPrefix || 'intern/';
@@ -101,6 +101,28 @@ class Settings {
     setTimeout(() => {
       successEl.classList.add('hidden');
     }, 3000);
+  }
+
+  setSecureField(fieldId, value) {
+    const field = document.getElementById(fieldId);
+    const label = field.parentElement.querySelector('label');
+    
+    if (value === '***CONFIGURED***') {
+      // Show that field is configured
+      field.value = '';
+      field.placeholder = '••••••••••••••••';
+      if (!label.textContent.includes('✓')) {
+        label.innerHTML = label.innerHTML + ' <span class="text-green-600">✓ Configured</span>';
+      }
+    } else {
+      // Field is empty
+      field.value = '';
+      field.placeholder = 'Enter value...';
+      const configuredSpan = label.querySelector('.text-green-600');
+      if (configuredSpan) {
+        configuredSpan.remove();
+      }
+    }
   }
 
   showError(message) {
