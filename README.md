@@ -1,3 +1,5 @@
+hello world
+
 # Intern
 
 Automated coding tool that wraps CLI coding assistants (OpenAI Codex, Claude Code, Amp Code) to automate the entire development workflow from task assignment to PR merge.
