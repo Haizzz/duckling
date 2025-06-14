@@ -33,7 +33,7 @@ export class CodingManager {
     
     try {
       // Get API key from settings
-      const apiKeySetting = this.db.getSetting('amp_api_key');
+      const apiKeySetting = this.db.getSetting('ampApiKey');
       if (!apiKeySetting) {
         throw new Error('Amp API key not configured');
       }
@@ -70,7 +70,7 @@ export class CodingManager {
     
     try {
       // Get API key from settings
-      const apiKeySetting = this.db.getSetting('openai_api_key');
+      const apiKeySetting = this.db.getSetting('openaiApiKey');
       if (!apiKeySetting) {
         throw new Error('OpenAI API key not configured');
       }

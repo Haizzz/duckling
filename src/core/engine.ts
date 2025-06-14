@@ -369,7 +369,7 @@ export class CoreEngine extends EventEmitter {
       }
 
       // Schedule next poll
-      const pollInterval = parseInt(this.db.getSetting('poll_interval_seconds')?.value || '30') * 1000;
+      const pollInterval = parseInt(this.db.getSetting('pollInterval')?.value || '30') * 1000;
       this.jobQueue.enqueue('poll-pr-comments', { taskId, prNumber }, { delay: pollInterval });
 
     } catch (error: any) {

@@ -105,7 +105,7 @@ class Dashboard {
     this.isLoading = true;
 
     const loadingEl = document.getElementById('loading-tasks');
-    if (this.loadedTasks.length === 0) {
+    if (this.loadedTasks.length === 0 && loadingEl) {
       loadingEl.classList.remove('hidden');
     }
 
@@ -131,7 +131,9 @@ class Dashboard {
       this.showError('Failed to load tasks');
     } finally {
       this.isLoading = false;
-      loadingEl.classList.add('hidden');
+      if (loadingEl) {
+        loadingEl.classList.add('hidden');
+      }
     }
   }
 
@@ -157,7 +159,9 @@ class Dashboard {
     const tasksHTML = this.loadedTasks.map(task => this.renderTaskCard(task)).join('');
     container.innerHTML = `<div class="space-y-4">${tasksHTML}</div>`;
 
-    loadingEl.classList.add('hidden');
+    if (loadingEl) {
+      loadingEl.classList.add('hidden');
+    }
   }
 
   renderTaskCard(task) {
