@@ -120,8 +120,6 @@ export class DatabaseManager {
       { key: 'maxRetries', value: DEFAULT_SETTINGS.maxRetries.toString(), category: 'general' },
       { key: 'baseBranch', value: DEFAULT_SETTINGS.baseBranch, category: 'general' },
       { key: 'pollInterval', value: DEFAULT_SETTINGS.pollInterval.toString(), category: 'general' },
-      { key: 'taskCheckInterval', value: DEFAULT_SETTINGS.taskCheckInterval.toString(), category: 'general' },
-      { key: 'reviewCheckInterval', value: DEFAULT_SETTINGS.reviewCheckInterval.toString(), category: 'general' },
       { key: 'onboarding_completed', value: 'false', category: 'general' },
     ];
 
@@ -226,7 +224,7 @@ export class DatabaseManager {
 
   getTaskLogs(
     taskId: number,
-    filters: { level?: string; limit?: number; offset?: number } = {}
+    filters: { level?: string; limit?: number; offset?: number; after?: number } = {}
   ): TaskLog[] {
     let query = 'SELECT * FROM task_logs WHERE task_id = ?';
     const params: any[] = [taskId];
@@ -234,6 +232,11 @@ export class DatabaseManager {
     if (filters.level && filters.level !== 'all') {
       query += ' AND level = ?';
       params.push(filters.level);
+    }
+
+    if (filters.after) {
+      query += ' AND id > ?';
+      params.push(filters.after);
     }
 
     query += ' ORDER BY timestamp ASC';

@@ -5,7 +5,9 @@ class TaskDetail {
     this.logRefreshInterval = null;
     this.currentTask = null;
     this.taskUpdateHandler = null;
-    
+    this.lastLogId = 0; // Track last loaded log ID for incremental loading
+    this.logs = []; // Cache logs to avoid full re-render
+
     if (this.taskId) {
       this.loadTaskDetail();
       this.startLogRefresh();
@@ -34,7 +36,7 @@ class TaskDetail {
       if (response.ok && result.success) {
         this.currentTask = result.data;
         this.renderTaskDetail(result.data);
-        
+
         // Stop log refresh if task is completed
         if (['completed', 'cancelled', 'failed'].includes(result.data.status)) {
           this.stopLogRefresh();
@@ -50,13 +52,13 @@ class TaskDetail {
 
   renderTaskDetail(task) {
     const container = document.getElementById('task-detail-container');
-    
+
     const createdDate = new Date(task.created_at).toLocaleString();
     const updatedDate = new Date(task.updated_at).toLocaleString();
-    
+
     const statusBadge = this.getStatusBadge(task.status);
     const stageBadge = this.getStageBadge(task.current_stage);
-    
+
     const summary = task.summary || task.description.substring(0, 80) + (task.description.length > 80 ? '...' : '');
     const canCancel = task.status !== 'completed' && task.status !== 'cancelled' && task.status !== 'failed';
 
@@ -68,7 +70,6 @@ class TaskDetail {
             <h1 class="text-2xl font-bold text-gray-900 mb-2">${this.escapeHtml(summary)}</h1>
             <div class="flex items-center space-x-4">
               ${statusBadge}
-              ${stageBadge || ''}
             </div>
           </div>
           ${canCancel ? `
@@ -160,29 +161,48 @@ class TaskDetail {
     this.loadTaskLogs();
   }
 
-  async loadTaskLogs() {
+  async loadTaskLogs(incremental = false) {
     try {
-      const response = await fetch(`/api/tasks/${this.taskId}/logs`);
+      // For incremental loading, only fetch logs after the last loaded ID
+      const url = incremental && this.lastLogId > 0
+        ? `/api/tasks/${this.taskId}/logs?after=${this.lastLogId}`
+        : `/api/tasks/${this.taskId}/logs`;
+
+      const response = await fetch(url);
       const result = await response.json();
 
       if (response.ok && result.success) {
-        this.renderLogs(result.data);
+        if (incremental && this.lastLogId > 0) {
+          // Append new logs to existing ones
+          this.appendLogs(result.data);
+        } else {
+          // Full refresh - cache all logs
+          this.logs = result.data;
+          this.renderLogs(this.logs);
+        }
+
+        // Update last log ID
+        if (result.data.length > 0) {
+          this.lastLogId = Math.max(...result.data.map(log => log.id));
+        }
       } else {
         throw new Error(result.error || 'Failed to load logs');
       }
     } catch (error) {
       console.error('Error loading logs:', error);
-      document.getElementById('task-logs').innerHTML = `
-        <div class="text-center py-4">
-          <p class="text-red-400 text-sm">Failed to load logs</p>
-        </div>
-      `;
+      if (!incremental) {
+        document.getElementById('task-logs').innerHTML = `
+          <div class="text-center py-4">
+            <p class="text-red-400 text-sm">Failed to load logs</p>
+          </div>
+        `;
+      }
     }
   }
 
   renderLogs(logs) {
     const container = document.getElementById('task-logs');
-    
+
     if (logs.length === 0) {
       container.innerHTML = `
         <div class="text-center py-4">
@@ -201,18 +221,43 @@ class TaskDetail {
     `).join('');
 
     container.innerHTML = logsHTML;
-    
-    // Auto-scroll to bottom with smooth behavior
-    setTimeout(() => {
-      container.scrollTop = container.scrollHeight;
-    }, 100);
+    this.scrollToBottom(container);
+  }
+
+  appendLogs(newLogs) {
+    if (newLogs.length === 0) return;
+
+    const container = document.getElementById('task-logs');
+    this.logs = [...this.logs, ...newLogs];
+
+    // Only append new logs instead of re-rendering everything
+    const newLogsHTML = newLogs.map(log => `
+      <div class="flex items-start space-x-2 mb-2 text-sm font-mono">
+        <span class="text-gray-400">${new Date(log.timestamp).toLocaleTimeString()}</span>
+        <span class="text-${this.getLogColor(log.level)}-400 font-medium">[${log.level.toUpperCase()}]</span>
+        <span class="text-gray-300 flex-1">${this.escapeHtml(log.message)}</span>
+      </div>
+    `).join('');
+
+    container.insertAdjacentHTML('beforeend', newLogsHTML);
+    this.scrollToBottom(container);
+  }
+
+  scrollToBottom(container) {
+    // Auto-scroll to bottom with smooth behavior, but only if user is near bottom
+    const isNearBottom = container.scrollTop >= container.scrollHeight - container.clientHeight - 100;
+    if (isNearBottom) {
+      setTimeout(() => {
+        container.scrollTop = container.scrollHeight;
+      }, 10);
+    }
   }
 
   startLogRefresh() {
-    // Refresh logs every 3 seconds for active tasks
+    // Refresh logs every 2 seconds for active tasks using incremental loading
     this.logRefreshInterval = setInterval(() => {
-      this.loadTaskLogs();
-    }, 3000);
+      this.loadTaskLogs(true); // Use incremental loading
+    }, 2000);
   }
 
   stopLogRefresh() {
@@ -229,14 +274,14 @@ class TaskDetail {
       if (taskUpdate.taskId == this.taskId) { // Note: == for type coercion
         this.currentTask = taskUpdate;
         this.renderTaskDetail(taskUpdate);
-        
+
         // Stop log refresh if task is completed
         if (['completed', 'cancelled', 'failed'].includes(taskUpdate.status)) {
           this.stopLogRefresh();
         }
       }
     };
-    
+
     window.addEventListener('intern-task-update', this.taskUpdateHandler);
     console.log('Listening for task updates via global EventSource');
   }
@@ -250,12 +295,7 @@ class TaskDetail {
   }
 
   getBranchLink(branchName) {
-    // Use current window location to infer repo info, or fallback to a generic link
-    const repoUrl = window.location.hostname === 'localhost' 
-      ? `https://github.com/owner/repo/tree/${encodeURIComponent(branchName)}`
-      : `https://github.com/owner/repo/tree/${encodeURIComponent(branchName)}`;
-    
-    return `<a href="#" onclick="TaskDetailInstance.openBranchUrl('${this.escapeHtml(branchName)}')" class="font-mono text-sm text-blue-600 hover:text-blue-800 underline">${this.escapeHtml(branchName)}</a>`;
+    return `<a href="javascript:void(0)" onclick="TaskDetailInstance.openBranchUrl('${this.escapeHtml(branchName)}')" class="font-mono text-sm text-blue-600 hover:text-blue-800 underline">${this.escapeHtml(branchName)}</a>`;
   }
 
   async openBranchUrl(branchName) {
@@ -319,19 +359,19 @@ class TaskDetail {
       'failed': 'bg-red-100 text-red-800',
       'cancelled': 'bg-red-100 text-red-800'
     };
-    
+
     const badgeClass = badges[status] || 'bg-gray-100 text-gray-800';
     const displayStatus = status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase());
-    
+
     return `<span class="px-2 py-1 text-xs font-medium rounded-full ${badgeClass}">${displayStatus}</span>`;
   }
 
   getStageBadge(stage) {
     if (!stage) return '';
-    
+
     const stageClass = 'bg-gray-50 text-gray-700 border border-gray-200';
     const displayStage = stage.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
-    
+
     return `<span class="px-2 py-1 text-xs font-medium rounded ${stageClass}">${displayStage}</span>`;
   }
 
@@ -352,6 +392,7 @@ class TaskDetail {
   }
 
   escapeHtml(text) {
+    if (!text) return '';
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;

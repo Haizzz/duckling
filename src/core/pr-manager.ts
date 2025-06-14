@@ -3,6 +3,7 @@ import { withRetry } from '../utils/retry';
 import { DatabaseManager } from './database';
 import { OpenAIManager } from './openai-manager';
 import { validateAndGetRepoInfo } from '../utils/git-utils';
+import { logger } from '../utils/logger';
 
 export class PRManager {
   private octokit: Octokit;
@@ -142,6 +143,7 @@ export class PRManager {
       // Filter comments from the target user and newer than last commit timestamp
       const newComments = reviewComments.filter(comment => {
         const isFromTargetUser = comment.user.login === targetUsername;
+        logger.info(`comment time ${new Date(comment.created_at)}, commit time ${lastCommitTimestamp ? new Date(lastCommitTimestamp) : 'null'}`);
         const isNewer = !lastCommitTimestamp || new Date(comment.created_at) > new Date(lastCommitTimestamp);
         return isFromTargetUser && isNewer;
       });
@@ -163,7 +165,9 @@ export class PRManager {
         pull_number: prNumber
       };
 
+      logger.info(`Getting PR review comments for PR #${prNumber}, ${JSON.stringify(params)}`);
       const response = await this.octokit.rest.pulls.listReviewComments(params);
+      logger.info(`Got PR review comments for PR #${prNumber}, ${JSON.stringify(response.data)}`);
       return response.data;
     }, 'Get PR review comments', 2);
   }

@@ -187,7 +187,7 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
 
   router.get('/tasks/:id/logs', async (req: Request, res: Response) => {
     try {
-      const { level, page = '1', limit = '100' } = req.query;
+      const { level, page = '1', limit = '100', after } = req.query;
       const pageNum = parseInt(page as string);
       const limitNum = parseInt(limit as string);
       const offset = (pageNum - 1) * limitNum;
@@ -195,7 +195,8 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
       const logs = db.getTaskLogs(parseInt(req.params.id), {
         level: level as string,
         limit: limitNum,
-        offset
+        offset: after ? undefined : offset, // Don't use offset when using after
+        after: after ? parseInt(after as string) : undefined
       });
 
       const response: ApiResponse = {

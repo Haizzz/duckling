@@ -27,8 +27,6 @@ export class CoreEngine extends EventEmitter {
     this.gitManager = new GitManager(db, repoPath, this.openaiManager);
     this.codingManager = new CodingManager(db);
     this.precommitManager = new PrecommitManager(db);
-
-
   }
 
   private getPRManager(): PRManager {
@@ -142,14 +140,19 @@ export class CoreEngine extends EventEmitter {
   }
 
   private startTaskProcessing(): void {
-    // Process tasks every 10 seconds based on their state
+    // Get polling interval from settings (default 10 seconds)
+    const pollIntervalSetting = this.db.getSetting('pollInterval');
+    const pollIntervalMs = (pollIntervalSetting ? parseInt(pollIntervalSetting.value) : 10) * 1000;
+    
+    logger.info(`Starting task processing with ${pollIntervalMs / 1000}s interval`);
+    
     this.processingInterval = setInterval(async () => {
       try {
         await this.processTasksByState();
       } catch (error) {
         logger.error(`Error in task processing: ${error}`);
       }
-    }, 10000);
+    }, pollIntervalMs);
   }
 
   private async processTasksByState(): Promise<void> {
@@ -369,18 +372,18 @@ export class CoreEngine extends EventEmitter {
       const prManager = this.getPRManager();
       const pr = await prManager.createPRFromTask(branchName, task.description, taskId);
 
-    this.db.updateTask(taskId, {
-      status: 'awaiting-review',
-      current_stage: 'awaiting_review',
-      pr_number: pr.number,
-      pr_url: pr.url
-    });
+      this.db.updateTask(taskId, {
+        status: 'awaiting-review',
+        current_stage: 'awaiting_review',
+        pr_number: pr.number,
+        pr_url: pr.url
+      });
 
-    this.db.addTaskLog({
-      task_id: taskId,
-      level: 'info',
-      message: `PR created: ${pr.url}`
-    });
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'info',
+        message: `PR created: ${pr.url}`
+      });
 
       this.emitTaskUpdate(taskId, 'awaiting-review');
 
@@ -398,6 +401,7 @@ export class CoreEngine extends EventEmitter {
   }
 
   private async pollPRComments(taskId: number, prNumber: number): Promise<void> {
+    logger.info(`Polling PR comments for task: ${taskId} ${prNumber}`);
     const task = this.db.getTask(taskId);
     if (!task || task.status !== 'awaiting-review') {
       return; // Task completed or cancelled
@@ -413,6 +417,7 @@ export class CoreEngine extends EventEmitter {
       if (task.branch_name) {
         try {
           lastCommitTimestamp = await this.gitManager.getLastCommitTimestamp(task.branch_name);
+          logger.info(`last commit timestamp for branch ${task.branch_name}: ${lastCommitTimestamp}`);
         } catch (error) {
           // If we can't get commit timestamp, continue with null (will get all comments)
           console.warn(`Could not get last commit timestamp for branch ${task.branch_name}:`, error);
@@ -458,6 +463,7 @@ export class CoreEngine extends EventEmitter {
   }
 
   private async handlePRComment(taskId: number, comment: string): Promise<void> {
+    logger.info(`Handling PR comment for task: ${taskId} ${comment}`);
     const task = this.db.getTask(taskId);
     if (!task) return;
 

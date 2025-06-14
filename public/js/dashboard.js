@@ -7,6 +7,7 @@ class Dashboard {
     this.isLoading = false;
     this.hasMore = true;
     this.hasRecentSSEUpdate = false;
+    this.isUpdating = false; // Prevent race conditions in updates
     this.init();
   }
 
@@ -178,10 +179,9 @@ class Dashboard {
     const updatedDate = new Date(task.updated_at).toLocaleString();
 
     const statusBadge = this.getStatusBadge(task.status);
-    const stageBadge = this.getStageBadge(task.current_stage);
 
-    const prLink = task.pr_url ?
-      `<a href="${task.pr_url}" target="_blank" class="text-gray-600 hover:text-gray-800 text-sm underline">View PR →</a>` :
+    const prLink = task.pr_url && task.pr_number ?
+      `<span class="text-blue-600 text-sm cursor-pointer underline break-words" onclick="window.open('${task.pr_url}', '_blank')">#${task.pr_number}</span>` :
       '<span class="text-gray-400 text-sm">No PR yet</span>';
 
     const branchName = task.branch_name ?
@@ -194,10 +194,10 @@ class Dashboard {
     const canCancel = task.status !== 'completed' && task.status !== 'cancelled' && task.status !== 'failed';
 
     return `
-      <a href="/task-detail.html?id=${task.id}" class="task-card bg-white border border-gray-200 rounded-lg p-6 hover:shadow-sm transition-shadow block" data-task-id="${task.id}">
+      <div class="task-card bg-white border border-gray-200 rounded-lg p-6 hover:shadow-sm transition-shadow" data-task-id="${task.id}">
         <!-- Summary | Status -->
         <div class="flex justify-between items-start mb-4">
-          <h3 class="text-lg font-medium text-gray-900 flex-1 mr-4">${this.escapeHtml(summary)}</h3>
+          <a href="task-detail.html?id=${task.id}" class="text-lg font-medium text-gray-900 flex-1 mr-4 hover:text-blue-600 hover:underline">${this.escapeHtml(summary)}</a>
           ${statusBadge}
         </div>
         
@@ -206,13 +206,6 @@ class Dashboard {
           <p class="text-sm text-gray-700">${this.escapeHtml(task.description)}</p>
         </div>
         
-        <!-- Stage -->
-        <div class="mb-3">
-          <div class="flex items-center space-x-2">
-            <span class="text-sm font-medium text-gray-600">Stage:</span>
-            ${stageBadge || '<span class="text-gray-400 text-sm">Not started</span>'}
-          </div>
-        </div>
         
         <!-- Branch Name -->
         <div class="mb-3">
@@ -238,14 +231,14 @@ class Dashboard {
           </div>
           ${canCancel ? `
             <button 
-              onclick="event.preventDefault(); event.stopPropagation(); window.Dashboard.cancelTask('${task.id}')"
+              onclick="window.Dashboard.cancelTask('${task.id}')"
               class="text-sm text-red-600 hover:text-red-800 hover:underline focus:outline-none"
             >
               Cancel Task
             </button>
           ` : ''}
         </div>
-      </a>
+      </div>
     `;
   }
 
@@ -287,56 +280,110 @@ class Dashboard {
     }
   }
 
-  startPolling() {
-    // Backup polling every 60 seconds in case SSE fails
-    setInterval(() => {
-      if (!this.isLoading && !this.hasRecentSSEUpdate) {
-        // Refresh current tasks without changing page  
-        const currentLength = this.loadedTasks.length;
-        this.currentPage = Math.ceil(currentLength / this.tasksPerPage) || 1;
-        this.loadedTasks = [];
-        this.loadTasks();
+  async startPolling() {
+    // Get polling interval from server settings for backup polling
+    try {
+      const response = await fetch('/api/settings/general');
+      const result = await response.json();
+      let pollInterval = 10; // Default fallback
+      
+      if (response.ok && result.success) {
+        const pollSetting = result.data.find(s => s.key === 'pollInterval');
+        if (pollSetting) {
+          pollInterval = parseInt(pollSetting.value);
+        }
       }
-      // Reset SSE flag
-      this.hasRecentSSEUpdate = false;
-    }, 60000); // Less frequent backup polling
+      
+      // Use 6x the poll interval for backup polling (less frequent)
+      const backupPollMs = pollInterval * 6 * 1000;
+      console.log(`Starting backup polling with ${backupPollMs / 1000}s interval`);
+      
+      setInterval(() => {
+        if (!this.isLoading && !this.hasRecentSSEUpdate) {
+          // Refresh current tasks without changing page  
+          const currentLength = this.loadedTasks.length;
+          this.currentPage = Math.ceil(currentLength / this.tasksPerPage) || 1;
+          this.loadedTasks = [];
+          this.loadTasks();
+        }
+        // Reset SSE flag
+        this.hasRecentSSEUpdate = false;
+      }, backupPollMs);
+    } catch (error) {
+      console.warn('Failed to get poll interval, using default 60s backup polling:', error);
+      setInterval(() => {
+        if (!this.isLoading && !this.hasRecentSSEUpdate) {
+          const currentLength = this.loadedTasks.length;
+          this.currentPage = Math.ceil(currentLength / this.tasksPerPage) || 1;
+          this.loadedTasks = [];
+          this.loadTasks();
+        }
+        this.hasRecentSSEUpdate = false;
+      }, 60000);
+    }
   }
 
   // Handle real-time updates from SSE
   handleTaskUpdate(data) {
+    // Prevent race conditions
+    if (this.isUpdating) {
+      console.log('Update already in progress, skipping...');
+      return;
+    }
+    
+    this.isUpdating = true;
     this.hasRecentSSEUpdate = true; // Prevent polling redundancy
-    const { taskId, status, metadata } = data;
+    
+    try {
+      const { taskId, status, metadata } = data;
 
-    // Find and update the task in our loaded tasks
-    const taskIndex = this.loadedTasks.findIndex(task => task.id === taskId);
-    if (taskIndex >= 0) {
-      // Update the task data
-      this.loadedTasks[taskIndex] = { ...this.loadedTasks[taskIndex], ...metadata, status };
-      // Only update the specific task card instead of re-rendering everything
-      this.updateTaskCard(taskIndex);
-    } else {
-      // Task not in current view, might be new - add it to the beginning if on first page
-      if (this.currentPage === 1 && metadata) {
-        // Add new task to the beginning of the list
-        const newTask = { id: taskId, status, ...metadata };
-        this.loadedTasks.unshift(newTask);
-        // Re-render the entire task list to show the new task
-        this.renderTasks();
+      // Find and update the task in our loaded tasks
+      const taskIndex = this.loadedTasks.findIndex(task => task.id === taskId);
+      if (taskIndex >= 0) {
+        // Update the task data
+        this.loadedTasks[taskIndex] = { ...this.loadedTasks[taskIndex], ...metadata, status };
+        // Only update the specific task card instead of re-rendering everything
+        this.updateTaskCard(taskIndex);
+      } else {
+        // Task not in current view, might be new - add it to the beginning if on first page
+        if (this.currentPage === 1 && metadata) {
+          // Add new task to the beginning of the list
+          const newTask = { id: taskId, status, ...metadata };
+          this.loadedTasks.unshift(newTask);
+          // Re-render the entire task list to show the new task
+          this.renderTasks();
+        }
       }
+    } finally {
+      // Always reset the flag
+      setTimeout(() => {
+        this.isUpdating = false;
+      }, 100);
     }
   }
 
   // Update a specific task card without full re-render
   updateTaskCard(taskIndex) {
     const task = this.loadedTasks[taskIndex];
-    const taskCards = document.querySelectorAll('.task-card');
-    if (taskCards[taskIndex]) {
+    // Find the specific task card by data-task-id attribute for better targeting
+    const taskCard = document.querySelector(`[data-task-id="${task.id}"]`);
+    
+    if (taskCard) {
       // Create new card HTML
       const newCardHTML = this.renderTaskCard(task);
-      // Replace just this card
+      // Create temporary container to parse the HTML
       const tempDiv = document.createElement('div');
       tempDiv.innerHTML = newCardHTML;
-      taskCards[taskIndex].replaceWith(tempDiv.firstElementChild);
+      const newCard = tempDiv.firstElementChild;
+      
+      if (newCard) {
+        // Replace the existing card with the new one
+        taskCard.replaceWith(newCard);
+      }
+    } else {
+      // If we can't find the specific card, fall back to full re-render
+      console.warn(`Task card not found for task ${task.id}, doing full re-render`);
+      this.renderTasks();
     }
   }
 
@@ -373,6 +420,7 @@ class Dashboard {
 
 
   escapeHtml(text) {
+    if (!text) return '';
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
