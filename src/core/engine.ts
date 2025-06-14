@@ -143,7 +143,7 @@ export class CoreEngine extends EventEmitter {
   private startTaskProcessing(): void {
     // Start task processing cycle
     this.scheduleTaskProcessing();
-    
+
     // Start review processing cycle
     this.scheduleReviewProcessing();
   }
@@ -155,7 +155,7 @@ export class CoreEngine extends EventEmitter {
       } catch (error) {
         logger.error(`Error in task processing: ${error}`);
       }
-      
+
       // Schedule next processing cycle
       this.scheduleTaskProcessing();
     }, 60000); // 1 minute
@@ -168,7 +168,7 @@ export class CoreEngine extends EventEmitter {
       } catch (error) {
         logger.error(`Error in review processing: ${error}`);
       }
-      
+
       // Schedule next processing cycle
       this.scheduleReviewProcessing();
     }, 300000); // 5 minutes
@@ -339,7 +339,7 @@ export class CoreEngine extends EventEmitter {
           this.db.updateTask(taskId, { current_stage: 'committing_changes' });
 
           try {
-            await this.gitManager.commitChangesWithTask(task.description, taskId);
+            await this.gitManager.commitChanges(task.description, taskId);
             await this.gitManager.pushBranch(branchName, taskId);
 
             this.db.addTaskLog({
@@ -502,7 +502,7 @@ export class CoreEngine extends EventEmitter {
     // Check PR status
     const prStatus = await prManager.getPRStatus(prNumber);
     let statusUpdate: 'completed' | 'cancelled' | undefined;
-    
+
     if (prStatus.merged) {
       statusUpdate = 'completed';
     } else if (prStatus.state === 'closed') {
@@ -545,7 +545,7 @@ export class CoreEngine extends EventEmitter {
           await this.runPrecommitChecks(taskId);
 
           // Commit and push changes
-          await this.gitManager.commitChanges(`Address PR feedback: ${comment.substring(0, 50)}...`, taskId);
+          await this.gitManager.commitChanges(`Address PR feedback: ${comment}`, taskId);
           if (task.branch_name) {
             await this.gitManager.pushBranch(task.branch_name, taskId);
           }
@@ -573,7 +573,7 @@ export class CoreEngine extends EventEmitter {
   private emitTaskUpdate(taskId: number, status: TaskStatus, metadata?: any): void {
     // Get the full task data to include in the update
     const task = this.db.getTask(taskId);
-    
+
     const event: TaskUpdateEvent = {
       taskId,
       status,

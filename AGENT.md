@@ -40,19 +40,23 @@ intern task cancel <taskId>
 ## Architecture
 
 ### Core Components
-- **Core Engine**: Main orchestration logic with retry mechanisms
+- **Core Engine**: Main orchestration logic with timeout-based processing and retry mechanisms
 - **Express API**: RESTful API with real-time updates via Server-Sent Events
-- **Frontend**: Plain HTML/CSS/JS single-page application
+- **Frontend**: Plain HTML/CSS/JS single-page application with real-time updates
 - **CLI**: Command-line interface for basic operations
-- **SQLite Database**: Local storage for tasks, logs, settings, and job queue
+- **SQLite Database**: Local storage for tasks, logs, and settings
 
 ### Key Files
-- `src/core/engine.ts` - Main business logic
+- `src/core/engine.ts` - Main business logic with separate task and review processing
 - `src/core/database.ts` - SQLite database manager
-- `src/core/job-queue.ts` - Custom SQLite-based job queue
+- `src/core/git-manager.ts` - Git operations with intelligent commit message generation and automatic suffix handling
+- `src/core/openai-manager.ts` - OpenAI integration for commit messages and task summaries
+- `src/core/task-executor.ts` - Task execution queue to prevent overlapping operations
 - `src/api/server.ts` - Express.js server
 - `src/api/routes.ts` - API route handlers
-- `public/js/app.js` - Frontend application controller
+- `public/js/app.js` - Frontend application controller with EventSource
+- `public/js/dashboard.js` - Main dashboard with real-time task updates
+- `public/js/task-detail.js` - Task detail page with live log streaming
 - `src/cli/index.ts` - CLI interface
 
 ## Configuration
@@ -66,9 +70,25 @@ intern task cancel <taskId>
 ### Optional Settings
 - Branch prefix (default: `intern/`)
 - PR title prefix (default: `[INTERN]`)
+- Commit suffix (default: ` [i]`)
+- Base branch (default: `main`)
 - Maximum retries (default: 3)
 - Auto-merge (default: false)
 - Poll interval for PR comments (default: 30 seconds)
+
+## Processing Architecture
+
+### Task Processing Intervals
+- **Pending Tasks**: Processed every 1 minute using setTimeout
+- **Review Processing**: PR comments checked every 5 minutes using setTimeout
+- **No Overlaps**: Uses flags to prevent concurrent processing of same type
+- **Self-Rescheduling**: Each timeout reschedules itself after completion
+
+### Real-time Updates
+- **Server-Sent Events**: Real-time task updates via EventSource
+- **Full Task Data**: Task updates include complete task object in metadata
+- **Live UI Updates**: Dashboard and task detail pages update without refresh
+- **Log Streaming**: Task logs update every 10 seconds for active tasks
 
 ## Testing
 

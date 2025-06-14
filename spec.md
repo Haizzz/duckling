@@ -1,7 +1,7 @@
 # Intern - Automated Coding Tool
 
 ## Overview
-Intern is a tool that wraps CLI coding assistants (OpenAI Codex, Claude Code, Amp Code) to automate the entire development workflow from task assignment to PR merge with robust error handling and retry mechanisms.
+Intern is a tool that wraps CLI coding assistants (OpenAI Codex, Claude Code, Amp Code) to automate the entire development workflow from task assignment to PR merge with robust error handling and retry mechanisms. The system uses timeout-based processing with separate intervals for task execution and review handling.
 
 ## Architecture
 
@@ -13,21 +13,26 @@ graph TB
     Web[Static HTML/CSS/JS] --> API[Express API]
     API --> Core
     
-    Core --> TM[Task Manager + SQLite Queue]
+    Core --> TE[Task Executor]
     Core --> GM[Git Manager] 
     Core --> CM[Coding Manager]
     Core --> PRM[PR Manager]
+    Core --> PM[Precommit Manager]
+    Core --> OAI[OpenAI Manager]
     
-    TM --> DB[(SQLite DB)]
+    TE --> DB[(SQLite DB)]
     Core --> DB
     
-    CM --> OAI[OpenAI CLI]
-    CM --> Claude[Claude CLI] 
-    CM --> Amp[Amp CLI]
+    CM --> AmpCLI[Amp CLI]
+    CM --> OpenAICLI[OpenAI CLI]
     
     GM --> Git[Git Commands]
+    GM --> OAI[OpenAI Manager]
     PRM --> GitHub[GitHub API]
-    Core --> PrecommitHooks[Precommit Hooks]
+    PM --> PrecommitHooks[Precommit Hooks]
+    
+    API --> SSE[Server-Sent Events]
+    SSE --> Web
 ```
 
 ### Workflow Architecture with Resilience
@@ -116,106 +121,90 @@ sequenceDiagram
 
 ## Task Management System
 
-### Job Queue Architecture
-**Custom SQLite-based job queue** for local persistence and zero external dependencies:
+### Processing Architecture
+**Timeout-based processing with separate intervals** for different task types:
 
 ```typescript
-// Custom SQLite job queue implementation
-import Database from 'better-sqlite3';
+// Core Engine timeout-based processing
+class CoreEngine extends EventEmitter {
+  private taskProcessingTimeout?: NodeJS.Timeout;
+  private reviewProcessingTimeout?: NodeJS.Timeout;
 
-class SQLiteJobQueue {
-  private db: Database.Database;
-  
-  constructor(dbPath: string) {
-    this.db = new Database(dbPath);
-    this.initTables();
-  }
-  
-  private initTables() {
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS jobs (
-        id TEXT PRIMARY KEY,
-        type TEXT NOT NULL,
-        data TEXT NOT NULL,
-        status TEXT DEFAULT 'pending',
-        attempts INTEGER DEFAULT 0,
-        max_attempts INTEGER DEFAULT 3,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        scheduled_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        processed_at DATETIME,
-        failed_at DATETIME,
-        error TEXT
-      )
-    `);
-  }
-  
-  enqueue(type: string, data: any, options: { delay?: number, maxAttempts?: number } = {}) {
-    const job = {
-      id: generateId(),
-      type,
-      data: JSON.stringify(data),
-      max_attempts: options.maxAttempts || 3,
-      scheduled_at: options.delay ? 
-        new Date(Date.now() + options.delay).toISOString() : 
-        new Date().toISOString()
-    };
+  private startTaskProcessing(): void {
+    // Start task processing cycle
+    this.scheduleTaskProcessing();
     
-    this.db.prepare(`
-      INSERT INTO jobs (id, type, data, max_attempts, scheduled_at)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(job.id, job.type, job.data, job.max_attempts, job.scheduled_at);
-    
-    return job.id;
+    // Start review processing cycle
+    this.scheduleReviewProcessing();
   }
-  
-  // Worker polling mechanism
-  process(type: string, handler: (data: any) => Promise<void>) {
-    setInterval(async () => {
-      const job = this.db.prepare(`
-        SELECT * FROM jobs 
-        WHERE type = ? AND status = 'pending' 
-        AND scheduled_at <= datetime('now')
-        AND attempts < max_attempts
-        ORDER BY created_at ASC 
-        LIMIT 1
-      `).get(type);
-      
-      if (job) {
-        await this.executeJob(job, handler);
+
+  private scheduleTaskProcessing(): void {
+    this.taskProcessingTimeout = setTimeout(async () => {
+      try {
+        await this.processPendingTasks();
+      } catch (error) {
+        logger.error(`Error in task processing: ${error}`);
       }
-    }, 1000); // Poll every second
-  }
-  
-  private async executeJob(job: any, handler: (data: any) => Promise<void>) {
-    // Mark as processing
-    this.db.prepare(`UPDATE jobs SET status = 'processing' WHERE id = ?`).run(job.id);
-    
-    try {
-      await handler(JSON.parse(job.data));
-      // Mark as completed
-      this.db.prepare(`
-        UPDATE jobs SET status = 'completed', processed_at = datetime('now') 
-        WHERE id = ?
-      `).run(job.id);
-    } catch (error) {
-      // Handle failure with retry logic
-      const nextAttempt = job.attempts + 1;
-      const backoffDelay = Math.pow(2, nextAttempt) * 1000; // Exponential backoff
       
-      if (nextAttempt >= job.max_attempts) {
-        // Max attempts reached
-        this.db.prepare(`
-          UPDATE jobs SET status = 'failed', failed_at = datetime('now'), 
-          error = ?, attempts = ? WHERE id = ?
-        `).run(error.message, nextAttempt, job.id);
-      } else {
-        // Schedule retry
-        const retryAt = new Date(Date.now() + backoffDelay).toISOString();
-        this.db.prepare(`
-          UPDATE jobs SET status = 'pending', attempts = ?, 
-          scheduled_at = ?, error = ? WHERE id = ?
-        `).run(nextAttempt, retryAt, error.message, job.id);
+      // Schedule next processing cycle
+      this.scheduleTaskProcessing();
+    }, 60000); // 1 minute
+  }
+
+  private scheduleReviewProcessing(): void {
+    this.reviewProcessingTimeout = setTimeout(async () => {
+      try {
+        await this.processReviews();
+      } catch (error) {
+        logger.error(`Error in review processing: ${error}`);
       }
+      
+      // Schedule next processing cycle
+      this.scheduleReviewProcessing();
+    }, 300000); // 5 minutes
+  }
+
+  private async processPendingTasks(): Promise<void> {
+    const pendingTasks = this.db.getTasks({ status: 'pending' });
+    for (const task of pendingTasks) {
+      await this.processTask(task.id);
+    }
+  }
+
+  private async processReviews(): Promise<void> {
+    // Batch collection of all new comments and PR status updates
+    const awaitingReviewTasks = this.db.getTasks({ status: 'awaiting-review' });
+    const allNewComments: Array<{ taskId: number; comments: Array<{ id: string; body: string }> }> = [];
+    const taskStatusUpdates: Array<{ taskId: number; status: 'completed' | 'cancelled' }> = [];
+
+    // First pass: collect all new comments and check PR statuses
+    for (const task of awaitingReviewTasks) {
+      if (task.pr_number) {
+        try {
+          const result = await this.collectPRComments(task.id, task.pr_number);
+          if (result.comments.length > 0) {
+            allNewComments.push({ taskId: task.id, comments: result.comments });
+          }
+          if (result.statusUpdate) {
+            taskStatusUpdates.push({ taskId: task.id, status: result.statusUpdate });
+          }
+        } catch (error: any) {
+          this.db.addTaskLog({ task_id: task.id, level: 'error', message: `Error collecting PR comments: ${error.message}` });
+        }
+      }
+    }
+
+    // Second pass: handle all collected comments
+    for (const { taskId, comments } of allNewComments) {
+      for (const comment of comments) {
+        await this.handlePRComment(taskId, comment.body);
+      }
+    }
+
+    // Third pass: update task statuses
+    for (const { taskId, status } of taskStatusUpdates) {
+      this.db.updateTask(taskId, { status, completed_at: status === 'completed' ? new Date().toISOString() : undefined });
+      this.emitTaskUpdate(taskId, status);
     }
   }
 }
@@ -237,6 +226,56 @@ stateDiagram-v2
     Cancelled --> [*]
 ```
 
+## Git Manager
+
+### Core Functionality
+
+The Git Manager handles all Git operations with comprehensive error handling and retry mechanisms:
+
+#### Branch Management
+- **createAndCheckoutBranch()**: Creates unique feature branches with automatic conflict resolution
+- **branchExists()**: Checks for existing branch names to avoid conflicts  
+- **switchToBranch()**: Safely switches between branches with upstream sync
+- **getCurrentBranch()**: Gets current active branch name
+
+#### Commit Operations
+- **commitChanges()**: Intelligent commit with OpenAI-generated message and automatic suffix from settings
+- **getChangedFiles()**: Lists all modified, created, and deleted files
+- **getDiff()**: Generates diff output for code review
+
+#### Remote Operations
+- **pushBranch()**: Pushes local branch to remote with retry logic
+- **pullLatest()**: Pulls latest changes from specified branch
+- **fetchBranch()**: Fetches specific branch updates
+
+#### Settings Integration
+- **Base Branch**: Configurable base branch (default: 'main') for feature branch creation
+- **Branch Prefix**: Configurable prefix (default: 'intern/') for all created branches
+- **Commit Suffix**: Configurable suffix (default: ' [i]') appended to all commit messages
+
+#### Intelligent Commit Messages
+The Git Manager integrates with OpenAI Manager to generate meaningful commit messages:
+- Maximum 50 characters (excluding suffix)
+- Imperative mood (e.g., "Fix", "Add", "Update")  
+- Context-aware based on changed files
+- Fallback to task description if OpenAI unavailable
+- Suffix automatically applied by `commitChanges()` method from settings
+- No duplicate suffixes - checks if message already ends with configured suffix
+
+```typescript
+// Example usage
+const gitManager = new GitManager(db, repoPath, openaiManager);
+
+// Create feature branch
+const branchName = await gitManager.createAndCheckoutBranch('user-auth', taskId);
+
+// Intelligent commit with OpenAI-generated message and automatic suffix
+await gitManager.commitChanges('Implement user authentication system', taskId);
+
+// Push to remote
+await gitManager.pushBranch(branchName, taskId);
+```
+
 ## Data Storage
 
 ### SQLite Schema
@@ -244,11 +283,13 @@ stateDiagram-v2
 ```sql
 -- Tasks table
 CREATE TABLE tasks (
-  id TEXT PRIMARY KEY,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
   title TEXT NOT NULL,
   description TEXT NOT NULL,
-  status TEXT NOT NULL, -- pending, in_progress, awaiting_review, completed, failed, cancelled
-  coding_tool TEXT NOT NULL, -- openai, claude, amp
+  summary TEXT, -- AI-generated summary
+  status TEXT NOT NULL, -- pending, in-progress, awaiting-review, completed, failed, cancelled
+  coding_tool TEXT NOT NULL, -- openai, amp
+  current_stage TEXT, -- current processing stage
   branch_name TEXT,
   pr_number INTEGER,
   pr_url TEXT,
@@ -299,7 +340,7 @@ CREATE TABLE system_config (
 **Location**: `~/.intern/`
 ```
 ~/.intern/
-├── intern.db            # SQLite database (tasks + jobs + settings)
+├── intern.db            # SQLite database (tasks + settings + logs)
 └── logs/                # Application logs
 ```
 
@@ -307,22 +348,23 @@ CREATE TABLE system_config (
 ```typescript
 interface InternSettings {
   // API Keys (category: 'api_keys')
-  github_token: string;
-  openai_api_key?: string;
-  claude_api_key?: string;
-  amp_api_key?: string;
+  githubToken: string;
+  openaiApiKey?: string;
+  ampApiKey?: string;
   
   // General settings (category: 'general')
-  default_coding_tool: 'openai' | 'claude' | 'amp';
-  branch_prefix: string; // e.g., 'intern/'
-  pr_prefix: string;     // e.g., '[INTERN]'
-  auto_merge: boolean;
-  max_retries: number;
+  defaultCodingTool: 'openai' | 'amp';
+  branchPrefix: string; // e.g., 'intern/'
+  prPrefix: string;     // e.g., '[INTERN]'
+  commitSuffix: string; // e.g., ' [i]' - appended to commit messages
+  baseBranch: string;   // e.g., 'main' - base branch for creating feature branches
+  autoMerge: boolean;
+  maxRetries: number;
+  pollInterval: number; // Seconds between PR comment checks
   
   // GitHub settings (category: 'github')
-  github_repo_url: string;
-  github_username: string; // Only respond to PR comments from this user
-  poll_interval_seconds: number; // How often to poll for PR comments
+  githubRepoUrl: string;
+  githubUsername: string; // Only respond to PR comments from this user
 }
 
 interface PrecommitCheck {
@@ -401,18 +443,34 @@ function sleep(ms: number): Promise<void> {
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
-| `/api/tasks` | GET | List all tasks |
+| `/api/tasks` | GET | List all tasks with pagination |
 | `/api/tasks` | POST | Create new task |
 | `/api/tasks/:id` | GET | Get task details |
-| `/api/tasks/:id` | PUT | Update task |
-| `/api/tasks/:id` | DELETE | Cancel/delete task |
-| `/api/tasks/:id/logs` | GET | Get task logs |
+| `/api/tasks/:id/cancel` | POST | Cancel task |
 | `/api/tasks/:id/retry` | POST | Retry failed task |
+| `/api/tasks/:id/logs` | GET | Get task logs |
 | `/api/settings` | GET/PUT | Settings management |
+| `/api/settings/:category` | GET | Get settings by category |
 | `/api/settings/onboarding` | GET | Check onboarding status |
 | `/api/settings/onboarding` | POST | Complete onboarding setup |
 | `/api/health` | GET | System health check |
 | `/api/events` | GET | Server-Sent Events stream |
+
+### Real-time Updates
+
+**Server-Sent Events Structure**:
+```typescript
+interface TaskUpdateEvent {
+  taskId: number;
+  status: TaskStatus;
+  metadata?: {
+    task: Task; // Full task object for complete UI updates
+    [key: string]: any;
+  };
+}
+```
+
+The system sends real-time updates via SSE including the complete task object in metadata, allowing the frontend to update all fields without additional API calls.
 
 ### CLI Commands
 
@@ -446,15 +504,18 @@ intern config             # Configure settings
 - [ ] Comment parsing and feedback loop
 
 ### Phase 4: Web Interface (Plain HTML/CSS/JS)
-- [ ] Static HTML task dashboard (OpenAI Codex style)
-- [ ] Real-time status updates via Server-Sent Events
-- [ ] Configuration management UI
-- [ ] Logs viewer with filtering
+- [x] Static HTML task dashboard with real-time updates
+- [x] Real-time status updates via Server-Sent Events
+- [x] Configuration management UI with onboarding flow
+- [x] Task detail pages with live log streaming
+- [x] Settings management interface
 
 ### Phase 5: Polish & Reliability
-- [ ] Comprehensive retry mechanisms
-- [ ] Error recovery and graceful degradation
-- [ ] Performance optimization and monitoring
+- [x] Timeout-based processing with overlap prevention
+- [x] Batch review processing for efficiency
+- [x] Real-time UI updates with full task data
+- [x] Error recovery and graceful degradation
+- [x] Comprehensive retry mechanisms
 
 ## Technical Considerations
 
@@ -486,19 +547,19 @@ intern config             # Configure settings
 - No built-in replication
 - Manual backup required
 
-#### Custom SQLite Job Queue
+#### Timeout-based Processing
 **Pros:**
-- No external dependencies (Redis, etc.)
+- No external dependencies 
 - Simple to understand and debug
-- Persistent jobs stored locally
-- Custom retry logic implementation
+- Self-rescheduling prevents memory leaks
+- Separate intervals for different task types
 - Zero configuration
 
 **Cons:**
-- Less battle-tested than mature solutions
-- Manual implementation of advanced features
+- Fixed intervals vs dynamic scheduling
+- Manual implementation vs mature solutions
 - No clustering support (not needed for local use)
-- Polling-based (higher latency than push-based)
+- Timeout-based (higher latency than event-driven)
 
 ### Device Failure Resilience
 

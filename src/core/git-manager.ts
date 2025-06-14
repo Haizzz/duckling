@@ -83,18 +83,7 @@ export class GitManager {
     }
   }
 
-  async commitChangesWithTask(taskDescription: string, taskId: number): Promise<void> {
-    // Get list of changed files for context
-    const status = await this.git.status();
-    const changedFiles = [...status.modified, ...status.created, ...status.deleted];
-
-    // Generate intelligent commit message
-    const message = await this.openaiManager.generateCommitMessage(taskDescription, changedFiles);
-
-    return this.commitChanges(message, taskId);
-  }
-
-  async commitChanges(message: string, taskId: number): Promise<void> {
+  async commitChanges(taskDescription: string, taskId: number): Promise<void> {
     return await withRetry(async () => {
       // Add all changes
       await this.git.add('.');
@@ -105,10 +94,20 @@ export class GitManager {
         throw new Error('No changes to commit');
       }
 
-      // Commit changes
-      await this.git.commit(message);
+      // Get list of changed files for context
+      const changedFiles = [...status.modified, ...status.created, ...status.deleted];
 
-      logger.info(`Committed changes: ${message}`, taskId.toString());
+      // Generate intelligent commit message
+      const message = await this.openaiManager.generateCommitMessage(taskDescription, changedFiles);
+
+      // Apply commit suffix from settings
+      const suffix = this.db.getSetting('commitSuffix')?.value || ' [i]';
+      const finalMessage = message.endsWith(suffix) ? message : `${message}${suffix}`;
+
+      // Commit changes
+      await this.git.commit(finalMessage);
+
+      logger.info(`Committed changes: ${finalMessage}`, taskId.toString());
     }, 'Commit changes');
   }
 

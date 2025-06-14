@@ -195,11 +195,9 @@ Summary:`;
   }
 
   async generateCommitMessage(taskDescription: string, changes: string[]): Promise<string> {
-    const suffix = this.db.getSetting('commitSuffix')?.value || ' [i]';
-
     if (!this.openai) {
       // Fallback to simple generation if OpenAI not available
-      return `${taskDescription.substring(0, 50)}${taskDescription.length > 50 ? '...' : ''}${suffix}`;
+      return `${taskDescription.substring(0, 50)}${taskDescription.length > 50 ? '...' : ''}`;
     }
 
     try {
@@ -207,7 +205,7 @@ Summary:`;
 
       const prompt = `Generate a concise git commit message for this task: "${taskDescription}".${changesText}
 Rules:
-- Maximum 50 characters (excluding suffix)
+- Maximum 50 characters
 - Use imperative mood (e.g., "Fix", "Add", "Update")
 - No period at the end
 - Be specific but concise
@@ -219,18 +217,17 @@ Commit message:`;
 
       // Clean up the result
       const cleanMessage = result.replace(/^["']|["']$/g, '').replace(/\.$/, '').trim();
-      const fullMessage = `${cleanMessage}${suffix}`;
 
       if (cleanMessage.length > 0 && cleanMessage.length <= 50) {
-        logger.info(`Generated commit message via OpenAI: ${fullMessage}`);
-        return fullMessage;
+        logger.info(`Generated commit message via OpenAI: ${cleanMessage}`);
+        return cleanMessage;
       }
     } catch (error) {
       logger.warn(`Failed to generate commit message via OpenAI: ${error}. Using fallback.`);
     }
 
     // Fallback to simple generation
-    return `${taskDescription.substring(0, 50 - suffix.length)}${taskDescription.length > (50 - suffix.length) ? '...' : ''}${suffix}`;
+    return `${taskDescription.substring(0, 50)}${taskDescription.length > 50 ? '...' : ''}`;
   }
 
   // Fallback methods for when OpenAI is not available
@@ -251,10 +248,7 @@ Commit message:`;
 ${taskDescription}
 
 ## Branch
-\`${branchName}\`
-
----
-*This PR was created automatically by Intern.*`;
+\`${branchName}\``;
   }
 
   // Method to refresh the OpenAI client when settings change
