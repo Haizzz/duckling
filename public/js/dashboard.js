@@ -19,26 +19,10 @@ class Dashboard {
 
   bindEvents() {
     // Task input submission
-    const taskInput = document.getElementById('task-input');
     const submitBtn = document.getElementById('submit-task');
 
     submitBtn.addEventListener('click', () => {
       this.createTask();
-    });
-
-    taskInput.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-      }
-    });
-
-    // Auto-resize textarea and position button with debouncing
-    let inputTimeout;
-    taskInput.addEventListener('input', () => {
-      clearTimeout(inputTimeout);
-      inputTimeout = setTimeout(() => {
-        this.adjustTextareaAndButton();
-      }, 50);
     });
 
     // Load more button
@@ -50,25 +34,7 @@ class Dashboard {
     }
   }
 
-  adjustTextareaAndButton() {
-    const taskInput = document.getElementById('task-input');
-    const submitBtn = document.getElementById('submit-task');
 
-    // Reset height to auto to calculate new height
-    taskInput.style.height = 'auto';
-    taskInput.style.height = (taskInput.scrollHeight) + 'px';
-
-    // Position button based on content
-    const lineCount = (taskInput.value.match(/\n/g) || []).length + 1;
-
-    if (lineCount > 1 || taskInput.scrollHeight > 60) {
-      // Multiple lines - position at bottom right
-      submitBtn.className = "absolute right-2 bottom-2 p-2 text-gray-400 hover:text-gray-600 focus:outline-none border border-gray-300 rounded-lg hover:border-gray-400 transition-all duration-200";
-    } else {
-      // Single line - position vertically centered
-      submitBtn.className = "absolute right-2 top-1/2 transform -translate-y-1/2 p-2 text-gray-400 hover:text-gray-600 focus:outline-none border border-gray-300 rounded-lg hover:border-gray-400 transition-all duration-200";
-    }
-  }
 
   async checkRequiredSettings() {
     try {
@@ -123,7 +89,7 @@ class Dashboard {
       if (response.ok) {
         taskInput.value = '';
         // Reset textarea height and button position
-        this.adjustTextareaAndButton();
+
         // Refresh task list to show the new task immediately
         this.refreshTasks();
       } else {

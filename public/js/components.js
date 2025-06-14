@@ -9,11 +9,11 @@ window.Components = {
     
     return `
       <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer" 
-           data-task-id="${task.id}" onclick="window.location.href='/task-detail.html?id=${task.id}'">
+           data-task-id="${task.id}" onclick="window.location.href='task-detail.html?id=${task.id}'">
         <!-- Header -->
         <div class="flex items-start justify-between mb-4">
           <div class="flex-1">
-            <h3 class="text-lg font-medium text-gray-900 mb-1 cursor-pointer hover:text-blue-600" onclick="window.location.href='/task-detail.html?id=${task.id}'">${Utils.escapeHtml(summary)}</h3>
+            <h3 class="text-lg font-medium text-gray-900 mb-1 cursor-pointer hover:text-blue-600" onclick="window.location.href='task-detail.html?id=${task.id}'">${Utils.escapeHtml(summary)}</h3>
             <p class="text-sm text-gray-600 line-clamp-2">${Utils.escapeHtml(task.description.substring(0, 150))}${task.description.length > 150 ? '...' : ''}</p>
           </div>
           <div class="flex items-center space-x-2 ml-4">

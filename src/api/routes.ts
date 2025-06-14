@@ -333,6 +333,99 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
     }
   });
 
+  // Precommit checks endpoints
+  router.get('/precommit-checks', async (req: Request, res: Response) => {
+    try {
+      const checks = db.getAllPrecommitChecks();
+
+      const response: ApiResponse = {
+        success: true,
+        data: checks
+      };
+
+      res.json(response);
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  router.post('/precommit-checks', async (req: Request, res: Response) => {
+    try {
+      const { name, command, required = false, enabled = true } = req.body;
+
+      if (!name || !command) {
+        return res.status(400).json({
+          success: false,
+          error: 'Missing required fields: name and command'
+        });
+      }
+
+      const id = db.addPrecommitCheck({
+        name,
+        command,
+        required,
+        enabled,
+        order_index: 0
+      });
+
+      const response: ApiResponse = {
+        success: true,
+        data: { id }
+      };
+
+      res.json(response);
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  router.put('/precommit-checks/:id', async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updates = req.body;
+
+      db.updatePrecommitCheck(id, updates);
+
+      const response: ApiResponse = {
+        success: true,
+        data: { message: 'Precommit check updated successfully' }
+      };
+
+      res.json(response);
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  router.delete('/precommit-checks/:id', async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+
+      db.deletePrecommitCheck(id);
+
+      const response: ApiResponse = {
+        success: true,
+        data: { message: 'Precommit check deleted successfully' }
+      };
+
+      res.json(response);
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
   // Server-Sent Events endpoint for real-time updates
   router.get('/events', (req: Request, res: Response) => {
     // Set headers for SSE

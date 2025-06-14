@@ -30,21 +30,21 @@ export class CoreEngine extends EventEmitter {
     this.gitManager = new GitManager(db, repoPath, this.openaiManager);
     this.codingManager = new CodingManager(db);
     this.precommitManager = new PrecommitManager(db);
-    
+
     // Initialize PR manager - GitHub token is required
     const githubToken = this.db.getSetting('githubToken');
-    
+
     if (!githubToken) {
       throw new Error('GitHub token is required. Please configure GitHub settings before starting the server.');
     }
-    
+
     this.prManager = new PRManager(githubToken.value, this.db, this.openaiManager);
   }
 
   async initialize(): Promise<void> {
-  if (this.isInitialized) return;
+    if (this.isInitialized) return;
 
-  // Set up job processing
+    // Set up job processing
     this.setupJobProcessors();
 
     // Recovery: reset any jobs that were processing when server shut down
@@ -64,6 +64,7 @@ export class CoreEngine extends EventEmitter {
     } catch (error) {
       logger.warn(`Failed to generate task summary: ${error}`);
       // Continue without summary - will fallback in UI
+      summary = undefined;
     }
 
     const task = {
@@ -76,8 +77,8 @@ export class CoreEngine extends EventEmitter {
 
     // Store task in database - returns auto-generated ID
     const taskId = this.db.createTask(task);
+    logger.info(`Task created: ${request.title}`, taskId.toString());
 
-    // Log task creation
     this.db.addTaskLog({
       task_id: taskId,
       level: 'info',
@@ -269,7 +270,7 @@ export class CoreEngine extends EventEmitter {
 
           // Step 5: Create PR
           this.db.updateTask(taskId, { current_stage: 'creating_pr' });
-          
+
           try {
             await this.createPR(taskId, task, branchName);
           } catch (error: any) {
@@ -527,19 +528,19 @@ export class CoreEngine extends EventEmitter {
 
   shutdown(): void {
     console.log('🔄 Shutting down engine...');
-    
+
     // Clear polling interval
     if (this.pollingInterval) {
       clearInterval(this.pollingInterval);
       this.pollingInterval = undefined;
     }
-    
+
     // Shutdown job queue
     this.jobQueue.shutdown();
-    
+
     // Remove all event listeners
     this.removeAllListeners();
-    
+
     console.log('✅ Engine shutdown complete');
   }
 }
