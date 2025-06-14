@@ -1,0 +1,147 @@
+import { simpleGit, SimpleGit } from 'simple-git';
+import { withRetry } from '../utils/retry';
+import { logger } from '../utils/logger';
+import { DatabaseManager } from './database';
+import { OpenAIManager } from './openai-manager';
+import { execCommand } from '../utils/exec';
+
+export class GitManager {
+  private git: SimpleGit;
+  private db: DatabaseManager;
+  private openaiManager: OpenAIManager;
+  private repoPath: string;
+
+  constructor(db: DatabaseManager, repoPath: string = process.cwd(), openaiManager?: OpenAIManager) {
+    this.git = simpleGit(repoPath);
+    this.db = db;
+    this.openaiManager = openaiManager || new OpenAIManager(db);
+    this.repoPath = repoPath;
+  }
+
+  async createAndCheckoutBranch(baseBranchName: string, taskId: string, branchPrefix?: string): Promise<string> {
+    return await withRetry(async () => {
+      // Get base branch from settings
+      const baseBranchSetting = this.db.getSetting('baseBranch');
+      const baseBranch = baseBranchSetting?.value || 'main';
+      
+      // Get branch prefix from settings if not provided
+      if (!branchPrefix) {
+        const prefixSetting = this.db.getSetting('branchPrefix');
+        branchPrefix = prefixSetting?.value || 'intern/';
+      }
+
+      logger.info(`Updating to latest ${baseBranch} and creating new branch`, taskId);
+      
+      // First, fetch latest changes
+      await this.git.fetch('origin');
+      
+      // Switch to base branch and pull latest  
+      await this.git.checkout(baseBranch);
+      await this.git.pull('origin', baseBranch);
+
+      // Generate unique branch name
+      let branchName = `${branchPrefix}${baseBranchName}`;
+      let counter = 1;
+
+      while (await this.branchExists(branchName)) {
+        branchName = `${branchPrefix}${baseBranchName}-${counter}`;
+        counter++;
+      }
+
+      // Create and checkout the new branch
+      await this.git.checkoutLocalBranch(branchName);
+      
+      logger.info(`Created and switched to branch: ${branchName}`, taskId);
+      return branchName;
+    }, 'Create and checkout branch');
+  }
+
+  async branchExists(branchName: string): Promise<boolean> {
+    try {
+      const branches = await this.git.branchLocal();
+      return branches.all.includes(branchName);
+    } catch (error) {
+      return false;
+    }
+  }
+
+  async commitChangesWithTask(taskDescription: string, taskId: string): Promise<void> {
+    // Get list of changed files for context
+    const status = await this.git.status();
+    const changedFiles = [...status.modified, ...status.created, ...status.deleted];
+    
+    // Generate intelligent commit message
+    const message = await this.openaiManager.generateCommitMessage(taskDescription, changedFiles);
+    
+    return this.commitChanges(message, taskId);
+  }
+
+  async commitChanges(message: string, taskId: string): Promise<void> {
+    return await withRetry(async () => {
+      // Get commit suffix from settings
+      const suffixSetting = this.db.getSetting('commitSuffix');
+      const suffix = suffixSetting?.value || '';
+      const fullMessage = message + suffix;
+
+      // Add all changes
+      await this.git.add('.');
+      
+      // Check if there are changes to commit
+      const status = await this.git.status();
+      if (status.files.length === 0) {
+        throw new Error('No changes to commit');
+      }
+
+      // Commit changes
+      await this.git.commit(fullMessage);
+      
+      logger.info(`Committed changes: ${fullMessage}`, taskId);
+    }, 'Commit changes');
+  }
+
+  async pushBranch(branchName: string, taskId: string): Promise<void> {
+    return await withRetry(async () => {
+      await this.git.push('origin', branchName);
+      logger.info(`Pushed branch: ${branchName}`, taskId);
+    }, 'Push branch');
+  }
+
+  async getCurrentBranch(): Promise<string> {
+    const status = await this.git.status();
+    return status.current || 'main';
+  }
+
+  async switchToBranch(branchName: string, taskId?: string): Promise<void> {
+    return await withRetry(async () => {
+      await this.git.checkout(branchName);
+      if (taskId) logger.info(`Switched to branch: ${branchName}`, taskId);
+    }, 'Switch to branch');
+  }
+
+  // Note: Branch deletion is not allowed per requirements
+
+  async getChangedFiles(): Promise<string[]> {
+    const status = await this.git.status();
+    return [
+      ...status.created,
+      ...status.modified,
+      ...status.deleted,
+      ...status.renamed.map(r => r.to || r.from)
+    ];
+  }
+
+  async getDiff(branchName?: string): Promise<string> {
+    if (branchName) {
+      return await this.git.diff([`origin/main...${branchName}`]);
+    } else {
+      return await this.git.diff();
+    }
+  }
+
+  async pullLatest(branchName: string = 'main', taskId?: string): Promise<void> {
+    return await withRetry(async () => {
+      await this.git.pull('origin', branchName);
+      if (taskId) logger.info(`Pulled latest changes from ${branchName}`, taskId);
+    }, 'Pull latest changes');
+  }
+}

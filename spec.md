@@ -1,4 +1,4 @@
-# Intern - Automated Code Review Tool
+# Intern - Automated Coding Tool
 
 ## Overview
 Intern is a tool that wraps CLI coding assistants (OpenAI Codex, Claude Code, Amp Code) to automate the entire development workflow from task assignment to PR merge with robust error handling and retry mechanisms.
@@ -572,15 +572,8 @@ INSERT INTO settings (key, value, category) VALUES
 
 -- GitHub Settings
 INSERT INTO settings (key, value, category) VALUES 
-('github_repo_url', 'https://github.com/user/repo', 'github'),
 ('github_username', 'user', 'github'),
 ('poll_interval_seconds', '30', 'github');
-
--- Precommit Checks
-INSERT INTO precommit_checks (name, command, required, enabled, order_index) VALUES 
-('TypeScript Check', 'npm run type-check', 1, 1, 1),
-('Linting', 'npm run lint', 1, 1, 2),
-('Tests', 'npm test', 0, 1, 3);
 
 -- System Config
 INSERT INTO system_config (key, value) VALUES 
