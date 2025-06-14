@@ -98,30 +98,13 @@ export class DatabaseManager {
       )
     `);
 
-    // Jobs table for the queue
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS jobs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        type TEXT NOT NULL,
-        data TEXT NOT NULL,
-        status TEXT DEFAULT 'pending',
-        attempts INTEGER DEFAULT 0,
-        max_attempts INTEGER DEFAULT 3,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        scheduled_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        processed_at DATETIME,
-        failed_at DATETIME,
-        error TEXT
-      )
-    `);
+
 
     // Create indexes
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
       CREATE INDEX IF NOT EXISTS idx_tasks_created_at ON tasks(created_at);
       CREATE INDEX IF NOT EXISTS idx_task_logs_task_id ON task_logs(task_id);
-      CREATE INDEX IF NOT EXISTS idx_jobs_type_status ON jobs(type, status);
-      CREATE INDEX IF NOT EXISTS idx_jobs_scheduled_at ON jobs(scheduled_at);
     `);
 
     // Initialize default settings if not exists
@@ -173,7 +156,7 @@ export class DatabaseManager {
       task.pr_url || null,
       task.completed_at || null
     );
-    
+
     return result.lastInsertRowid as number;
   }
 
@@ -208,8 +191,6 @@ export class DatabaseManager {
       query += ' WHERE status = ?';
       params.push(filters.status);
     }
-
-    query += ' ORDER BY created_at DESC';
 
     if (filters.limit) {
       query += ' LIMIT ?';
@@ -314,80 +295,7 @@ export class DatabaseManager {
     stmt.run(key, value);
   }
 
-  // Job queue operations
-  enqueueJob(type: string, data: any, options: { delay?: number; maxAttempts?: number } = {}): string {
-    const jobId = Date.now().toString(36) + Math.random().toString(36).substr(2);
 
-    const stmt = this.db.prepare(`
-      INSERT INTO jobs (id, type, data, status, attempts, max_attempts, created_at, scheduled_at)
-      VALUES (?, ?, ?, 'pending', 0, ?, datetime('now'), ?)
-    `);
-
-    const scheduledAt = options.delay ?
-      new Date(Date.now() + options.delay).toISOString() :
-      new Date().toISOString();
-
-    stmt.run(
-      jobId,
-      type,
-      JSON.stringify(data),
-      options.maxAttempts || 3,
-      scheduledAt
-    );
-
-    return jobId;
-  }
-
-  getNextJob(type: string): Job | null {
-    const stmt = this.db.prepare(`
-      SELECT * FROM jobs 
-      WHERE type = ? AND status = 'pending' 
-      AND attempts < max_attempts
-      ORDER BY created_at ASC 
-      LIMIT 1
-    `);
-
-    return stmt.get(type) as Job | null;
-  }
-
-  updateJobStatus(jobId: string, status: string, error?: string): void {
-    if (status === 'completed') {
-      const stmt = this.db.prepare(`
-        UPDATE jobs SET status = 'completed', processed_at = datetime('now') 
-        WHERE id = ?
-      `);
-      stmt.run(jobId);
-    } else if (status === 'failed') {
-      const stmt = this.db.prepare(`
-        UPDATE jobs SET status = 'failed', failed_at = datetime('now'), error = ?
-        WHERE id = ?
-      `);
-      stmt.run(error || '', jobId);
-    } else {
-      const stmt = this.db.prepare(`UPDATE jobs SET status = ? WHERE id = ?`);
-      stmt.run(status, jobId);
-    }
-  }
-
-  incrementJobAttempts(jobId: string, nextScheduledAt?: string): void {
-    const stmt = this.db.prepare(`
-      UPDATE jobs 
-      SET attempts = attempts + 1, status = 'pending', scheduled_at = ?
-      WHERE id = ?
-    `);
-
-    const scheduledAt = nextScheduledAt || new Date().toISOString();
-    stmt.run(scheduledAt, jobId);
-  }
-
-  resetProcessingJobs(): void {
-    const stmt = this.db.prepare(`
-      UPDATE jobs 
-      SET status = 'pending', scheduled_at = datetime('now')
-      WHERE status = 'processing'
-    `);
-    stmt.run();
-  }
 
   // Precommit check operations
   addPrecommitCheck(check: Omit<PrecommitCheck, 'id' | 'created_at'>): number {

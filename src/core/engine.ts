@@ -1,57 +1,63 @@
 import { EventEmitter } from 'events';
 import { DatabaseManager } from './database';
-import { SQLiteJobQueue } from './job-queue';
+
 import { GitManager } from './git-manager';
 import { CodingManager } from './coding-manager';
 import { PrecommitManager } from './precommit-manager';
 import { PRManager } from './pr-manager';
 import { OpenAIManager } from './openai-manager';
 import { Task, TaskStatus, CodingTool, TaskUpdateEvent, CreateTaskRequest } from '../types';
-import { generateId } from '../utils/retry';
 import { taskExecutor } from './task-executor';
 import { logger } from '../utils/logger';
 
 export class CoreEngine extends EventEmitter {
   private db: DatabaseManager;
-  private jobQueue: SQLiteJobQueue;
   private gitManager: GitManager;
   private codingManager: CodingManager;
   private precommitManager: PrecommitManager;
-  private prManager: PRManager;
+  private prManager?: PRManager;
   private openaiManager: OpenAIManager;
   private isInitialized = false;
-  private pollingInterval?: NodeJS.Timeout;
+  private processingInterval?: NodeJS.Timeout;
 
   constructor(db: DatabaseManager, repoPath: string = process.cwd()) {
     super();
     this.db = db;
-    this.jobQueue = new SQLiteJobQueue(db);
     this.openaiManager = new OpenAIManager(db);
     this.gitManager = new GitManager(db, repoPath, this.openaiManager);
     this.codingManager = new CodingManager(db);
     this.precommitManager = new PrecommitManager(db);
 
-    // Initialize PR manager - GitHub token is required
-    const githubToken = this.db.getSetting('githubToken');
 
-    if (!githubToken) {
-      throw new Error('GitHub token is required. Please configure GitHub settings before starting the server.');
+  }
+
+  private getPRManager(): PRManager {
+    if (this.prManager) {
+      return this.prManager;
     }
 
-    this.prManager = new PRManager(githubToken.value, this.db, this.openaiManager);
+    const githubToken = this.db.getSetting('githubToken');
+    if (!githubToken || !githubToken.value) {
+      logger.error('GitHub token not configured. PR operations will be skipped. Please configure GitHub settings.');
+      throw new Error('GitHub token not configured. PR operations will be skipped. Please configure GitHub settings.');
+    }
+
+    try {
+      this.prManager = new PRManager(githubToken.value, this.db, this.openaiManager);
+      return this.prManager;
+    } catch (error) {
+      const errorMsg = `Failed to initialize PR manager: ${error}`;
+      logger.error(errorMsg);
+      console.error(`❌ ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
   }
 
   async initialize(): Promise<void> {
     if (this.isInitialized) return;
 
-    // Set up job processing
-    this.setupJobProcessors();
-
-    // Recovery: reset any jobs that were processing when server shut down
-    this.jobQueue.resetProcessingJobs();
-
-    // Start polling for PR comments if configured
-    this.startPRCommentPolling();
+    // Start periodic task processing based on state
+    this.startTaskProcessing();
 
     this.isInitialized = true;
   }
@@ -77,16 +83,13 @@ export class CoreEngine extends EventEmitter {
 
     // Store task in database - returns auto-generated ID
     const taskId = this.db.createTask(task);
-    logger.info(`Task created: ${request.title}`, taskId.toString());
+    logger.info(`Task created: ${request.title} ${taskId.toString()}`);
 
     this.db.addTaskLog({
       task_id: taskId,
       level: 'info',
       message: `Task created: ${request.title}`
     });
-
-    // Enqueue task for processing
-    this.jobQueue.enqueue('process-task', { taskId: taskId.toString() }, { maxAttempts: 5 });
 
     // Emit task update event
     this.emitTaskUpdate(taskId, 'pending');
@@ -133,30 +136,41 @@ export class CoreEngine extends EventEmitter {
       message: 'Task retry requested'
     });
 
-    // Re-enqueue for processing
-    this.jobQueue.enqueue('process-task', { taskId }, { maxAttempts: 5 });
+    // Task will be picked up by periodic processing
 
     this.emitTaskUpdate(taskId, 'pending');
   }
 
-  private setupJobProcessors(): void {
-    // Main task processor
-    this.jobQueue.process('process-task', async (data) => {
-      await this.processTask(data.taskId);
-    });
+  private startTaskProcessing(): void {
+    // Process tasks every 10 seconds based on their state
+    this.processingInterval = setInterval(async () => {
+      try {
+        await this.processTasksByState();
+      } catch (error) {
+        logger.error(`Error in task processing: ${error}`);
+      }
+    }, 10000);
+  }
 
-    // PR comment processor
-    this.jobQueue.process('handle-pr-comment', async (data) => {
-      await this.handlePRComment(data.taskId, data.comment);
-    });
+  private async processTasksByState(): Promise<void> {
+    // Process pending tasks
+    const pendingTasks = this.db.getTasks({ status: 'pending' });
 
-    // PR polling processor
-    this.jobQueue.process('poll-pr-comments', async (data) => {
-      await this.pollPRComments(data.taskId, data.prNumber);
-    });
+    for (const task of pendingTasks) {
+      await this.processTask(task.id);
+    }
+
+    // Poll PR comments for awaiting-review tasks
+    const awaitingReviewTasks = this.db.getTasks({ status: 'awaiting-review' });
+    for (const task of awaitingReviewTasks) {
+      if (task.pr_number) {
+        await this.pollPRComments(task.id, task.pr_number);
+      }
+    }
   }
 
   private async processTask(taskId: number): Promise<void> {
+    logger.info(`Processing task: ${taskId}`);
     const task = this.db.getTask(taskId);
     if (!task) {
       throw new Error('Task not found');
@@ -351,7 +365,9 @@ export class CoreEngine extends EventEmitter {
   }
 
   private async createPR(taskId: number, task: Task, branchName: string): Promise<void> {
-    const pr = await this.prManager.createPRFromTask(branchName, task.description, taskId);
+    try {
+      const prManager = this.getPRManager();
+      const pr = await prManager.createPRFromTask(branchName, task.description, taskId);
 
     this.db.updateTask(taskId, {
       status: 'awaiting-review',
@@ -366,10 +382,19 @@ export class CoreEngine extends EventEmitter {
       message: `PR created: ${pr.url}`
     });
 
-    this.emitTaskUpdate(taskId, 'awaiting-review');
+      this.emitTaskUpdate(taskId, 'awaiting-review');
 
-    // Start polling for comments on this PR
-    this.jobQueue.enqueue('poll-pr-comments', { taskId, prNumber: pr.number });
+      // PR comments will be polled by periodic processing
+    } catch (error) {
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'error',
+        message: `Failed to create PR: ${error}`
+      });
+      // Update task to completed since we can't create PR
+      this.db.updateTask(taskId, { status: 'completed', current_stage: 'completed' });
+      this.emitTaskUpdate(taskId, 'completed');
+    }
   }
 
   private async pollPRComments(taskId: number, prNumber: number): Promise<void> {
@@ -378,10 +403,11 @@ export class CoreEngine extends EventEmitter {
       return; // Task completed or cancelled
     }
 
-    const githubUsername = this.db.getSetting('githubUsername')?.value;
-    if (!githubUsername) return;
-
     try {
+      const prManager = this.getPRManager();
+      const githubUsername = this.db.getSetting('githubUsername')?.value;
+      if (!githubUsername) return;
+
       // Get last commit timestamp for the branch
       let lastCommitTimestamp: string | null = null;
       if (task.branch_name) {
@@ -394,18 +420,18 @@ export class CoreEngine extends EventEmitter {
       }
 
       // Poll for new comments since last commit
-      const newComments = await this.prManager.pollForComments(prNumber, lastCommitTimestamp, githubUsername);
+      const newComments = await prManager.pollForComments(prNumber, lastCommitTimestamp, githubUsername);
 
       for (const comment of newComments) {
-        // Process each new comment
-        this.jobQueue.enqueue('handle-pr-comment', { taskId, comment: comment.body });
+        // Process each new comment directly
+        await this.handlePRComment(taskId, comment.body);
 
         // Update last processed comment ID
         this.db.setSetting(`last_comment_${taskId}`, comment.id.toString(), 'system');
       }
 
       // Check PR status
-      const prStatus = await this.prManager.getPRStatus(prNumber);
+      const prStatus = await prManager.getPRStatus(prNumber);
       if (prStatus.merged) {
         this.db.updateTask(taskId, {
           status: 'completed',
@@ -420,9 +446,7 @@ export class CoreEngine extends EventEmitter {
         return;
       }
 
-      // Schedule next poll
-      const pollInterval = parseInt(this.db.getSetting('pollInterval')?.value || '30') * 1000;
-      this.jobQueue.enqueue('poll-pr-comments', { taskId, prNumber }, { delay: pollInterval });
+      // No need to schedule next poll - will be handled by periodic processing
 
     } catch (error: any) {
       this.db.addTaskLog({
@@ -430,9 +454,6 @@ export class CoreEngine extends EventEmitter {
         level: 'error',
         message: `Error polling PR comments: ${error.message}`
       });
-
-      // Retry polling after a delay
-      this.jobQueue.enqueue('poll-pr-comments', { taskId, prNumber }, { delay: 60000 }); // 1 minute delay
     }
   }
 
@@ -503,40 +524,14 @@ export class CoreEngine extends EventEmitter {
     this.emit('task-update', event);
   }
 
-  private startPRCommentPolling(): void {
-    // Poll every 30 seconds for all tasks awaiting review
-    this.pollingInterval = setInterval(() => {
-      this.pollAllAwaitingTasks().catch(error => {
-        logger.error('Error in PR comment polling:', error);
-      });
-    }, 30000); // 30 seconds
-  }
-
-  private async pollAllAwaitingTasks(): Promise<void> {
-    const awaitingTasks = this.db.getTasks({ status: 'awaiting-review' });
-
-    for (const task of awaitingTasks) {
-      if (task.pr_number) {
-        try {
-          await this.pollPRComments(task.id, task.pr_number);
-        } catch (error) {
-          logger.error(`Error polling comments for task ${task.id}: ${error}`);
-        }
-      }
-    }
-  }
-
   shutdown(): void {
     console.log('🔄 Shutting down engine...');
 
-    // Clear polling interval
-    if (this.pollingInterval) {
-      clearInterval(this.pollingInterval);
-      this.pollingInterval = undefined;
+    // Clear processing interval
+    if (this.processingInterval) {
+      clearInterval(this.processingInterval);
+      this.processingInterval = undefined;
     }
-
-    // Shutdown job queue
-    this.jobQueue.shutdown();
 
     // Remove all event listeners
     this.removeAllListeners();
