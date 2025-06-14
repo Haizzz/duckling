@@ -8,7 +8,7 @@ window.Components = {
     
     return `
       <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer" 
-           data-task-id="${task.id}" onclick="App.navigate('/task/${task.id}')">
+           data-task-id="${task.id}" onclick="window.location.href='/task-detail.html?id=${task.id}'">
         <!-- Header -->
         <div class="flex items-start justify-between mb-4">
           <div class="flex-1">
@@ -59,7 +59,7 @@ window.Components = {
             <span>Created ${Utils.formatRelativeTime(task.created_at)}</span>
           </div>
           <div class="flex items-center space-x-2">
-            <button class="text-blue-600 hover:text-blue-800 text-sm font-medium" onclick="App.navigate('/task/${task.id}/logs', event)">
+            <button class="text-blue-600 hover:text-blue-800 text-sm font-medium" onclick="event.stopPropagation(); window.location.href='/task-detail.html?id=${task.id}#logs'">
               View Logs
             </button>
             ${task.status === 'failed' ? `
@@ -160,7 +160,7 @@ window.Components = {
     try {
       await API.retryTask(taskId);
       Utils.showToast('Task retry initiated', 'success');
-      App.reloadCurrentPage();
+      location.reload();
     } catch (error) {
       Utils.showToast(`Failed to retry task: ${error.message}`, 'error');
     }
@@ -177,7 +177,7 @@ window.Components = {
     try {
       await API.cancelTask(taskId);
       Utils.showToast('Task cancelled', 'success');
-      App.reloadCurrentPage();
+      location.reload();
     } catch (error) {
       Utils.showToast(`Failed to cancel task: ${error.message}`, 'error');
     }

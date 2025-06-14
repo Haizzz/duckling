@@ -1,9 +1,11 @@
-// Simple app initialization without routing
+// Simple app initialization with basic SPA routing
 window.App = {
   eventSource: null,
+  currentRoute: null,
   
   async init() {
     this.setupEventStream();
+    this.setupRouter();
     this.hideLoading();
   },
 

@@ -48,18 +48,6 @@ class Dashboard {
         this.loadMoreTasks();
       });
     }
-
-    // Infinite scroll with throttling
-    let scrollTimeout;
-    window.addEventListener('scroll', () => {
-      if (scrollTimeout) return;
-      scrollTimeout = setTimeout(() => {
-        if (this.isNearBottom() && this.hasMore && !this.isLoading) {
-          this.loadMoreTasks();
-        }
-        scrollTimeout = null;
-      }, 100);
-    });
   }
 
   adjustTextareaAndButton() {
@@ -72,7 +60,6 @@ class Dashboard {
 
     // Position button based on content
     const lineCount = (taskInput.value.match(/\n/g) || []).length + 1;
-    const hasContent = taskInput.value.trim().length > 0;
 
     if (lineCount > 1 || taskInput.scrollHeight > 60) {
       // Multiple lines - position at bottom right
@@ -81,10 +68,6 @@ class Dashboard {
       // Single line - position vertically centered
       submitBtn.className = "absolute right-2 top-1/2 transform -translate-y-1/2 p-2 text-gray-400 hover:text-gray-600 focus:outline-none border border-gray-300 rounded-lg hover:border-gray-400 transition-all duration-200";
     }
-  }
-
-  isNearBottom() {
-    return window.innerHeight + window.scrollY >= document.body.offsetHeight - 1000;
   }
 
   async createTask() {
@@ -198,7 +181,7 @@ class Dashboard {
     const canCancel = task.status !== 'completed' && task.status !== 'cancelled' && task.status !== 'failed';
 
     return `
-      <div class="task-card bg-white border border-gray-200 rounded-lg p-6 hover:shadow-sm transition-shadow cursor-pointer" onclick="Dashboard.goToTaskDetail('${task.id}')" data-task-id="${task.id}">
+      <a href="/task-detail.html?id=${task.id}" class="task-card bg-white border border-gray-200 rounded-lg p-6 hover:shadow-sm transition-shadow block" data-task-id="${task.id}">
         <!-- Summary | Status -->
         <div class="flex justify-between items-start mb-4">
           <h3 class="text-lg font-medium text-gray-900 flex-1 mr-4">${this.escapeHtml(summary)}</h3>
@@ -242,14 +225,14 @@ class Dashboard {
           </div>
           ${canCancel ? `
             <button 
-              onclick="Dashboard.cancelTask('${task.id}')"
+              onclick="event.preventDefault(); event.stopPropagation(); Dashboard.cancelTask('${task.id}')"
               class="text-sm text-red-600 hover:text-red-800 hover:underline focus:outline-none"
             >
               Cancel Task
             </button>
           ` : ''}
         </div>
-      </div>
+      </a>
     `;
   }
 
@@ -311,7 +294,7 @@ class Dashboard {
   handleTaskUpdate(data) {
     this.hasRecentSSEUpdate = true; // Prevent polling redundancy
     const { taskId, status, metadata } = data;
-    
+
     // Find and update the task in our loaded tasks
     const taskIndex = this.loadedTasks.findIndex(task => task.id === taskId);
     if (taskIndex >= 0) {
@@ -375,9 +358,7 @@ class Dashboard {
     }
   }
 
-  goToTaskDetail(taskId) {
-    window.location.href = `task-detail.html?id=${taskId}`;
-  }
+
 
   escapeHtml(text) {
     const div = document.createElement('div');
