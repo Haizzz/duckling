@@ -21,7 +21,6 @@ export const DEFAULT_SETTINGS = {
   commitSuffix: ' [i]',
   maxRetries: 3,
   baseBranch: 'main',
-  pollInterval: 10, // Unified polling interval in seconds for all operations
 } as const;
 
 // Git settings

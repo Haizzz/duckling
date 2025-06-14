@@ -22,22 +22,14 @@ export class GitManager {
 
   async getLastCommitTimestamp(branchName: string): Promise<string> {
     return await withRetry(async () => {
-      // Switch to the branch first
-      logger.info(`Switching to branch: ${branchName}`);
-      await this.git.checkout(branchName);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      logger.info(`Pulling branch: ${branchName}`);
-      await this.git.pull('origin', branchName);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
       // Get the timestamp of the last commit
       logger.info(`Getting last commit timestamp for branch: ${branchName}`);
-      const log = await this.git.log(['-1', '--format=%cI']);
+      const log = await this.git.log(['-1', "--format=%cI"]);
       logger.info(JSON.stringify(log));
 
       if (log.latest) {
-        return log.latest.date;
+        // it's parsed wrong
+        return log.latest.hash;
       }
 
       throw new Error(`No commits found for branch ${branchName}`);

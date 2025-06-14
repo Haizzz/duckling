@@ -140,19 +140,14 @@ export class CoreEngine extends EventEmitter {
   }
 
   private startTaskProcessing(): void {
-    // Get polling interval from settings (default 10 seconds)
-    const pollIntervalSetting = this.db.getSetting('pollInterval');
-    const pollIntervalMs = (pollIntervalSetting ? parseInt(pollIntervalSetting.value) : 10) * 1000;
-    
-    logger.info(`Starting task processing with ${pollIntervalMs / 1000}s interval`);
-    
+    // Process tasks every 10 seconds based on their state
     this.processingInterval = setInterval(async () => {
       try {
         await this.processTasksByState();
       } catch (error) {
         logger.error(`Error in task processing: ${error}`);
       }
-    }, pollIntervalMs);
+    }, 10000);
   }
 
   private async processTasksByState(): Promise<void> {
@@ -415,6 +410,8 @@ export class CoreEngine extends EventEmitter {
       // Get last commit timestamp for the branch
       let lastCommitTimestamp: string | null = null;
       if (task.branch_name) {
+        await this.gitManager.switchToBranch(task.branch_name, taskId);
+
         try {
           lastCommitTimestamp = await this.gitManager.getLastCommitTimestamp(task.branch_name);
           logger.info(`last commit timestamp for branch ${task.branch_name}: ${lastCommitTimestamp}`);

@@ -119,7 +119,7 @@ export class DatabaseManager {
       { key: 'commitSuffix', value: DEFAULT_SETTINGS.commitSuffix, category: 'general' },
       { key: 'maxRetries', value: DEFAULT_SETTINGS.maxRetries.toString(), category: 'general' },
       { key: 'baseBranch', value: DEFAULT_SETTINGS.baseBranch, category: 'general' },
-      { key: 'pollInterval', value: DEFAULT_SETTINGS.pollInterval.toString(), category: 'general' },
+      
       { key: 'onboarding_completed', value: 'false', category: 'general' },
     ];
 

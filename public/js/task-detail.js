@@ -100,20 +100,12 @@ class TaskDetail {
                 <span class="text-gray-600">Task ID:</span>
                 <span class="font-mono text-sm">${task.id}</span>
               </div>
-              <div class="flex justify-between">
-                <span class="text-gray-600">Status:</span>
-                <span>${statusBadge}</span>
-              </div>
               ${task.current_stage ? `
                 <div class="flex justify-between">
                   <span class="text-gray-600">Stage:</span>
                   <span>${this.getStageBadge(task.current_stage)}</span>
                 </div>
               ` : ''}
-              <div class="flex justify-between">
-                <span class="text-gray-600">Coding Tool:</span>
-                <span class="capitalize">${task.coding_tool}</span>
-              </div>
               ${task.branch_name ? `
                 <div class="flex justify-between">
                   <span class="text-gray-600">Branch:</span>
@@ -254,10 +246,10 @@ class TaskDetail {
   }
 
   startLogRefresh() {
-    // Refresh logs every 2 seconds for active tasks using incremental loading
+    // Refresh logs every 3 seconds for active tasks using incremental loading
     this.logRefreshInterval = setInterval(() => {
       this.loadTaskLogs(true); // Use incremental loading
-    }, 2000);
+    }, 3000);
   }
 
   stopLogRefresh() {
