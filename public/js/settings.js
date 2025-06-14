@@ -105,23 +105,15 @@ class Settings {
 
   setSecureField(fieldId, value) {
     const field = document.getElementById(fieldId);
-    const label = field.parentElement.querySelector('label');
     
     if (value === '***CONFIGURED***') {
-      // Show that field is configured
+      // Show that field is configured with placeholder
       field.value = '';
       field.placeholder = '••••••••••••••••';
-      if (!label.textContent.includes('✓')) {
-        label.innerHTML = label.innerHTML + ' <span class="text-green-600">✓ Configured</span>';
-      }
     } else {
       // Field is empty
       field.value = '';
       field.placeholder = 'Enter value...';
-      const configuredSpan = label.querySelector('.text-green-600');
-      if (configuredSpan) {
-        configuredSpan.remove();
-      }
     }
   }
 

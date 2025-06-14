@@ -14,6 +14,7 @@ class Dashboard {
     this.bindEvents();
     this.loadTasks();
     this.startPolling();
+    this.checkRequiredSettings();
   }
 
   bindEvents() {
@@ -70,8 +71,46 @@ class Dashboard {
     }
   }
 
+  async checkRequiredSettings() {
+    try {
+      const response = await fetch('/api/settings');
+      if (response.ok) {
+        const result = await response.json();
+        const settings = result.data;
+        
+        // Check if required settings are present
+        const hasGithubToken = settings.githubToken === '***CONFIGURED***';
+        const hasApiKey = settings.ampApiKey === '***CONFIGURED***' || settings.openaiApiKey === '***CONFIGURED***';
+        
+        const taskInput = document.getElementById('task-input');
+        const submitBtn = document.getElementById('submit-task');
+        
+        if (!hasGithubToken || !hasApiKey) {
+          // Disable task creation
+          taskInput.disabled = true;
+          taskInput.placeholder = 'Configure GitHub token and API key in settings to create tasks';
+          submitBtn.disabled = true;
+          submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        } else {
+          // Enable task creation
+          taskInput.disabled = false;
+          taskInput.placeholder = 'What would you like me to work on?';
+          submitBtn.disabled = false;
+          submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+      }
+    } catch (error) {
+      console.error('Failed to check settings:', error);
+    }
+  }
+
   async createTask() {
     const taskInput = document.getElementById('task-input');
+    const submitBtn = document.getElementById('submit-task');
+    
+    // Don't proceed if inputs are disabled
+    if (taskInput.disabled || submitBtn.disabled) return;
+    
     const description = taskInput.value.trim();
     if (!description) return;
 
