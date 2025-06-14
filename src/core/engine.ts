@@ -17,9 +17,10 @@ export class CoreEngine extends EventEmitter {
   private gitManager: GitManager;
   private codingManager: CodingManager;
   private precommitManager: PrecommitManager;
-  private prManager: PRManager | null = null;
+  private prManager: PRManager;
   private openaiManager: OpenAIManager;
   private isInitialized = false;
+  private pollingInterval?: NodeJS.Timeout;
 
   constructor(db: DatabaseManager, repoPath: string = process.cwd()) {
     super();
@@ -29,19 +30,21 @@ export class CoreEngine extends EventEmitter {
     this.gitManager = new GitManager(db, repoPath, this.openaiManager);
     this.codingManager = new CodingManager(db);
     this.precommitManager = new PrecommitManager(db);
+    
+    // Initialize PR manager - GitHub token is required
+    const githubToken = this.db.getSetting('githubToken');
+    
+    if (!githubToken) {
+      throw new Error('GitHub token is required. Please configure GitHub settings before starting the server.');
+    }
+    
+    this.prManager = new PRManager(githubToken.value, this.db, this.openaiManager);
   }
 
   async initialize(): Promise<void> {
-    if (this.isInitialized) return;
+  if (this.isInitialized) return;
 
-    // Initialize PR manager if GitHub settings are available
-    const githubToken = this.db.getSetting('githubToken');
-
-    if (githubToken) {
-      this.prManager = new PRManager(githubToken.value, this.db, this.openaiManager);
-    }
-
-    // Set up job processing
+  // Set up job processing
     this.setupJobProcessors();
 
     // Recovery: reset any jobs that were processing when server shut down
@@ -266,25 +269,16 @@ export class CoreEngine extends EventEmitter {
 
           // Step 5: Create PR
           this.db.updateTask(taskId, { current_stage: 'creating_pr' });
-          if (this.prManager) {
-            try {
-              await this.createPR(taskId, task, branchName);
-            } catch (error: any) {
-              this.db.addTaskLog({
-                task_id: taskId,
-                level: 'error',
-                message: `Failed to create PR: ${error.message}`
-              });
-              throw error;
-            }
-          } else {
-            // No PR manager - mark as completed
-            this.db.updateTask(taskId, {
-              status: 'completed',
-              current_stage: 'completed',
-              completed_at: new Date().toISOString()
+          
+          try {
+            await this.createPR(taskId, task, branchName);
+          } catch (error: any) {
+            this.db.addTaskLog({
+              task_id: taskId,
+              level: 'error',
+              message: `Failed to create PR: ${error.message}`
             });
-            this.emitTaskUpdate(taskId, 'completed');
+            throw error;
           }
 
         } catch (error: any) {
@@ -356,8 +350,6 @@ export class CoreEngine extends EventEmitter {
   }
 
   private async createPR(taskId: number, task: Task, branchName: string): Promise<void> {
-    if (!this.prManager) return;
-
     const pr = await this.prManager.createPRFromTask(branchName, task.description, taskId);
 
     this.db.updateTask(taskId, {
@@ -380,8 +372,6 @@ export class CoreEngine extends EventEmitter {
   }
 
   private async pollPRComments(taskId: number, prNumber: number): Promise<void> {
-    if (!this.prManager) return;
-
     const task = this.db.getTask(taskId);
     if (!task || task.status !== 'awaiting-review') {
       return; // Task completed or cancelled
@@ -514,7 +504,7 @@ export class CoreEngine extends EventEmitter {
 
   private startPRCommentPolling(): void {
     // Poll every 30 seconds for all tasks awaiting review
-    setInterval(() => {
+    this.pollingInterval = setInterval(() => {
       this.pollAllAwaitingTasks().catch(error => {
         logger.error('Error in PR comment polling:', error);
       });
@@ -536,6 +526,20 @@ export class CoreEngine extends EventEmitter {
   }
 
   shutdown(): void {
+    console.log('🔄 Shutting down engine...');
+    
+    // Clear polling interval
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+      this.pollingInterval = undefined;
+    }
+    
+    // Shutdown job queue
     this.jobQueue.shutdown();
+    
+    // Remove all event listeners
+    this.removeAllListeners();
+    
+    console.log('✅ Engine shutdown complete');
   }
 }

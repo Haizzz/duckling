@@ -89,16 +89,37 @@ export class APIServer {
         console.log(`🚀 Intern server running on http://localhost:${port}`);
         resolve();
       });
+      
+      // Increase max listeners to prevent warnings
+      this.server.setMaxListeners(20);
     });
   }
 
   async stop(): Promise<void> {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       if (this.server) {
-        this.server.close(() => {
-          console.log('Server stopped');
+        console.log('🔄 Stopping API server...');
+        
+        // Set a timeout for server close
+        const timeout = setTimeout(() => {
+          console.log('⚠️  Server close timeout, forcing shutdown');
+          this.server.destroy();
           resolve();
+        }, 5000);
+        
+        this.server.close((err: any) => {
+          clearTimeout(timeout);
+          if (err) {
+            console.error('Error stopping server:', err);
+            reject(err);
+          } else {
+            console.log('✅ API server stopped');
+            resolve();
+          }
         });
+        
+        // Close all active connections
+        this.server.closeAllConnections();
       } else {
         resolve();
       }

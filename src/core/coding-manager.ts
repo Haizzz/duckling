@@ -106,7 +106,7 @@ export class CodingManager {
     errorMessages: string[],
     context: { files?: string[]; taskId: number }
   ): Promise<string> {
-    logger.info('Requesting fixes for precommit errors', context.taskId);
+    logger.info('Requesting fixes for precommit errors', context.taskId.toString());
 
     const fixPrompt = `
 Original request: ${originalPrompt}

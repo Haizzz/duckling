@@ -176,6 +176,29 @@
           </div>
         </div>
 
+        <!-- Precommit Checks -->
+        <div class="bg-white shadow rounded-lg">
+          <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-lg font-medium text-gray-900">Precommit Checks</h2>
+            <p class="text-sm text-gray-500 mt-1">Commands to run before committing code</p>
+          </div>
+          <div class="px-6 py-4 space-y-4">
+            <div class="flex space-x-2">
+              <input type="text" id="precommit-command" placeholder="e.g., npm run lint"
+                class="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
+              <button type="button" id="add-precommit-btn"
+                class="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500">
+                Add
+              </button>
+            </div>
+            <p class="text-xs text-gray-500">Add commands that should be run before committing changes. Each command will be executed in order.</p>
+            
+            <div id="precommit-list" class="space-y-2">
+              <!-- Precommit checks will be rendered here -->
+            </div>
+          </div>
+        </div>
+
         <!-- Save Button -->
         <div class="flex justify-end">
           <button type="submit"

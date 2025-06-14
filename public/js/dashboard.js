@@ -29,7 +29,6 @@ class Dashboard {
     taskInput.addEventListener('keypress', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        this.createTask();
       }
     });
 
@@ -77,14 +76,14 @@ class Dashboard {
       if (response.ok) {
         const result = await response.json();
         const settings = result.data;
-        
+
         // Check if required settings are present
         const hasGithubToken = settings.githubToken === '***CONFIGURED***';
         const hasApiKey = settings.ampApiKey === '***CONFIGURED***' || settings.openaiApiKey === '***CONFIGURED***';
-        
+
         const taskInput = document.getElementById('task-input');
         const submitBtn = document.getElementById('submit-task');
-        
+
         if (!hasGithubToken || !hasApiKey) {
           // Disable task creation
           taskInput.disabled = true;
@@ -107,10 +106,10 @@ class Dashboard {
   async createTask() {
     const taskInput = document.getElementById('task-input');
     const submitBtn = document.getElementById('submit-task');
-    
+
     // Don't proceed if inputs are disabled
     if (taskInput.disabled || submitBtn.disabled) return;
-    
+
     const description = taskInput.value.trim();
     if (!description) return;
 
@@ -125,8 +124,8 @@ class Dashboard {
         taskInput.value = '';
         // Reset textarea height and button position
         this.adjustTextareaAndButton();
-        // Don't refresh immediately - let real-time updates handle it
-        // The SSE will send a task-update event for the new task
+        // Refresh task list to show the new task immediately
+        this.refreshTasks();
       } else {
         throw new Error('Failed to create task');
       }
@@ -176,6 +175,14 @@ class Dashboard {
   async loadMoreTasks() {
     if (!this.hasMore || this.isLoading) return;
     this.currentPage++;
+    await this.loadTasks();
+  }
+
+  async refreshTasks() {
+    // Reset pagination and reload tasks from the beginning
+    this.currentPage = 1;
+    this.loadedTasks = [];
+    this.hasMore = true;
     await this.loadTasks();
   }
 
@@ -331,23 +338,23 @@ class Dashboard {
 
   // Handle real-time updates from SSE
   handleTaskUpdate(data) {
-  this.hasRecentSSEUpdate = true; // Prevent polling redundancy
-  const { taskId, status, metadata } = data;
-  
-  // Find and update the task in our loaded tasks
-  const taskIndex = this.loadedTasks.findIndex(task => task.id === taskId);
-  if (taskIndex >= 0) {
-  // Update the task data
-  this.loadedTasks[taskIndex] = { ...this.loadedTasks[taskIndex], ...metadata, status };
-  // Only update the specific task card instead of re-rendering everything
-  this.updateTaskCard(taskIndex);
-  } else {
-  // Task not in current view, might be new - add it to the beginning if on first page
-  if (this.currentPage === 1 && metadata) {
-  // Add new task to the beginning of the list
-  const newTask = { id: taskId, status, ...metadata };
-    this.loadedTasks.unshift(newTask);
-      // Re-render the entire task list to show the new task
+    this.hasRecentSSEUpdate = true; // Prevent polling redundancy
+    const { taskId, status, metadata } = data;
+
+    // Find and update the task in our loaded tasks
+    const taskIndex = this.loadedTasks.findIndex(task => task.id === taskId);
+    if (taskIndex >= 0) {
+      // Update the task data
+      this.loadedTasks[taskIndex] = { ...this.loadedTasks[taskIndex], ...metadata, status };
+      // Only update the specific task card instead of re-rendering everything
+      this.updateTaskCard(taskIndex);
+    } else {
+      // Task not in current view, might be new - add it to the beginning if on first page
+      if (this.currentPage === 1 && metadata) {
+        // Add new task to the beginning of the list
+        const newTask = { id: taskId, status, ...metadata };
+        this.loadedTasks.unshift(newTask);
+        // Re-render the entire task list to show the new task
         this.renderTasks();
       }
     }

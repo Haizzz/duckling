@@ -46,7 +46,7 @@ export class GitManager {
         branchPrefix = prefixSetting?.value || 'intern/';
       }
 
-      logger.info(`Updating to latest ${baseBranch} and creating new branch`, taskId);
+      logger.info(`Updating to latest ${baseBranch} and creating new branch`, taskId.toString());
 
       // First, fetch latest changes for the specific base branch
       await this.git.fetch('origin', baseBranch);
@@ -67,7 +67,7 @@ export class GitManager {
       // Create and checkout the new branch
       await this.git.checkoutLocalBranch(branchName);
 
-      logger.info(`Created and switched to branch: ${branchName}`, taskId);
+      logger.info(`Created and switched to branch: ${branchName}`, taskId.toString());
       return branchName;
     }, 'Create and checkout branch');
   }

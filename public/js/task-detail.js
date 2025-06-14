@@ -4,7 +4,7 @@ class TaskDetail {
     this.taskId = this.getTaskIdFromUrl();
     this.logRefreshInterval = null;
     this.currentTask = null;
-    this.eventSource = null;
+    this.taskUpdateHandler = null;
     
     if (this.taskId) {
       this.loadTaskDetail();
@@ -91,62 +91,54 @@ class TaskDetail {
             </div>
           </div>
 
-          <!-- Metadata -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <h3 class="text-lg font-medium text-gray-900 mb-3">Details</h3>
-              <div class="space-y-3">
-                <div class="flex justify-between">
-                  <span class="text-gray-600">Task ID:</span>
-                  <span class="font-mono text-sm">${task.id}</span>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-gray-600">Coding Tool:</span>
-                  <span class="capitalize">${task.coding_tool}</span>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-gray-600">Created:</span>
-                  <span>${createdDate}</span>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-gray-600">Updated:</span>
-                  <span>${updatedDate}</span>
-                </div>
-                ${task.completed_at ? `
-                  <div class="flex justify-between">
-                    <span class="text-gray-600">Completed:</span>
-                    <span>${new Date(task.completed_at).toLocaleString()}</span>
-                  </div>
-                ` : ''}
+          <!-- Details -->
+          <div>
+            <h3 class="text-lg font-medium text-gray-900 mb-3">Details</h3>
+            <div class="space-y-3">
+              <div class="flex justify-between">
+                <span class="text-gray-600">Task ID:</span>
+                <span class="font-mono text-sm">${task.id}</span>
               </div>
-            </div>
-
-            <div>
-              <h3 class="text-lg font-medium text-gray-900 mb-3">Progress</h3>
-              <div class="space-y-3">
-                <div class="flex justify-between">
-                  <span class="text-gray-600">Status:</span>
-                  <span>${statusBadge}</span>
-                </div>
-                ${task.current_stage ? `
-                  <div class="flex justify-between">
-                    <span class="text-gray-600">Stage:</span>
-                    <span>${this.getStageBadge(task.current_stage)}</span>
-                  </div>
-                ` : ''}
-                ${task.branch_name ? `
-                  <div class="flex justify-between">
-                    <span class="text-gray-600">Branch:</span>
-                    ${this.getBranchLink(task.branch_name)}
-                  </div>
-                ` : ''}
-                ${task.pr_url ? `
-                  <div class="flex justify-between">
-                    <span class="text-gray-600">Pull Request:</span>
-                    <a href="${task.pr_url}" target="_blank" class="text-blue-600 hover:text-blue-800 underline">#${task.pr_number}</a>
-                  </div>
-                ` : ''}
+              <div class="flex justify-between">
+                <span class="text-gray-600">Status:</span>
+                <span>${statusBadge}</span>
               </div>
+              ${task.current_stage ? `
+                <div class="flex justify-between">
+                  <span class="text-gray-600">Stage:</span>
+                  <span>${this.getStageBadge(task.current_stage)}</span>
+                </div>
+              ` : ''}
+              <div class="flex justify-between">
+                <span class="text-gray-600">Coding Tool:</span>
+                <span class="capitalize">${task.coding_tool}</span>
+              </div>
+              ${task.branch_name ? `
+                <div class="flex justify-between">
+                  <span class="text-gray-600">Branch:</span>
+                  ${this.getBranchLink(task.branch_name)}
+                </div>
+              ` : ''}
+              ${task.pr_url ? `
+                <div class="flex justify-between">
+                  <span class="text-gray-600">Pull Request:</span>
+                  <a href="${task.pr_url}" target="_blank" class="text-blue-600 hover:text-blue-800 underline">#${task.pr_number}</a>
+                </div>
+              ` : ''}
+              <div class="flex justify-between">
+                <span class="text-gray-600">Created:</span>
+                <span>${createdDate}</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-600">Updated:</span>
+                <span>${updatedDate}</span>
+              </div>
+              ${task.completed_at ? `
+                <div class="flex justify-between">
+                  <span class="text-gray-600">Completed:</span>
+                  <span>${new Date(task.completed_at).toLocaleString()}</span>
+                </div>
+              ` : ''}
             </div>
           </div>
 
@@ -231,11 +223,10 @@ class TaskDetail {
   }
 
   startEventStream() {
-    this.eventSource = new EventSource('/api/events');
-    
-    this.eventSource.addEventListener('task-update', (event) => {
-      const taskUpdate = JSON.parse(event.data);
-      if (taskUpdate.id === this.taskId) {
+    // Listen for task updates via custom events from the global EventSource
+    this.taskUpdateHandler = (event) => {
+      const taskUpdate = event.detail;
+      if (taskUpdate.taskId == this.taskId) { // Note: == for type coercion
         this.currentTask = taskUpdate;
         this.renderTaskDetail(taskUpdate);
         
@@ -244,23 +235,46 @@ class TaskDetail {
           this.stopLogRefresh();
         }
       }
-    });
-    
-    this.eventSource.onerror = (error) => {
-      console.error('EventSource error:', error);
     };
+    
+    window.addEventListener('intern-task-update', this.taskUpdateHandler);
+    console.log('Listening for task updates via global EventSource');
   }
 
   stopEventStream() {
-    if (this.eventSource) {
-      this.eventSource.close();
-      this.eventSource = null;
+    // Remove the event listener
+    if (this.taskUpdateHandler) {
+      window.removeEventListener('intern-task-update', this.taskUpdateHandler);
+      this.taskUpdateHandler = null;
     }
   }
 
   getBranchLink(branchName) {
-    // Get GitHub repo URL from settings or construct from branch
-    return `<a href="https://github.com/Haizzz/intern/tree/${encodeURIComponent(branchName)}" target="_blank" class="font-mono text-sm text-blue-600 hover:text-blue-800 underline">${this.escapeHtml(branchName)}</a>`;
+    // Use current window location to infer repo info, or fallback to a generic link
+    const repoUrl = window.location.hostname === 'localhost' 
+      ? `https://github.com/owner/repo/tree/${encodeURIComponent(branchName)}`
+      : `https://github.com/owner/repo/tree/${encodeURIComponent(branchName)}`;
+    
+    return `<a href="#" onclick="TaskDetailInstance.openBranchUrl('${this.escapeHtml(branchName)}')" class="font-mono text-sm text-blue-600 hover:text-blue-800 underline">${this.escapeHtml(branchName)}</a>`;
+  }
+
+  async openBranchUrl(branchName) {
+    try {
+      // Get repo info from server
+      const response = await fetch('/api/repo-info');
+      if (response.ok) {
+        const result = await response.json();
+        const repoUrl = `https://github.com/${result.owner}/${result.name}/tree/${encodeURIComponent(branchName)}`;
+        window.open(repoUrl, '_blank');
+      } else {
+        // Fallback - just copy branch name to clipboard or show error
+        navigator.clipboard.writeText(branchName);
+        alert('Copied branch name to clipboard');
+      }
+    } catch (error) {
+      navigator.clipboard.writeText(branchName);
+      alert('Copied branch name to clipboard');
+    }
   }
 
   getLogColor(level) {

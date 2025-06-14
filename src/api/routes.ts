@@ -230,6 +230,29 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
     }
   });
 
+  // Repo info endpoint
+  router.get('/repo-info', async (req: Request, res: Response) => {
+    try {
+      const { validateAndGetRepoInfo } = await import('../utils/git-utils');
+      const repoInfo = await validateAndGetRepoInfo(process.cwd());
+      
+      const response: ApiResponse = {
+        success: true,
+        data: {
+          owner: repoInfo.owner,
+          name: repoInfo.name
+        }
+      };
+
+      res.json(response);
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
   // Settings endpoints
   router.get('/settings', async (req: Request, res: Response) => {
     try {

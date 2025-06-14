@@ -7,11 +7,31 @@ window.App = {
     this.setupEventStream();
     this.setupRouter();
     this.hideLoading();
+    
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+      this.cleanup();
+    });
+  },
+
+  cleanup() {
+    if (this.eventSource) {
+      console.log('Closing EventSource connection...');
+      this.eventSource.close();
+      this.eventSource = null;
+    }
   },
 
   // Real-time updates via Server-Sent Events
   setupEventStream() {
+    // Don't create multiple connections
+    if (this.eventSource) {
+      console.log('EventSource already exists, reusing...');
+      return;
+    }
+    
     try {
+      console.log('Creating new EventSource connection...');
       this.eventSource = new EventSource('/api/events');
       
       this.eventSource.onmessage = (event) => {
@@ -34,6 +54,11 @@ window.App = {
   handleRealtimeUpdate(data) {
     if (data.type === 'task-update') {
       this.handleTaskUpdate(data);
+      
+      // Dispatch custom event for other components to listen to
+      window.dispatchEvent(new CustomEvent('intern-task-update', {
+        detail: data
+      }));
     } else if (data.type === 'heartbeat') {
       // Handle heartbeat if needed
     } else if (data.type === 'connected') {
