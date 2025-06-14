@@ -162,8 +162,8 @@ class Dashboard {
   }
 
   renderTaskCard(task) {
-    const createdDate = new Date(task.created_at).toLocaleDateString();
-    const updatedDate = new Date(task.updated_at).toLocaleDateString();
+    const createdDate = new Date(task.created_at).toLocaleString();
+    const updatedDate = new Date(task.updated_at).toLocaleString();
 
     const statusBadge = this.getStatusBadge(task.status);
     const stageBadge = this.getStageBadge(task.current_stage);
@@ -226,7 +226,7 @@ class Dashboard {
           </div>
           ${canCancel ? `
             <button 
-              onclick="event.preventDefault(); event.stopPropagation(); Dashboard.cancelTask('${task.id}')"
+              onclick="event.preventDefault(); event.stopPropagation(); window.Dashboard.cancelTask('${task.id}')"
               class="text-sm text-red-600 hover:text-red-800 hover:underline focus:outline-none"
             >
               Cancel Task

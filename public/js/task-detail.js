@@ -2,11 +2,20 @@
 class TaskDetail {
   constructor() {
     this.taskId = this.getTaskIdFromUrl();
+    this.logRefreshInterval = null;
+    this.currentTask = null;
+    
     if (this.taskId) {
       this.loadTaskDetail();
+      this.startLogRefresh();
     } else {
       this.showError('No task ID provided');
     }
+
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+      this.stopLogRefresh();
+    });
   }
 
   getTaskIdFromUrl() {
@@ -20,7 +29,13 @@ class TaskDetail {
       const result = await response.json();
 
       if (response.ok && result.success) {
+        this.currentTask = result.data;
         this.renderTaskDetail(result.data);
+        
+        // Stop log refresh if task is completed
+        if (['completed', 'cancelled', 'failed'].includes(result.data.status)) {
+          this.stopLogRefresh();
+        }
       } else {
         throw new Error(result.error || 'Failed to load task');
       }
@@ -33,8 +48,8 @@ class TaskDetail {
   renderTaskDetail(task) {
     const container = document.getElementById('task-detail-container');
     
-    const createdDate = new Date(task.created_at).toLocaleDateString();
-    const updatedDate = new Date(task.updated_at).toLocaleDateString();
+    const createdDate = new Date(task.created_at).toLocaleString();
+    const updatedDate = new Date(task.updated_at).toLocaleString();
     
     const statusBadge = this.getStatusBadge(task.status);
     const stageBadge = this.getStageBadge(task.current_stage);
@@ -97,7 +112,7 @@ class TaskDetail {
                 ${task.completed_at ? `
                   <div class="flex justify-between">
                     <span class="text-gray-600">Completed:</span>
-                    <span>${new Date(task.completed_at).toLocaleDateString()}</span>
+                    <span>${new Date(task.completed_at).toLocaleString()}</span>
                   </div>
                 ` : ''}
               </div>
@@ -181,7 +196,25 @@ class TaskDetail {
     `).join('');
 
     container.innerHTML = logsHTML;
-    container.scrollTop = container.scrollHeight;
+    
+    // Auto-scroll to bottom with smooth behavior
+    setTimeout(() => {
+      container.scrollTop = container.scrollHeight;
+    }, 100);
+  }
+
+  startLogRefresh() {
+    // Refresh logs every 3 seconds for active tasks
+    this.logRefreshInterval = setInterval(() => {
+      this.loadTaskLogs();
+    }, 3000);
+  }
+
+  stopLogRefresh() {
+    if (this.logRefreshInterval) {
+      clearInterval(this.logRefreshInterval);
+      this.logRefreshInterval = null;
+    }
   }
 
   getLogColor(level) {

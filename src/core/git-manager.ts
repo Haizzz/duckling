@@ -32,8 +32,8 @@ export class GitManager {
 
       logger.info(`Updating to latest ${baseBranch} and creating new branch`, taskId);
       
-      // First, fetch latest changes
-      await this.git.fetch('origin');
+      // First, fetch latest changes for the specific base branch
+      await this.git.fetch('origin', baseBranch);
       
       // Switch to base branch and pull latest  
       await this.git.checkout(baseBranch);
@@ -113,12 +113,33 @@ export class GitManager {
 
   async switchToBranch(branchName: string, taskId?: string): Promise<void> {
     return await withRetry(async () => {
+      if (taskId) logger.info(`Fetching and switching to branch: ${branchName}`, taskId);
+      
+      // Fetch the specific branch to ensure we have latest changes
+      await this.git.fetch('origin', branchName);
+      
+      // Switch to the branch
       await this.git.checkout(branchName);
-      if (taskId) logger.info(`Switched to branch: ${branchName}`, taskId);
+      
+      // Pull any remote changes to ensure we're up to date
+      try {
+        await this.git.pull('origin', branchName);
+        if (taskId) logger.info(`Pulled latest changes for branch: ${branchName}`, taskId);
+      } catch (error: any) {
+        // If pull fails (e.g., no upstream), that's okay for local branches
+        if (taskId) logger.info(`No upstream changes to pull for branch: ${branchName}`, taskId);
+      }
     }, 'Switch to branch');
   }
 
   // Note: Branch deletion is not allowed per requirements
+
+  async fetchBranch(branchName: string, taskId?: string): Promise<void> {
+    return await withRetry(async () => {
+      if (taskId) logger.info(`Fetching latest changes for branch: ${branchName}`, taskId);
+      await this.git.fetch('origin', branchName);
+    }, `Fetch branch ${branchName}`);
+  }
 
   async getChangedFiles(): Promise<string[]> {
     const status = await this.git.status();

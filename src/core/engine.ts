@@ -466,7 +466,7 @@ export class CoreEngine extends EventEmitter {
             { taskId }
           );
 
-          // Switch to task branch
+          // Fetch latest changes and switch to task branch
           if (task.branch_name) {
             await this.gitManager.switchToBranch(task.branch_name, taskId);
           }

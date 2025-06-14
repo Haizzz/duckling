@@ -27,7 +27,6 @@ export class OpenAIManager {
     }
 
     return await withRetry(async () => {
-      logger.info(prompt);
       const response = await this.openai!.chat.completions.create({
         model: 'gpt-4o',
         messages: [
@@ -53,7 +52,7 @@ export class OpenAIManager {
     const prefixSetting = this.db.getSetting('branchPrefix');
     const branchPrefix = prefixSetting?.value || 'intern/';
     const maxBranchNameLength = 30 - branchPrefix.length; // Reserve space for prefix
-    
+
     if (!this.openai) {
       // Fallback to simple generation if OpenAI not available
       return this.generateSimpleBranchName(taskDescription, maxBranchNameLength);
