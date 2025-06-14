@@ -174,15 +174,36 @@ export class CoreEngine extends EventEmitter {
           this.emitTaskUpdate(taskId, 'in-progress');
 
           // Step 1: Create branch
-          const baseBranchName = await this.openaiManager.generateBranchName(task.description);
-          const branchName = await this.gitManager.createAndCheckoutBranch(baseBranchName, taskId);
+          let baseBranchName: string;
+          let branchName: string;
           
-          this.db.updateTask(taskId, { branch_name: branchName });
-          this.db.addTaskLog({
-            task_id: taskId,
-            level: 'info',
-            message: `Branch created: ${branchName}`
-          });
+          try {
+            baseBranchName = await this.openaiManager.generateBranchName(task.description);
+          } catch (error: any) {
+            this.db.addTaskLog({
+              task_id: taskId,
+              level: 'error',
+              message: `Failed to generate branch name: ${error.message}`
+            });
+            throw error;
+          }
+
+          try {
+            branchName = await this.gitManager.createAndCheckoutBranch(baseBranchName, taskId);
+            this.db.updateTask(taskId, { branch_name: branchName });
+            this.db.addTaskLog({
+              task_id: taskId,
+              level: 'info',
+              message: `Branch created: ${branchName}`
+            });
+          } catch (error: any) {
+            this.db.addTaskLog({
+              task_id: taskId,
+              level: 'error',
+              message: `Failed to create branch: ${error.message}`
+            });
+            throw error;
+          }
 
           // Step 2: Generate code
           this.db.updateTask(taskId, { current_stage: 'generating_code' });
@@ -192,37 +213,75 @@ export class CoreEngine extends EventEmitter {
             message: `Calling ${task.coding_tool} to generate code...`
           });
 
-          const generatedCode = await this.codingManager.generateCode(
-            task.coding_tool,
-            task.description,
-            { taskId }
-          );
+          try {
+            const generatedCode = await this.codingManager.generateCode(
+              task.coding_tool,
+              task.description,
+              { taskId }
+            );
 
-          this.db.addTaskLog({
-            task_id: taskId,
-            level: 'info',
-            message: 'Code generation completed'
-          });
+            this.db.addTaskLog({
+              task_id: taskId,
+              level: 'info',
+              message: 'Code generation completed'
+            });
+          } catch (error: any) {
+            this.db.addTaskLog({
+              task_id: taskId,
+              level: 'error',
+              message: `Code generation failed: ${error.message}`
+            });
+            throw error;
+          }
 
           // Step 3: Run precommit checks
           this.db.updateTask(taskId, { current_stage: 'running_precommit_checks' });
-          await this.runPrecommitChecks(taskId);
+          
+          try {
+            await this.runPrecommitChecks(taskId);
+          } catch (error: any) {
+            this.db.addTaskLog({
+              task_id: taskId,
+              level: 'error',
+              message: `Precommit checks failed: ${error.message}`
+            });
+            throw error;
+          }
 
           // Step 4: Commit and push changes
           this.db.updateTask(taskId, { current_stage: 'committing_changes' });
-          await this.gitManager.commitChangesWithTask(task.description, taskId);
-          await this.gitManager.pushBranch(branchName, taskId);
+          
+          try {
+            await this.gitManager.commitChangesWithTask(task.description, taskId);
+            await this.gitManager.pushBranch(branchName, taskId);
 
-          this.db.addTaskLog({
-            task_id: taskId,
-            level: 'info',
-            message: 'Changes committed and pushed'
-          });
+            this.db.addTaskLog({
+              task_id: taskId,
+              level: 'info',
+              message: 'Changes committed and pushed'
+            });
+          } catch (error: any) {
+            this.db.addTaskLog({
+              task_id: taskId,
+              level: 'error',
+              message: `Failed to commit/push changes: ${error.message}`
+            });
+            throw error;
+          }
 
           // Step 5: Create PR
           this.db.updateTask(taskId, { current_stage: 'creating_pr' });
           if (this.prManager) {
-            await this.createPR(taskId, task, branchName);
+            try {
+              await this.createPR(taskId, task, branchName);
+            } catch (error: any) {
+              this.db.addTaskLog({
+                task_id: taskId,
+                level: 'error',
+                message: `Failed to create PR: ${error.message}`
+              });
+              throw error;
+            }
           } else {
             // No PR manager - mark as completed
             this.db.updateTask(taskId, { 

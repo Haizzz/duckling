@@ -65,6 +65,10 @@ export class PRManager {
         };
       }
 
+      // Get base branch from settings
+      const baseBranchSetting = this.db.getSetting('baseBranch');
+      const baseBranch = baseBranchSetting?.value || 'main';
+
       // Create new PR
       const response = await this.octokit.rest.pulls.create({
         owner: this.repoOwner,
@@ -72,7 +76,7 @@ export class PRManager {
         title,
         body: description,
         head: branchName,
-        base: 'main'
+        base: baseBranch
       });
 
       this.logPREvent(taskId, `PR created: #${response.data.number}`);
