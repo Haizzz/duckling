@@ -246,10 +246,10 @@ class TaskDetail {
   }
 
   startLogRefresh() {
-    // Refresh logs every 3 seconds for active tasks using incremental loading
+    // Refresh logs every 10 seconds for active tasks using incremental loading
     this.logRefreshInterval = setInterval(() => {
       this.loadTaskLogs(true); // Use incremental loading
-    }, 3000);
+    }, 10000);
   }
 
   stopLogRefresh() {
@@ -264,8 +264,14 @@ class TaskDetail {
     this.taskUpdateHandler = (event) => {
       const taskUpdate = event.detail;
       if (taskUpdate.taskId == this.taskId) { // Note: == for type coercion
-        this.currentTask = taskUpdate;
-        this.renderTaskDetail(taskUpdate);
+        // Use the full task data from metadata if available, otherwise fall back to current task
+        if (taskUpdate.metadata && taskUpdate.metadata.task) {
+          this.currentTask = taskUpdate.metadata.task;
+          this.renderTaskDetail(taskUpdate.metadata.task);
+        } else {
+          // Fallback: refresh full task data from server
+          this.loadTaskDetail();
+        }
 
         // Stop log refresh if task is completed
         if (['completed', 'cancelled', 'failed'].includes(taskUpdate.status)) {

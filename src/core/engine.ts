@@ -571,10 +571,16 @@ export class CoreEngine extends EventEmitter {
 
 
   private emitTaskUpdate(taskId: number, status: TaskStatus, metadata?: any): void {
+    // Get the full task data to include in the update
+    const task = this.db.getTask(taskId);
+    
     const event: TaskUpdateEvent = {
       taskId,
       status,
-      metadata
+      metadata: {
+        ...metadata,
+        task: task // Include full task data
+      }
     };
 
     this.emit('task-update', event);

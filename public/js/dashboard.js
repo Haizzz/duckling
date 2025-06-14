@@ -340,15 +340,19 @@ class Dashboard {
       // Find and update the task in our loaded tasks
       const taskIndex = this.loadedTasks.findIndex(task => task.id === taskId);
       if (taskIndex >= 0) {
-        // Update the task data
-        this.loadedTasks[taskIndex] = { ...this.loadedTasks[taskIndex], ...metadata, status };
+        // Update the task data - prefer full task from metadata if available
+        if (metadata && metadata.task) {
+          this.loadedTasks[taskIndex] = metadata.task;
+        } else {
+          this.loadedTasks[taskIndex] = { ...this.loadedTasks[taskIndex], ...metadata, status };
+        }
         // Only update the specific task card instead of re-rendering everything
         this.updateTaskCard(taskIndex);
       } else {
         // Task not in current view, might be new - add it to the beginning if on first page
         if (this.currentPage === 1 && metadata) {
-          // Add new task to the beginning of the list
-          const newTask = { id: taskId, status, ...metadata };
+          // Add new task to the beginning of the list - prefer full task from metadata
+          const newTask = metadata.task || { id: taskId, status, ...metadata };
           this.loadedTasks.unshift(newTask);
           // Re-render the entire task list to show the new task
           this.renderTasks();
