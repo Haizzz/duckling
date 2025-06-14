@@ -52,8 +52,8 @@ export class OpenAIManager {
     // Get branch prefix to calculate available space
     const prefixSetting = this.db.getSetting('branchPrefix');
     const branchPrefix = prefixSetting?.value || 'intern/';
-    const maxBranchNameLength = 30 - branchPrefix.length; // Reserve space for prefix
-    
+    const maxBranchNameLength = 30 + branchPrefix.length; // Reserve space for prefix
+
     if (!this.openai) {
       // Fallback to simple generation if OpenAI not available
       return this.generateSimpleBranchName(taskDescription, maxBranchNameLength);
