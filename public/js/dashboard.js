@@ -86,11 +86,8 @@ class Dashboard {
         taskInput.value = '';
         // Reset textarea height and button position
         this.adjustTextareaAndButton();
-        // Refresh tasks to show the new one
-        this.loadedTasks = [];
-        this.currentPage = 1;
-        this.hasMore = true;
-        this.loadTasks();
+        // Don't refresh immediately - let real-time updates handle it
+        // The SSE will send a task-update event for the new task
       } else {
         throw new Error('Failed to create task');
       }
@@ -279,11 +276,10 @@ class Dashboard {
   }
 
   startPolling() {
-    // Only poll if SSE is not working - prefer real-time updates
-    // Poll for task updates every 30 seconds as backup
+    // Backup polling every 60 seconds in case SSE fails
     setInterval(() => {
       if (!this.isLoading && !this.hasRecentSSEUpdate) {
-        // Refresh current tasks without changing page
+        // Refresh current tasks without changing page  
         const currentLength = this.loadedTasks.length;
         this.currentPage = Math.ceil(currentLength / this.tasksPerPage) || 1;
         this.loadedTasks = [];
@@ -291,26 +287,29 @@ class Dashboard {
       }
       // Reset SSE flag
       this.hasRecentSSEUpdate = false;
-    }, 30000); // Reduced frequency
+    }, 60000); // Less frequent backup polling
   }
 
   // Handle real-time updates from SSE
   handleTaskUpdate(data) {
-    this.hasRecentSSEUpdate = true; // Prevent polling redundancy
-    const { taskId, status, metadata } = data;
-
-    // Find and update the task in our loaded tasks
-    const taskIndex = this.loadedTasks.findIndex(task => task.id === taskId);
-    if (taskIndex >= 0) {
-      // Update the task data
-      this.loadedTasks[taskIndex] = { ...this.loadedTasks[taskIndex], ...metadata, status };
-      // Only update the specific task card instead of re-rendering everything
-      this.updateTaskCard(taskIndex);
-    } else {
-      // Task not in current view, might be new - only refresh if on first page
-      if (this.currentPage === 1) {
-        this.loadedTasks = [];
-        this.loadTasks();
+  this.hasRecentSSEUpdate = true; // Prevent polling redundancy
+  const { taskId, status, metadata } = data;
+  
+  // Find and update the task in our loaded tasks
+  const taskIndex = this.loadedTasks.findIndex(task => task.id === taskId);
+  if (taskIndex >= 0) {
+  // Update the task data
+  this.loadedTasks[taskIndex] = { ...this.loadedTasks[taskIndex], ...metadata, status };
+  // Only update the specific task card instead of re-rendering everything
+  this.updateTaskCard(taskIndex);
+  } else {
+  // Task not in current view, might be new - add it to the beginning if on first page
+  if (this.currentPage === 1 && metadata) {
+  // Add new task to the beginning of the list
+  const newTask = { id: taskId, status, ...metadata };
+    this.loadedTasks.unshift(newTask);
+      // Re-render the entire task list to show the new task
+        this.renderTasks();
       }
     }
   }
@@ -347,11 +346,8 @@ class Dashboard {
       });
 
       if (response.ok) {
-        // Refresh tasks to show updated status
-        this.loadedTasks = [];
-        this.currentPage = 1;
-        this.hasMore = true;
-        this.loadTasks();
+        // Don't refresh immediately - let real-time updates handle it
+        // The SSE will send a task-update event for the cancelled task
       } else {
         const result = await response.json();
         throw new Error(result.error || 'Failed to cancel task');

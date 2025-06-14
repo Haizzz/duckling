@@ -49,18 +49,24 @@ export class OpenAIManager {
   }
 
   async generateBranchName(taskDescription: string): Promise<string> {
+    // Get branch prefix to calculate available space
+    const prefixSetting = this.db.getSetting('branchPrefix');
+    const branchPrefix = prefixSetting?.value || 'intern/';
+    const maxBranchNameLength = 30 - branchPrefix.length; // Reserve space for prefix
+    
     if (!this.openai) {
       // Fallback to simple generation if OpenAI not available
-      return this.generateSimpleBranchName(taskDescription);
+      return this.generateSimpleBranchName(taskDescription, maxBranchNameLength);
     }
 
     try {
-      const prompt = `Generate a short, descriptive Git branch name (kebab-case, max 30 chars) for this task: "${taskDescription}". 
+      const prompt = `Generate a short, descriptive Git branch name (kebab-case, max ${maxBranchNameLength} chars) for this task: "${taskDescription}". 
 Rules:
 - Use only lowercase letters, numbers, and hyphens
 - Start with a letter
 - Be descriptive but concise
 - No special characters or spaces
+- Maximum ${maxBranchNameLength} characters (prefix will be added separately)
 - Examples: "fix-login-bug", "add-user-auth", "update-navbar-styles"
 
 Branch name:`;
@@ -73,10 +79,10 @@ Branch name:`;
         .replace(/[^a-z0-9-]/g, '-')
         .replace(/-+/g, '-')
         .replace(/^-|-$/g, '')
-        .substring(0, 30);
+        .substring(0, maxBranchNameLength);
 
       if (cleanBranchName.length > 0) {
-        logger.info(`Generated branch name via OpenAI: ${cleanBranchName}`);
+        logger.info(`Generated branch name via OpenAI: ${cleanBranchName} (${cleanBranchName.length}/${maxBranchNameLength} chars)`);
         return cleanBranchName;
       }
     } catch (error) {
@@ -84,7 +90,7 @@ Branch name:`;
     }
 
     // Fallback to simple generation
-    return this.generateSimpleBranchName(taskDescription);
+    return this.generateSimpleBranchName(taskDescription, maxBranchNameLength);
   }
 
   async generatePRTitle(taskDescription: string, branchName: string): Promise<string> {
@@ -229,7 +235,7 @@ Commit message:`;
   }
 
   // Fallback methods for when OpenAI is not available
-  private generateSimpleBranchName(description: string): string {
+  private generateSimpleBranchName(description: string, maxLength: number = 30): string {
     return description
       .toLowerCase()
       .replace(/[^a-z0-9\s]/g, '')
@@ -237,7 +243,7 @@ Commit message:`;
       .split(/\s+/)
       .slice(0, 4)
       .join('-')
-      .substring(0, 30);
+      .substring(0, maxLength);
   }
 
   private generateSimplePRDescription(taskDescription: string, branchName: string): string {
