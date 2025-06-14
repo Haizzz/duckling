@@ -91,7 +91,7 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
 
   router.get('/tasks/:id', async (req: Request, res: Response) => {
     try {
-      const task = db.getTask(req.params.id);
+      const task = db.getTask(parseInt(req.params.id));
 
       if (!task) {
         return res.status(404).json({
@@ -116,7 +116,7 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
 
   router.put('/tasks/:id', async (req: Request, res: Response) => {
     try {
-      const task = db.getTask(req.params.id);
+      const task = db.getTask(parseInt(req.params.id));
 
       if (!task) {
         return res.status(404).json({
@@ -125,7 +125,7 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
         });
       }
 
-      db.updateTask(req.params.id, req.body);
+      db.updateTask(parseInt(req.params.id), req.body);
 
       const response: ApiResponse = {
         success: true,
@@ -143,7 +143,7 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
 
   router.post('/tasks/:id/cancel', async (req: Request, res: Response) => {
     try {
-      const task = db.getTask(req.params.id);
+      const task = db.getTask(parseInt(req.params.id));
 
       if (!task) {
         return res.status(404).json({
@@ -152,7 +152,7 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
         });
       }
 
-      await engine.cancelTask(req.params.id);
+      await engine.cancelTask(parseInt(req.params.id));
 
       const response: ApiResponse = {
         success: true,
@@ -192,7 +192,7 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
       const limitNum = parseInt(limit as string);
       const offset = (pageNum - 1) * limitNum;
 
-      const logs = db.getTaskLogs(req.params.id, {
+      const logs = db.getTaskLogs(parseInt(req.params.id), {
         level: level as string,
         limit: limitNum,
         offset
@@ -214,7 +214,7 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
 
   router.post('/tasks/:id/retry', async (req: Request, res: Response) => {
     try {
-      await engine.retryTask(req.params.id);
+      await engine.retryTask(parseInt(req.params.id));
 
       const response: ApiResponse = {
         success: true,

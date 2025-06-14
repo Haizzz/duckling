@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,6 +8,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="/css/base.css">
 </head>
+
 <body class="bg-gray-50">
   <div class="min-h-screen">
     <!-- Common Header -->
@@ -21,8 +23,11 @@
           <div class="flex items-center">
             <span class="text-gray-400">
               <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z">
+                </path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
               </svg>
             </span>
           </div>
@@ -46,14 +51,19 @@
           </div>
           <div class="px-6 py-4 space-y-4">
             <div>
-              <label for="github-token" class="block text-sm font-medium text-gray-700">GitHub Personal Access Token</label>
-              <input type="password" id="github-token" name="githubToken" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400" required>
-              <p class="text-xs text-gray-500 mt-1">Personal access token with repo permissions to create branches and PRs</p>
+              <label for="github-token" class="block text-sm font-medium text-gray-700">GitHub Personal Access
+                Token</label>
+              <input type="password" id="github-token" name="githubToken"
+                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
+              <p class="text-xs text-gray-500 mt-1">Personal access token with repo permissions to create branches and
+                PRs</p>
             </div>
             <div>
               <label for="github-username" class="block text-sm font-medium text-gray-700">GitHub Username</label>
-              <input type="text" id="github-username" name="githubUsername" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400" required>
-              <p class="text-xs text-gray-500 mt-1">Your GitHub username for filtering PR comments and identifying assignments</p>
+              <input type="text" id="github-username" name="githubUsername"
+                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
+              <p class="text-xs text-gray-500 mt-1">Your GitHub username for filtering PR comments and identifying
+                assignments</p>
             </div>
           </div>
         </div>
@@ -66,27 +76,32 @@
           </div>
           <div class="px-6 py-4 space-y-6">
             <div>
-              <label for="default-coding-tool" class="block text-sm font-medium text-gray-700">Default Coding Tool</label>
-              <select id="default-coding-tool" name="defaultCodingTool" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
+              <label for="default-coding-tool" class="block text-sm font-medium text-gray-700">Default Coding
+                Tool</label>
+              <select id="default-coding-tool" name="defaultCodingTool"
+                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
                 <option value="amp">Amp Code</option>
                 <option value="openai">OpenAI</option>
               </select>
               <p class="text-xs text-gray-500 mt-1">Choose which coding assistant to use by default for new tasks</p>
             </div>
-            
+
             <div>
               <h3 class="text-sm font-medium text-gray-900 mb-3">Amp Code</h3>
               <div>
                 <label for="amp-api-key" class="block text-sm font-medium text-gray-700">API Key</label>
-                <input type="password" id="amp-api-key" name="ampApiKey" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
-                <p class="text-xs text-gray-500 mt-1">Sourcegraph Amp API key for AI-powered code generation and assistance</p>
+                <input type="password" id="amp-api-key" name="ampApiKey"
+                  class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
+                <p class="text-xs text-gray-500 mt-1">Sourcegraph Amp API key for AI-powered code generation and
+                  assistance</p>
               </div>
             </div>
             <div>
               <h3 class="text-sm font-medium text-gray-900 mb-3">OpenAI Codex</h3>
               <div>
                 <label for="openai-api-key" class="block text-sm font-medium text-gray-700">API Key</label>
-                <input type="password" id="openai-api-key" name="openaiApiKey" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
+                <input type="password" id="openai-api-key" name="openaiApiKey"
+                  class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
                 <p class="text-xs text-gray-500 mt-1">OpenAI API key for GPT-powered code generation and completion</p>
               </div>
             </div>
@@ -102,50 +117,69 @@
           <div class="px-6 py-4 space-y-4">
             <div>
               <label for="branch-prefix" class="block text-sm font-medium text-gray-700">Branch Prefix</label>
-              <input type="text" id="branch-prefix" name="branchPrefix" value="intern/" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
-              <p class="text-xs text-gray-500 mt-1">Prefix for all branches created by Intern (e.g., "intern/feature-name")</p>
+              <input type="text" id="branch-prefix" name="branchPrefix" value="intern/"
+                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
+              <p class="text-xs text-gray-500 mt-1">Prefix for all branches created by Intern (e.g.,
+                "intern/feature-name")</p>
             </div>
             <div>
               <label for="base-branch" class="block text-sm font-medium text-gray-700">Base Branch</label>
-              <input type="text" id="base-branch" name="baseBranch" value="main" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
+              <input type="text" id="base-branch" name="baseBranch" value="main"
+                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
               <p class="text-xs text-gray-500 mt-1">Default branch to create new branches from and merge PRs into</p>
             </div>
             <div>
               <label for="pr-title-prefix" class="block text-sm font-medium text-gray-700">PR Title Prefix</label>
-              <input type="text" id="pr-title-prefix" name="prTitlePrefix" value="[INTERN]" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
-              <p class="text-xs text-gray-500 mt-1">Prefix added to all PR titles to identify Intern-created pull requests</p>
+              <input type="text" id="pr-title-prefix" name="prTitlePrefix" value="[INTERN]"
+                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
+              <p class="text-xs text-gray-500 mt-1">Prefix added to all PR titles to identify Intern-created pull
+                requests</p>
             </div>
             <div>
               <label for="commit-suffix" class="block text-sm font-medium text-gray-700">Commit Suffix</label>
-              <input type="text" id="commit-suffix" name="commitSuffix" value=" [i]" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
-              <p class="text-xs text-gray-500 mt-1">Suffix added to all commit messages to identify Intern-created commits</p>
+              <input type="text" id="commit-suffix" name="commitSuffix" value=" [i]"
+                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
+              <p class="text-xs text-gray-500 mt-1">Suffix added to all commit messages to identify Intern-created
+                commits</p>
             </div>
             <div>
               <label for="max-retries" class="block text-sm font-medium text-gray-700">Max Retries</label>
-              <input type="number" id="max-retries" name="maxRetries" value="3" min="1" max="10" step="1" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
-              <p class="text-xs text-gray-500 mt-1">Maximum number of retry attempts when tasks fail due to transient errors</p>
+              <input type="number" id="max-retries" name="maxRetries" value="3" min="1" max="10" step="1"
+                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
+              <p class="text-xs text-gray-500 mt-1">Maximum number of retry attempts when tasks fail due to transient
+                errors</p>
             </div>
             <div>
               <label for="poll-interval" class="block text-sm font-medium text-gray-700">Poll Interval (seconds)</label>
-              <input type="number" id="poll-interval" name="pollInterval" value="30" min="10" max="300" step="1" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
-              <p class="text-xs text-gray-500 mt-1">How often to check for new PR comments that might contain task assignments</p>
+              <input type="number" id="poll-interval" name="pollInterval" value="30" min="10" max="300" step="1"
+                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
+              <p class="text-xs text-gray-500 mt-1">How often to check for new PR comments that might contain task
+                assignments</p>
             </div>
             <div>
-              <label for="task-check-interval" class="block text-sm font-medium text-gray-700">Task Check Interval (seconds)</label>
-              <input type="number" id="task-check-interval" name="taskCheckInterval" value="60" min="10" max="600" step="1" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
+              <label for="task-check-interval" class="block text-sm font-medium text-gray-700">Task Check Interval
+                (seconds)</label>
+              <input type="number" id="task-check-interval" name="taskCheckInterval" value="60" min="10" max="600"
+                step="1"
+                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
               <p class="text-xs text-gray-500 mt-1">How often to check for pending tasks in the job queue to process</p>
             </div>
             <div>
-              <label for="review-check-interval" class="block text-sm font-medium text-gray-700">Review Check Interval (seconds)</label>
-              <input type="number" id="review-check-interval" name="reviewCheckInterval" value="30" min="10" max="300" step="1" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
-              <p class="text-xs text-gray-500 mt-1">How often to check for PR review comments that need responses or actions</p>
+              <label for="review-check-interval" class="block text-sm font-medium text-gray-700">Review Check Interval
+                (seconds)</label>
+              <input type="number" id="review-check-interval" name="reviewCheckInterval" value="30" min="10" max="300"
+                step="1"
+                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
+              <p class="text-xs text-gray-500 mt-1">How often to check for PR review comments that need responses or
+                actions</p>
             </div>
           </div>
         </div>
 
         <!-- Save Button -->
         <div class="flex justify-end">
-          <button type="submit" class="px-6 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2">
+          <button type="submit"
+            class="px-6 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2">
             Save Settings
           </button>
         </div>
@@ -165,4 +199,5 @@
 
   <script src="/js/settings.js"></script>
 </body>
+
 </html>

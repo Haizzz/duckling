@@ -14,7 +14,7 @@ export class CodingManager {
   async generateCode(
     tool: CodingTool,
     prompt: string,
-    context: { files?: string[]; taskId: string }
+    context: { files?: string[]; taskId: number }
   ): Promise<string> {
     return await withRetry(async () => {
       switch (tool) {
@@ -30,7 +30,7 @@ export class CodingManager {
 
   private async callAmp(prompt: string, context: any): Promise<string> {
     const { taskId } = context;
-    
+
     try {
       // Get API key from settings
       const apiKeySetting = this.db.getSetting('ampApiKey');
@@ -40,7 +40,7 @@ export class CodingManager {
 
       // Check if amp is available
       await execCommand('which', ['amp'], { taskId });
-      
+
       // Call amp with the prompt via stdin
       const result = await execCommandWithInput('amp', prompt, [], {
         taskId,
@@ -51,11 +51,11 @@ export class CodingManager {
           NODE_ENV: 'production' // Use Node 22 for amp
         }
       });
-      
+
       if (result.exitCode !== 0) {
         throw new Error(result.stderr || result.stdout || 'Amp command failed');
       }
-      
+
       return result.stdout;
     } catch (error: any) {
       if (error.code === 'ENOENT') {
@@ -67,7 +67,7 @@ export class CodingManager {
 
   private async callCodex(prompt: string, context: any): Promise<string> {
     const { taskId } = context;
-    
+
     try {
       // Get API key from settings
       const apiKeySetting = this.db.getSetting('openaiApiKey');
@@ -77,7 +77,7 @@ export class CodingManager {
 
       // Check if codex is available
       await execCommand('which', ['codex'], { taskId });
-      
+
       const result = await execCommand('codex', ['-q', prompt], {
         taskId,
         timeout: 300000,
@@ -86,11 +86,11 @@ export class CodingManager {
           OPENAI_API_KEY: apiKeySetting.value
         }
       });
-      
+
       if (result.exitCode !== 0) {
         throw new Error(result.stderr || result.stdout || 'Codex command failed');
       }
-      
+
       return result.stdout;
     } catch (error: any) {
       if (error.code === 'ENOENT') {
@@ -104,10 +104,10 @@ export class CodingManager {
     tool: CodingTool,
     originalPrompt: string,
     errorMessages: string[],
-    context: { files?: string[]; taskId: string }
+    context: { files?: string[]; taskId: number }
   ): Promise<string> {
     logger.info('Requesting fixes for precommit errors', context.taskId);
-    
+
     const fixPrompt = `
 Original request: ${originalPrompt}
 

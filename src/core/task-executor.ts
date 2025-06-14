@@ -2,7 +2,7 @@ import { EventEmitter } from 'events';
 import { logger } from '../utils/logger';
 
 export interface TaskOperation {
-  taskId: string;
+  taskId: number;
   operation: string;
   execute: () => Promise<void>;
 }
@@ -45,26 +45,26 @@ export class TaskExecutor extends EventEmitter {
     }
 
     this.isProcessing = true;
-    
+
     while (this.operationQueue.length > 0) {
       const operation = this.operationQueue.shift()!;
       this.currentOperation = operation;
-      
-      logger.info(`Starting task operation: ${operation.operation}`, operation.taskId);
+
+      logger.info(`Starting task operation: ${operation.operation}`, operation.taskId.toString());
       this.emit('operation-start', operation);
-      
+
       try {
         await operation.execute();
-        logger.info(`Completed task operation: ${operation.operation}`, operation.taskId);
+        logger.info(`Completed task operation: ${operation.operation}`, operation.taskId.toString());
         this.emit('operation-complete', operation);
       } catch (error) {
-        logger.error(`Failed task operation: ${operation.operation} - ${error}`, operation.taskId);
+        logger.error(`Failed task operation: ${operation.operation} - ${error}`, operation.taskId.toString());
         this.emit('operation-error', operation, error);
       }
-      
+
       this.currentOperation = null;
     }
-    
+
     this.isProcessing = false;
   }
 
@@ -76,7 +76,7 @@ export class TaskExecutor extends EventEmitter {
     return [...this.operationQueue];
   }
 
-  isTaskActive(taskId: string): boolean {
+  isTaskActive(taskId: number): boolean {
     if (this.currentOperation?.taskId === taskId) {
       return true;
     }

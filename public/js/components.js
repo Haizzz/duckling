@@ -5,6 +5,7 @@ window.Components = {
   createTaskCard(task) {
     const timeAgo = Utils.formatRelativeTime(task.updated_at);
     const statusFormatted = Utils.formatStatus(task.status);
+    const summary = task.summary || task.description.substring(0, 80) + (task.description.length > 80 ? '...' : '');
     
     return `
       <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer" 
@@ -12,11 +13,19 @@ window.Components = {
         <!-- Header -->
         <div class="flex items-start justify-between mb-4">
           <div class="flex-1">
-            <h3 class="text-lg font-medium text-gray-900 mb-1">${Utils.escapeHtml(task.title)}</h3>
+            <h3 class="text-lg font-medium text-gray-900 mb-1 cursor-pointer hover:text-blue-600" onclick="window.location.href='/task-detail.html?id=${task.id}'">${Utils.escapeHtml(summary)}</h3>
             <p class="text-sm text-gray-600 line-clamp-2">${Utils.escapeHtml(task.description.substring(0, 150))}${task.description.length > 150 ? '...' : ''}</p>
           </div>
           <div class="flex items-center space-x-2 ml-4">
             <span class="status-badge status-${task.status}">${statusFormatted}</span>
+            ${task.pr_url ? `
+              <a href="${task.pr_url}" target="_blank" class="inline-flex items-center px-2 py-1 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100" onclick="event.stopPropagation()">
+                <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M7.707 3.293a1 1 0 010 1.414L5.414 7H11a7 7 0 017 7v2a1 1 0 11-2 0v-2a5 5 0 00-5-5H5.414l2.293 2.293a1 1 0 11-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                </svg>
+                PR #${task.pr_number}
+              </a>
+            ` : ''}
             <div class="relative">
               <button class="text-gray-400 hover:text-gray-600" onclick="Components.toggleTaskMenu(event, '${task.id}')">
                 <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -28,7 +37,7 @@ window.Components = {
         </div>
 
         <!-- Metadata Grid -->
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 text-sm">
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4 text-sm">
           <div>
             <span class="text-gray-500">Agent:</span>
             <span class="ml-1 font-medium">${Utils.escapeHtml(task.coding_tool)}</span>
@@ -37,14 +46,6 @@ window.Components = {
           <div>
             <span class="text-gray-500">Branch:</span>
             <span class="ml-1 font-mono text-xs">${Utils.escapeHtml(task.branch_name)}</span>
-          </div>
-          ` : '<div></div>'}
-          ${task.pr_url ? `
-          <div>
-            <span class="text-gray-500">PR:</span>
-            <a href="${task.pr_url}" class="ml-1 text-blue-600 hover:text-blue-800" onclick="event.stopPropagation()" target="_blank">
-              #${task.pr_number}
-            </a>
           </div>
           ` : '<div></div>'}
           <div>

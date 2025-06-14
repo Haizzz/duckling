@@ -18,12 +18,28 @@ export class GitManager {
     this.repoPath = repoPath;
   }
 
-  async createAndCheckoutBranch(baseBranchName: string, taskId: string, branchPrefix?: string): Promise<string> {
+  async getLastCommitTimestamp(branchName: string): Promise<string> {
+    return await withRetry(async () => {
+      // Switch to the branch first
+      await this.git.checkout(branchName);
+
+      // Get the timestamp of the last commit
+      const log = await this.git.log(['-1', '--format=%cI']);
+
+      if (log.latest) {
+        return log.latest.date;
+      }
+
+      throw new Error(`No commits found for branch ${branchName}`);
+    }, 'Get last commit timestamp', 2);
+  }
+
+  async createAndCheckoutBranch(baseBranchName: string, taskId: number, branchPrefix?: string): Promise<string> {
     return await withRetry(async () => {
       // Get base branch from settings
       const baseBranchSetting = this.db.getSetting('baseBranch');
       const baseBranch = baseBranchSetting?.value || 'main';
-      
+
       // Get branch prefix from settings if not provided
       if (!branchPrefix) {
         const prefixSetting = this.db.getSetting('branchPrefix');
@@ -31,10 +47,10 @@ export class GitManager {
       }
 
       logger.info(`Updating to latest ${baseBranch} and creating new branch`, taskId);
-      
+
       // First, fetch latest changes for the specific base branch
       await this.git.fetch('origin', baseBranch);
-      
+
       // Switch to base branch and pull latest  
       await this.git.checkout(baseBranch);
       await this.git.pull('origin', baseBranch);
@@ -50,7 +66,7 @@ export class GitManager {
 
       // Create and checkout the new branch
       await this.git.checkoutLocalBranch(branchName);
-      
+
       logger.info(`Created and switched to branch: ${branchName}`, taskId);
       return branchName;
     }, 'Create and checkout branch');
@@ -65,27 +81,22 @@ export class GitManager {
     }
   }
 
-  async commitChangesWithTask(taskDescription: string, taskId: string): Promise<void> {
+  async commitChangesWithTask(taskDescription: string, taskId: number): Promise<void> {
     // Get list of changed files for context
     const status = await this.git.status();
     const changedFiles = [...status.modified, ...status.created, ...status.deleted];
-    
+
     // Generate intelligent commit message
     const message = await this.openaiManager.generateCommitMessage(taskDescription, changedFiles);
-    
+
     return this.commitChanges(message, taskId);
   }
 
-  async commitChanges(message: string, taskId: string): Promise<void> {
+  async commitChanges(message: string, taskId: number): Promise<void> {
     return await withRetry(async () => {
-      // Get commit suffix from settings
-      const suffixSetting = this.db.getSetting('commitSuffix');
-      const suffix = suffixSetting?.value || '';
-      const fullMessage = message + suffix;
-
       // Add all changes
       await this.git.add('.');
-      
+
       // Check if there are changes to commit
       const status = await this.git.status();
       if (status.files.length === 0) {
@@ -93,16 +104,16 @@ export class GitManager {
       }
 
       // Commit changes
-      await this.git.commit(fullMessage);
-      
-      logger.info(`Committed changes: ${fullMessage}`, taskId);
+      await this.git.commit(message);
+
+      logger.info(`Committed changes: ${message}`, taskId.toString());
     }, 'Commit changes');
   }
 
-  async pushBranch(branchName: string, taskId: string): Promise<void> {
+  async pushBranch(branchName: string, taskId: number): Promise<void> {
     return await withRetry(async () => {
       await this.git.push('origin', branchName);
-      logger.info(`Pushed branch: ${branchName}`, taskId);
+      logger.info(`Pushed branch: ${branchName}`, taskId.toString());
     }, 'Push branch');
   }
 
@@ -111,32 +122,32 @@ export class GitManager {
     return status.current || 'main';
   }
 
-  async switchToBranch(branchName: string, taskId?: string): Promise<void> {
+  async switchToBranch(branchName: string, taskId?: number): Promise<void> {
     return await withRetry(async () => {
-      if (taskId) logger.info(`Fetching and switching to branch: ${branchName}`, taskId);
-      
+      if (taskId) logger.info(`Fetching and switching to branch: ${branchName}`, taskId.toString());
+
       // Fetch the specific branch to ensure we have latest changes
       await this.git.fetch('origin', branchName);
-      
+
       // Switch to the branch
       await this.git.checkout(branchName);
-      
+
       // Pull any remote changes to ensure we're up to date
       try {
         await this.git.pull('origin', branchName);
-        if (taskId) logger.info(`Pulled latest changes for branch: ${branchName}`, taskId);
+        if (taskId) logger.info(`Pulled latest changes for branch: ${branchName}`, taskId.toString());
       } catch (error: any) {
         // If pull fails (e.g., no upstream), that's okay for local branches
-        if (taskId) logger.info(`No upstream changes to pull for branch: ${branchName}`, taskId);
+        if (taskId) logger.info(`No upstream changes to pull for branch: ${branchName}`, taskId.toString());
       }
     }, 'Switch to branch');
   }
 
   // Note: Branch deletion is not allowed per requirements
 
-  async fetchBranch(branchName: string, taskId?: string): Promise<void> {
+  async fetchBranch(branchName: string, taskId?: number): Promise<void> {
     return await withRetry(async () => {
-      if (taskId) logger.info(`Fetching latest changes for branch: ${branchName}`, taskId);
+      if (taskId) logger.info(`Fetching latest changes for branch: ${branchName}`, taskId.toString());
       await this.git.fetch('origin', branchName);
     }, `Fetch branch ${branchName}`);
   }
@@ -159,10 +170,10 @@ export class GitManager {
     }
   }
 
-  async pullLatest(branchName: string = 'main', taskId?: string): Promise<void> {
+  async pullLatest(branchName: string = 'main', taskId?: number): Promise<void> {
     return await withRetry(async () => {
       await this.git.pull('origin', branchName);
-      if (taskId) logger.info(`Pulled latest changes from ${branchName}`, taskId);
+      if (taskId) logger.info(`Pulled latest changes from ${branchName}`, taskId.toString());
     }, 'Pull latest changes');
   }
 }

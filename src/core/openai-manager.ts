@@ -142,7 +142,7 @@ Include:
 - Why this change was needed
 - Any relevant details for reviewers
 
-Format as markdown. Keep it concise but informative.
+Keep it concise but informative. Use plain text, no markdown formatting.
 
 PR description:`;
 

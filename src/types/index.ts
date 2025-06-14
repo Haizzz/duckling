@@ -1,5 +1,5 @@
 export interface Task {
-  id: string;
+  id: number;
   title: string;
   description: string;
   summary?: string;
@@ -14,7 +14,7 @@ export interface Task {
   completed_at?: string;
 }
 
-export type TaskStatus = 
+export type TaskStatus =
   | 'pending'
   | 'in-progress'
   | 'awaiting-review'
@@ -26,7 +26,7 @@ export type CodingTool = 'openai' | 'amp';
 
 export interface TaskLog {
   id: number;
-  task_id: string;
+  task_id: number;
   level: LogLevel;
   message: string;
   timestamp: string;
@@ -64,7 +64,7 @@ export interface InternSettings {
   github_token: string;
   openai_api_key?: string;
   amp_api_key?: string;
-  
+
   // General settings
   default_coding_tool: CodingTool;
   branch_prefix: string;
@@ -73,7 +73,7 @@ export interface InternSettings {
   auto_merge: boolean;
   max_retries: number;
   base_branch: string;
-  
+
   // GitHub settings
   github_repo_url: string;
   github_username: string;
@@ -83,7 +83,7 @@ export interface InternSettings {
 }
 
 export interface Job {
-  id: string;
+  id: number;
   type: string;
   data: string;
   status: JobStatus;
@@ -99,7 +99,7 @@ export interface Job {
 export type JobStatus = 'pending' | 'processing' | 'completed' | 'failed';
 
 export interface TaskUpdateEvent {
-  taskId: string;
+  taskId: number;
   status: TaskStatus;
   progress?: number;
   metadata?: Record<string, any>;

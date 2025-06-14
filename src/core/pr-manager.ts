@@ -22,7 +22,7 @@ export class PRManager {
 
   private async ensureInitialized() {
     if (this.initialized) return;
-    
+
     try {
       const repoInfo = await validateAndGetRepoInfo(process.cwd());
       this.repoOwner = repoInfo.owner;
@@ -36,14 +36,14 @@ export class PRManager {
   async createPRFromTask(
     branchName: string,
     taskDescription: string,
-    taskId: string
+    taskId: number
   ): Promise<{ number: number; url: string }> {
     await this.ensureInitialized();
-    
+
     // Generate intelligent title and description using OpenAI
     const title = await this.openaiManager.generatePRTitle(taskDescription, branchName);
     const description = await this.openaiManager.generatePRDescription(taskDescription, branchName);
-    
+
     return this.createPR(branchName, title, description, taskId);
   }
 
@@ -51,10 +51,10 @@ export class PRManager {
     branchName: string,
     title: string,
     description: string,
-    taskId: string
+    taskId: number
   ): Promise<{ number: number; url: string }> {
     await this.ensureInitialized();
-    
+
     return await withRetry(async () => {
       // Check if PR already exists for this branch
       const existingPR = await this.findPRByBranch(branchName);
@@ -92,14 +92,14 @@ export class PRManager {
     prNumber: number,
     title?: string,
     description?: string,
-    taskId?: string
+    taskId?: number
   ): Promise<void> {
     return await withRetry(async () => {
       const updateData: any = {};
-      
+
       if (title) updateData.title = title;
       if (description) updateData.body = description;
-      
+
       if (Object.keys(updateData).length === 0) return;
 
       await this.octokit.rest.pulls.update({
@@ -130,46 +130,45 @@ export class PRManager {
     }
   }
 
-  async getPRComments(prNumber: number, since?: string): Promise<any[]> {
-    return await withRetry(async () => {
-      const params: any = {
-        owner: this.repoOwner,
-        repo: this.repoName,
-        issue_number: prNumber // Comments API uses issue_number for PRs
-      };
-
-      if (since) {
-        params.since = since;
-      }
-
-      const response = await this.octokit.rest.issues.listComments(params);
-      return response.data;
-    }, 'Get PR comments', 2);
-  }
-
   async pollForComments(
     prNumber: number,
-    lastCommentId: number | null,
+    lastCommitTimestamp: string | null,
     targetUsername: string
   ): Promise<any[]> {
     try {
-      const comments = await this.getPRComments(prNumber);
-      
-      // Filter comments from the target user and newer than lastCommentId
-      const newComments = comments.filter(comment => {
+      // Only get PR review comments (not regular PR comments)
+      const reviewComments = await this.getPRReviewComments(prNumber);
+
+      // Filter comments from the target user and newer than last commit timestamp
+      const newComments = reviewComments.filter(comment => {
         const isFromTargetUser = comment.user.login === targetUsername;
-        const isNewer = !lastCommentId || comment.id > lastCommentId;
+        const isNewer = !lastCommitTimestamp || new Date(comment.created_at) > new Date(lastCommitTimestamp);
         return isFromTargetUser && isNewer;
       });
 
       return newComments;
     } catch (error) {
-      console.error('Error polling for PR comments:', error);
+      console.error('Error polling for PR review comments:', error);
       return [];
     }
   }
 
-  async addComment(prNumber: number, comment: string, taskId?: string): Promise<void> {
+  async getPRReviewComments(prNumber: number): Promise<any[]> {
+    return await withRetry(async () => {
+      await this.ensureInitialized();
+
+      const params = {
+        owner: this.repoOwner,
+        repo: this.repoName,
+        pull_number: prNumber
+      };
+
+      const response = await this.octokit.rest.pulls.listReviewComments(params);
+      return response.data;
+    }, 'Get PR review comments', 2);
+  }
+
+  async addComment(prNumber: number, comment: string, taskId?: number): Promise<void> {
     return await withRetry(async () => {
       await this.octokit.rest.issues.createComment({
         owner: this.repoOwner,
@@ -190,7 +189,7 @@ export class PRManager {
     merged: boolean;
   }> {
     await this.ensureInitialized();
-    
+
     return await withRetry(async () => {
       const response = await this.octokit.rest.pulls.get({
         owner: this.repoOwner,
@@ -209,7 +208,7 @@ export class PRManager {
   // Note: PR merge and close functionality removed per requirements
   // The system can only create PRs and push new commits
 
-  private logPREvent(taskId: string, message: string): void {
+  private logPREvent(taskId: number, message: string): void {
     this.db.addTaskLog({
       task_id: taskId,
       level: 'info',

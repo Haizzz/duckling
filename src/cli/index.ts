@@ -219,7 +219,7 @@ taskCmd
       const engine = new CoreEngine(db);
       await engine.initialize();
       
-      const task = db.getTask(taskId);
+      const task = db.getTask(parseInt(taskId));
       if (!task) {
         console.log(`❌ Task not found: ${taskId}`);
         engine.shutdown();
@@ -234,7 +234,7 @@ taskCmd
         return;
       }
       
-      await engine.cancelTask(taskId);
+      await engine.cancelTask(parseInt(taskId));
       
       console.log(`✅ Task cancelled: ${task.title}`);
       

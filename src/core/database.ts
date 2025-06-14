@@ -27,7 +27,7 @@ export class DatabaseManager {
     // Tasks table
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS tasks (
-        id TEXT PRIMARY KEY,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL,
         description TEXT NOT NULL,
         status TEXT NOT NULL,
@@ -58,7 +58,7 @@ export class DatabaseManager {
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS task_logs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        task_id TEXT NOT NULL,
+        task_id INTEGER NOT NULL,
         level TEXT NOT NULL,
         message TEXT NOT NULL,
         timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -101,7 +101,7 @@ export class DatabaseManager {
     // Jobs table for the queue
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS jobs (
-        id TEXT PRIMARY KEY,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         type TEXT NOT NULL,
         data TEXT NOT NULL,
         status TEXT DEFAULT 'pending',
@@ -155,14 +155,13 @@ export class DatabaseManager {
   }
 
   // Task operations
-  createTask(task: Omit<Task, 'created_at' | 'updated_at'>): void {
+  createTask(task: Omit<Task, 'id' | 'created_at' | 'updated_at'>): number {
     const stmt = this.db.prepare(`
-      INSERT INTO tasks (id, title, description, summary, status, coding_tool, current_stage, branch_name, pr_number, pr_url, completed_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO tasks (title, description, summary, status, coding_tool, current_stage, branch_name, pr_number, pr_url, completed_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
-    stmt.run(
-      task.id,
+    const result = stmt.run(
       task.title,
       task.description,
       task.summary || null,
@@ -174,9 +173,11 @@ export class DatabaseManager {
       task.pr_url || null,
       task.completed_at || null
     );
+    
+    return result.lastInsertRowid as number;
   }
 
-  updateTask(id: string, updates: Partial<Task>): void {
+  updateTask(id: number, updates: Partial<Task>): void {
     const fields = Object.keys(updates).filter(key => key !== 'id');
     if (fields.length === 0) return;
 
@@ -192,7 +193,7 @@ export class DatabaseManager {
     stmt.run(...values, id);
   }
 
-  getTask(id: string): Task | null {
+  getTask(id: number): Task | null {
     const stmt = this.db.prepare('SELECT * FROM tasks WHERE id = ?');
     return stmt.get(id) as Task | null;
   }
@@ -224,7 +225,7 @@ export class DatabaseManager {
     return stmt.all(...params) as Task[];
   }
 
-  deleteTask(id: string): void {
+  deleteTask(id: number): void {
     // Delete task logs first
     this.db.prepare('DELETE FROM task_logs WHERE task_id = ?').run(id);
 
@@ -243,7 +244,7 @@ export class DatabaseManager {
   }
 
   getTaskLogs(
-    taskId: string,
+    taskId: number,
     filters: { level?: string; limit?: number; offset?: number } = {}
   ): TaskLog[] {
     let query = 'SELECT * FROM task_logs WHERE task_id = ?';

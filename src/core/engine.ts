@@ -36,7 +36,7 @@ export class CoreEngine extends EventEmitter {
 
     // Initialize PR manager if GitHub settings are available
     const githubToken = this.db.getSetting('githubToken');
-    
+
     if (githubToken) {
       this.prManager = new PRManager(githubToken.value, this.db, this.openaiManager);
     }
@@ -53,9 +53,7 @@ export class CoreEngine extends EventEmitter {
     this.isInitialized = true;
   }
 
-  async createTask(request: CreateTaskRequest): Promise<string> {
-    const taskId = generateId();
-    
+  async createTask(request: CreateTaskRequest): Promise<number> {
     // Generate summary using OpenAI
     let summary: string | undefined;
     try {
@@ -64,20 +62,17 @@ export class CoreEngine extends EventEmitter {
       logger.warn(`Failed to generate task summary: ${error}`);
       // Continue without summary - will fallback in UI
     }
-    
-    const task: Task = {
-      id: taskId,
+
+    const task = {
       title: request.title,
       description: request.description,
       summary,
-      status: 'pending',
-      coding_tool: request.codingTool,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      status: 'pending' as TaskStatus,
+      coding_tool: request.codingTool
     };
 
-    // Store task in database
-    this.db.createTask(task);
+    // Store task in database - returns auto-generated ID
+    const taskId = this.db.createTask(task);
 
     // Log task creation
     this.db.addTaskLog({
@@ -87,7 +82,7 @@ export class CoreEngine extends EventEmitter {
     });
 
     // Enqueue task for processing
-    this.jobQueue.enqueue('process-task', { taskId }, { maxAttempts: 5 });
+    this.jobQueue.enqueue('process-task', { taskId: taskId.toString() }, { maxAttempts: 5 });
 
     // Emit task update event
     this.emitTaskUpdate(taskId, 'pending');
@@ -95,13 +90,13 @@ export class CoreEngine extends EventEmitter {
     return taskId;
   }
 
-  async cancelTask(taskId: string): Promise<void> {
+  async cancelTask(taskId: number): Promise<void> {
     const task = this.db.getTask(taskId);
     if (!task) {
       throw new Error('Task not found');
     }
 
-    this.db.updateTask(taskId, { 
+    this.db.updateTask(taskId, {
       status: 'cancelled',
       current_stage: 'cancelled',
       completed_at: new Date().toISOString()
@@ -116,7 +111,7 @@ export class CoreEngine extends EventEmitter {
     this.emitTaskUpdate(taskId, 'cancelled');
   }
 
-  async retryTask(taskId: string): Promise<void> {
+  async retryTask(taskId: number): Promise<void> {
     const task = this.db.getTask(taskId);
     if (!task) {
       throw new Error('Task not found');
@@ -157,7 +152,7 @@ export class CoreEngine extends EventEmitter {
     });
   }
 
-  private async processTask(taskId: string): Promise<void> {
+  private async processTask(taskId: number): Promise<void> {
     const task = this.db.getTask(taskId);
     if (!task) {
       throw new Error('Task not found');
@@ -165,7 +160,7 @@ export class CoreEngine extends EventEmitter {
 
     // Use task executor to ensure only one task operation at a time
     await taskExecutor.executeTask({
-      taskId,
+      taskId: taskId,
       operation: 'process-task',
       execute: async () => {
         try {
@@ -176,7 +171,7 @@ export class CoreEngine extends EventEmitter {
           // Step 1: Create branch
           let baseBranchName: string;
           let branchName: string;
-          
+
           try {
             baseBranchName = await this.openaiManager.generateBranchName(task.description);
           } catch (error: any) {
@@ -236,7 +231,7 @@ export class CoreEngine extends EventEmitter {
 
           // Step 3: Run precommit checks
           this.db.updateTask(taskId, { current_stage: 'running_precommit_checks' });
-          
+
           try {
             await this.runPrecommitChecks(taskId);
           } catch (error: any) {
@@ -250,7 +245,7 @@ export class CoreEngine extends EventEmitter {
 
           // Step 4: Commit and push changes
           this.db.updateTask(taskId, { current_stage: 'committing_changes' });
-          
+
           try {
             await this.gitManager.commitChangesWithTask(task.description, taskId);
             await this.gitManager.pushBranch(branchName, taskId);
@@ -284,7 +279,7 @@ export class CoreEngine extends EventEmitter {
             }
           } else {
             // No PR manager - mark as completed
-            this.db.updateTask(taskId, { 
+            this.db.updateTask(taskId, {
               status: 'completed',
               current_stage: 'completed',
               completed_at: new Date().toISOString()
@@ -306,7 +301,7 @@ export class CoreEngine extends EventEmitter {
     });
   }
 
-  private async runPrecommitChecks(taskId: string): Promise<void> {
+  private async runPrecommitChecks(taskId: number): Promise<void> {
     this.db.addTaskLog({
       task_id: taskId,
       level: 'info',
@@ -315,7 +310,7 @@ export class CoreEngine extends EventEmitter {
 
     // First run - stop on first failure to get focused error messages
     const firstResult = await this.precommitManager.runChecks(taskId, true);
-    
+
     if (!firstResult.passed) {
       // Get task to retry with fixes
       const task = this.db.getTask(taskId);
@@ -343,7 +338,7 @@ export class CoreEngine extends EventEmitter {
 
       // Second run - run all checks without stopping, don't try to fix again
       const secondResult = await this.precommitManager.runChecks(taskId, false);
-      
+
       if (!secondResult.passed) {
         this.db.addTaskLog({
           task_id: taskId,
@@ -360,12 +355,12 @@ export class CoreEngine extends EventEmitter {
     });
   }
 
-  private async createPR(taskId: string, task: Task, branchName: string): Promise<void> {
+  private async createPR(taskId: number, task: Task, branchName: string): Promise<void> {
     if (!this.prManager) return;
 
     const pr = await this.prManager.createPRFromTask(branchName, task.description, taskId);
-    
-    this.db.updateTask(taskId, { 
+
+    this.db.updateTask(taskId, {
       status: 'awaiting-review',
       current_stage: 'awaiting_review',
       pr_number: pr.number,
@@ -384,7 +379,7 @@ export class CoreEngine extends EventEmitter {
     this.jobQueue.enqueue('poll-pr-comments', { taskId, prNumber: pr.number });
   }
 
-  private async pollPRComments(taskId: string, prNumber: number): Promise<void> {
+  private async pollPRComments(taskId: number, prNumber: number): Promise<void> {
     if (!this.prManager) return;
 
     const task = this.db.getTask(taskId);
@@ -396,17 +391,24 @@ export class CoreEngine extends EventEmitter {
     if (!githubUsername) return;
 
     try {
-      // Get last processed comment ID
-      const lastCommentSetting = this.db.getSetting(`last_comment_${taskId}`);
-      const lastCommentId = lastCommentSetting ? parseInt(lastCommentSetting.value) : null;
+      // Get last commit timestamp for the branch
+      let lastCommitTimestamp: string | null = null;
+      if (task.branch_name) {
+        try {
+          lastCommitTimestamp = await this.gitManager.getLastCommitTimestamp(task.branch_name);
+        } catch (error) {
+          // If we can't get commit timestamp, continue with null (will get all comments)
+          console.warn(`Could not get last commit timestamp for branch ${task.branch_name}:`, error);
+        }
+      }
 
-      // Poll for new comments
-      const newComments = await this.prManager.pollForComments(prNumber, lastCommentId, githubUsername);
+      // Poll for new comments since last commit
+      const newComments = await this.prManager.pollForComments(prNumber, lastCommitTimestamp, githubUsername);
 
       for (const comment of newComments) {
         // Process each new comment
         this.jobQueue.enqueue('handle-pr-comment', { taskId, comment: comment.body });
-        
+
         // Update last processed comment ID
         this.db.setSetting(`last_comment_${taskId}`, comment.id.toString(), 'system');
       }
@@ -414,7 +416,7 @@ export class CoreEngine extends EventEmitter {
       // Check PR status
       const prStatus = await this.prManager.getPRStatus(prNumber);
       if (prStatus.merged) {
-        this.db.updateTask(taskId, { 
+        this.db.updateTask(taskId, {
           status: 'completed',
           current_stage: 'completed',
           completed_at: new Date().toISOString()
@@ -437,13 +439,13 @@ export class CoreEngine extends EventEmitter {
         level: 'error',
         message: `Error polling PR comments: ${error.message}`
       });
-      
+
       // Retry polling after a delay
       this.jobQueue.enqueue('poll-pr-comments', { taskId, prNumber }, { delay: 60000 }); // 1 minute delay
     }
   }
 
-  private async handlePRComment(taskId: string, comment: string): Promise<void> {
+  private async handlePRComment(taskId: number, comment: string): Promise<void> {
     const task = this.db.getTask(taskId);
     if (!task) return;
 
@@ -455,7 +457,7 @@ export class CoreEngine extends EventEmitter {
 
     // Use task executor to ensure only one task operation at a time
     await taskExecutor.executeTask({
-      taskId,
+      taskId: taskId,
       operation: 'handle-pr-comment',
       execute: async () => {
         try {
@@ -500,26 +502,35 @@ export class CoreEngine extends EventEmitter {
 
 
 
-  private emitTaskUpdate(taskId: string, status: TaskStatus, metadata?: any): void {
+  private emitTaskUpdate(taskId: number, status: TaskStatus, metadata?: any): void {
     const event: TaskUpdateEvent = {
       taskId,
       status,
       metadata
     };
-    
+
     this.emit('task-update', event);
   }
 
   private startPRCommentPolling(): void {
-    // Find all tasks that are awaiting review and start polling for them
+    // Poll every 30 seconds for all tasks awaiting review
+    setInterval(() => {
+      this.pollAllAwaitingTasks().catch(error => {
+        logger.error('Error in PR comment polling:', error);
+      });
+    }, 30000); // 30 seconds
+  }
+
+  private async pollAllAwaitingTasks(): Promise<void> {
     const awaitingTasks = this.db.getTasks({ status: 'awaiting-review' });
-    
+
     for (const task of awaitingTasks) {
       if (task.pr_number) {
-        this.jobQueue.enqueue('poll-pr-comments', { 
-          taskId: task.id, 
-          prNumber: task.pr_number 
-        });
+        try {
+          await this.pollPRComments(task.id, task.pr_number);
+        } catch (error) {
+          logger.error(`Error polling comments for task ${task.id}: ${error}`);
+        }
       }
     }
   }

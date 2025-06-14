@@ -4,10 +4,12 @@ class TaskDetail {
     this.taskId = this.getTaskIdFromUrl();
     this.logRefreshInterval = null;
     this.currentTask = null;
+    this.eventSource = null;
     
     if (this.taskId) {
       this.loadTaskDetail();
       this.startLogRefresh();
+      this.startEventStream();
     } else {
       this.showError('No task ID provided');
     }
@@ -15,6 +17,7 @@ class TaskDetail {
     // Cleanup on page unload
     window.addEventListener('beforeunload', () => {
       this.stopLogRefresh();
+      this.stopEventStream();
     });
   }
 
@@ -121,16 +124,26 @@ class TaskDetail {
             <div>
               <h3 class="text-lg font-medium text-gray-900 mb-3">Progress</h3>
               <div class="space-y-3">
+                <div class="flex justify-between">
+                  <span class="text-gray-600">Status:</span>
+                  <span>${statusBadge}</span>
+                </div>
+                ${task.current_stage ? `
+                  <div class="flex justify-between">
+                    <span class="text-gray-600">Stage:</span>
+                    <span>${this.getStageBadge(task.current_stage)}</span>
+                  </div>
+                ` : ''}
                 ${task.branch_name ? `
                   <div class="flex justify-between">
                     <span class="text-gray-600">Branch:</span>
-                    <span class="font-mono text-sm">${this.escapeHtml(task.branch_name)}</span>
+                    ${this.getBranchLink(task.branch_name)}
                   </div>
                 ` : ''}
                 ${task.pr_url ? `
                   <div class="flex justify-between">
                     <span class="text-gray-600">Pull Request:</span>
-                    <a href="${task.pr_url}" target="_blank" class="text-gray-600 hover:text-gray-800 underline">#${task.pr_number}</a>
+                    <a href="${task.pr_url}" target="_blank" class="text-blue-600 hover:text-blue-800 underline">#${task.pr_number}</a>
                   </div>
                 ` : ''}
               </div>
@@ -215,6 +228,39 @@ class TaskDetail {
       clearInterval(this.logRefreshInterval);
       this.logRefreshInterval = null;
     }
+  }
+
+  startEventStream() {
+    this.eventSource = new EventSource('/api/events');
+    
+    this.eventSource.addEventListener('task-update', (event) => {
+      const taskUpdate = JSON.parse(event.data);
+      if (taskUpdate.id === this.taskId) {
+        this.currentTask = taskUpdate;
+        this.renderTaskDetail(taskUpdate);
+        
+        // Stop log refresh if task is completed
+        if (['completed', 'cancelled', 'failed'].includes(taskUpdate.status)) {
+          this.stopLogRefresh();
+        }
+      }
+    });
+    
+    this.eventSource.onerror = (error) => {
+      console.error('EventSource error:', error);
+    };
+  }
+
+  stopEventStream() {
+    if (this.eventSource) {
+      this.eventSource.close();
+      this.eventSource = null;
+    }
+  }
+
+  getBranchLink(branchName) {
+    // Get GitHub repo URL from settings or construct from branch
+    return `<a href="https://github.com/Haizzz/intern/tree/${encodeURIComponent(branchName)}" target="_blank" class="font-mono text-sm text-blue-600 hover:text-blue-800 underline">${this.escapeHtml(branchName)}</a>`;
   }
 
   getLogColor(level) {

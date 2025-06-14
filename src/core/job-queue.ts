@@ -50,12 +50,12 @@ export class SQLiteJobQueue {
 
   private async executeJob(job: Job, handler: (data: any) => Promise<void>): Promise<void> {
     // Mark as processing
-    this.db.updateJobStatus(job.id, 'processing');
+    this.db.updateJobStatus(job.id.toString(), 'processing');
 
     try {
       await handler(JSON.parse(job.data));
       // Mark as completed
-      this.db.updateJobStatus(job.id, 'completed');
+      this.db.updateJobStatus(job.id.toString(), 'completed');
 
     } catch (error) {
       await this.handleJobFailure(job, error as Error);
@@ -67,12 +67,12 @@ export class SQLiteJobQueue {
 
     if (nextAttempt >= job.max_attempts) {
       // Max attempts reached
-      this.db.updateJobStatus(job.id, 'failed', error.message);
+      this.db.updateJobStatus(job.id.toString(), 'failed', error.message);
     } else {
       // Schedule retry
       const backoffDelay = Math.pow(2, nextAttempt) * 1000; // Exponential backoff
       const retryAt = new Date(Date.now() + backoffDelay).toISOString();
-      this.db.incrementJobAttempts(job.id, retryAt);
+      this.db.incrementJobAttempts(job.id.toString(), retryAt);
     }
   }
 
