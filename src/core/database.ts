@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 import fs from 'fs';
-import { Task, TaskLog, Setting, PrecommitCheck, SystemConfig, Job } from '../types';
+import { Task, TaskLog, Setting, PrecommitCheck } from '../types';
 import { DUCKLING_DIR, DATABASE_PATH, DEFAULT_SETTINGS } from '../utils/constants';
 import { logger } from '../utils/logger';
 
@@ -89,14 +89,7 @@ export class DatabaseManager {
       )
     `);
 
-    // System config table
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS system_config (
-        key TEXT PRIMARY KEY,
-        value TEXT NOT NULL,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
+
 
 
 
@@ -119,7 +112,7 @@ export class DatabaseManager {
       { key: 'commitSuffix', value: DEFAULT_SETTINGS.commitSuffix, category: 'general' },
       { key: 'maxRetries', value: DEFAULT_SETTINGS.maxRetries.toString(), category: 'general' },
       { key: 'baseBranch', value: DEFAULT_SETTINGS.baseBranch, category: 'general' },
-      
+
 
     ];
 
@@ -283,20 +276,7 @@ export class DatabaseManager {
     stmt.run(key, value, category);
   }
 
-  // System config operations
-  getSystemConfig(key: string): SystemConfig | null {
-    const stmt = this.db.prepare('SELECT * FROM system_config WHERE key = ?');
-    return stmt.get(key) as SystemConfig | null;
-  }
 
-  setSystemConfig(key: string, value: string): void {
-    const stmt = this.db.prepare(`
-      INSERT OR REPLACE INTO system_config (key, value, updated_at)
-      VALUES (?, ?, CURRENT_TIMESTAMP)
-    `);
-
-    stmt.run(key, value);
-  }
 
 
 

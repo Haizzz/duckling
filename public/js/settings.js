@@ -64,10 +64,9 @@ class Settings {
     document.getElementById('branch-prefix').value = settings.branchPrefix || 'duckling-';
     document.getElementById('base-branch').value = settings.baseBranch || 'main';
     document.getElementById('pr-title-prefix').value = settings.prTitlePrefix || '[DUCKLING]';
-    document.getElementById('commit-suffix').value = settings.commitSuffix || ' [d]';
+    document.getElementById('commit-suffix').value = settings.commitSuffix || ' [quack]';
     document.getElementById('max-retries').value = settings.maxRetries || 3;
-    document.getElementById('task-check-interval').value = settings.taskCheckInterval || 60;
-    document.getElementById('review-check-interval').value = settings.reviewCheckInterval || 30;
+
 
     // Show configuration status
     this.showConfigurationStatus(settings);
@@ -87,8 +86,7 @@ class Settings {
 
     // Convert numeric fields
     settings.maxRetries = parseInt(settings.maxRetries);
-    settings.taskCheckInterval = parseInt(settings.taskCheckInterval);
-    settings.reviewCheckInterval = parseInt(settings.reviewCheckInterval);
+
 
     try {
       const response = await fetch('/api/settings', {

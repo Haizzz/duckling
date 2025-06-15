@@ -53,11 +53,7 @@ export interface PrecommitCheck {
   created_at: string;
 }
 
-export interface SystemConfig {
-  key: string;
-  value: string;
-  updated_at: string;
-}
+
 
 export interface DucklingSettings {
   // API Keys
@@ -70,7 +66,6 @@ export interface DucklingSettings {
   branch_prefix: string;
   pr_prefix: string;
   commit_suffix: string;
-  auto_merge: boolean;
   max_retries: number;
   base_branch: string;
 
@@ -78,25 +73,7 @@ export interface DucklingSettings {
   github_repo_url: string;
   github_username: string;
   poll_interval_seconds: number;
-  task_check_interval_seconds: number;
-  review_check_interval_seconds: number;
 }
-
-export interface Job {
-  id: number;
-  type: string;
-  data: string;
-  status: JobStatus;
-  attempts: number;
-  max_attempts: number;
-  created_at: string;
-  scheduled_at: string;
-  processed_at?: string;
-  failed_at?: string;
-  error?: string;
-}
-
-export type JobStatus = 'pending' | 'processing' | 'completed' | 'failed';
 
 export interface TaskUpdateEvent {
   taskId: number;
@@ -118,7 +95,6 @@ export interface CreateTaskRequest {
   codingTool: CodingTool;
   branchPrefix?: string;
   prPrefix?: string;
-  autoMerge?: boolean;
 }
 
 

@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events';
 import { DatabaseManager } from './database';
-
+import { SettingsManager } from './settings-manager';
 import { GitManager } from './git-manager';
 import { CodingManager } from './coding-manager';
 import { PrecommitManager } from './precommit-manager';
@@ -12,6 +12,7 @@ import { logger } from '../utils/logger';
 
 export class CoreEngine extends EventEmitter {
   private db: DatabaseManager;
+  private settings: SettingsManager;
   private gitManager: GitManager;
   private codingManager: CodingManager;
   private precommitManager: PrecommitManager;
@@ -24,6 +25,7 @@ export class CoreEngine extends EventEmitter {
   constructor(db: DatabaseManager, repoPath: string = process.cwd()) {
     super();
     this.db = db;
+    this.settings = new SettingsManager(db);
     this.openaiManager = new OpenAIManager(db);
     this.gitManager = new GitManager(db, repoPath, this.openaiManager);
     this.codingManager = new CodingManager(db);
@@ -35,14 +37,14 @@ export class CoreEngine extends EventEmitter {
       return this.prManager;
     }
 
-    const githubToken = this.db.getSetting('githubToken');
-    if (!githubToken || !githubToken.value) {
+    const githubToken = this.settings.get('githubToken');
+    if (!githubToken) {
       logger.error('GitHub token not configured. PR operations will be skipped. Please configure GitHub settings.');
       throw new Error('GitHub token not configured. PR operations will be skipped. Please configure GitHub settings.');
     }
 
     try {
-      this.prManager = new PRManager(githubToken.value, this.db, this.openaiManager);
+      this.prManager = new PRManager(githubToken, this.db, this.openaiManager);
       return this.prManager;
     } catch (error) {
       const errorMsg = `Failed to initialize PR manager: ${error}`;
@@ -470,7 +472,7 @@ export class CoreEngine extends EventEmitter {
     }
 
     const prManager = this.getPRManager();
-    const githubUsername = this.db.getSetting('githubUsername')?.value;
+    const githubUsername = this.settings.get('githubUsername');
     if (!githubUsername) return { comments: [] };
 
     // Get last commit timestamp for the branch

@@ -1,6 +1,7 @@
 import { Octokit } from '@octokit/rest';
 import { withRetry } from '../utils/retry';
 import { DatabaseManager } from './database';
+import { SettingsManager } from './settings-manager';
 import { OpenAIManager } from './openai-manager';
 import { validateAndGetRepoInfo } from '../utils/git-utils';
 import { logger } from '../utils/logger';
@@ -8,6 +9,7 @@ import { logger } from '../utils/logger';
 export class PRManager {
   private octokit: Octokit;
   private db: DatabaseManager;
+  private settings: SettingsManager;
   private openaiManager: OpenAIManager;
   private repoOwner: string = '';
   private repoName: string = '';
@@ -18,6 +20,7 @@ export class PRManager {
       auth: githubToken,
     });
     this.db = db;
+    this.settings = new SettingsManager(db);
     this.openaiManager = openaiManager;
   }
 
@@ -67,8 +70,7 @@ export class PRManager {
       }
 
       // Get base branch from settings
-      const baseBranchSetting = this.db.getSetting('baseBranch');
-      const baseBranch = baseBranchSetting?.value || 'main';
+      const baseBranch = this.settings.get('baseBranch');
 
       // Create new PR
       const response = await this.octokit.rest.pulls.create({

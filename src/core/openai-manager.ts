@@ -1,22 +1,25 @@
 import OpenAI from 'openai';
 import { logger } from '../utils/logger';
 import { DatabaseManager } from './database';
+import { SettingsManager } from './settings-manager';
 import { withRetry } from '../utils/retry';
 
 export class OpenAIManager {
   private db: DatabaseManager;
+  private settings: SettingsManager;
   private openai: OpenAI | null = null;
 
   constructor(db: DatabaseManager) {
     this.db = db;
+    this.settings = new SettingsManager(db);
     this.initializeClient();
   }
 
   private initializeClient(): void {
-    const apiKey = this.db.getSetting('openaiApiKey');
-    if (apiKey && apiKey.value) {
+    const apiKey = this.settings.get('openaiApiKey');
+    if (apiKey) {
       this.openai = new OpenAI({
-        apiKey: apiKey.value
+        apiKey: apiKey
       });
     }
   }
@@ -49,8 +52,7 @@ export class OpenAIManager {
 
   async generateBranchName(taskDescription: string): Promise<string> {
     // Get branch prefix to calculate available space
-    const prefixSetting = this.db.getSetting('branchPrefix');
-    const branchPrefix = prefixSetting?.value || 'duckling-';
+    const branchPrefix = this.settings.get('branchPrefix');
     const maxBranchNameLength = 30 - branchPrefix.length; // Reserve space for prefix
 
     if (!this.openai) {
@@ -93,7 +95,7 @@ Branch name:`;
   }
 
   async generatePRTitle(taskDescription: string, branchName: string): Promise<string> {
-    const prefix = this.db.getSetting('prTitlePrefix')?.value || '[DUCKLING]';
+    const prefix = this.settings.get('prTitlePrefix');
 
     if (!this.openai) {
       // Fallback to simple generation if OpenAI not available

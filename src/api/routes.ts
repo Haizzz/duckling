@@ -1,10 +1,12 @@
 import { Router, Request, Response } from 'express';
 import { DatabaseManager } from '../core/database';
+import { SettingsManager } from '../core/settings-manager';
 import { CoreEngine } from '../core/engine';
 import { ApiResponse, CreateTaskRequest } from '../types';
 
 export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
   const router = Router();
+  const settings = new SettingsManager(db);
 
   // Health check
   router.get('/health', (req: Request, res: Response) => {
@@ -236,7 +238,7 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
     try {
       const { validateAndGetRepoInfo } = await import('../utils/git-utils');
       const repoInfo = await validateAndGetRepoInfo(process.cwd());
-      
+
       const response: ApiResponse = {
         success: true,
         data: {
@@ -257,23 +259,23 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
   // Settings endpoints
   router.get('/settings', async (req: Request, res: Response) => {
     try {
-      const { category } = req.query;
-      const settings = db.getSettings(category as string);
+      const settingsObj = settings.getAll();
 
-      // Convert array to object for easier frontend usage
-      const settingsObj: Record<string, any> = {};
-      settings.forEach(setting => {
-        // For password fields, return a special indicator if value exists
-        if (setting.key.toLowerCase().includes('token') || setting.key.toLowerCase().includes('apikey')) {
-          settingsObj[setting.key] = setting.value ? '***CONFIGURED***' : '';
+      // For password fields, return a special indicator if value exists
+      const secureFields = ['githubToken', 'ampApiKey', 'openaiApiKey'];
+      const sanitizedSettings: Record<string, any> = {};
+
+      for (const [key, value] of Object.entries(settingsObj)) {
+        if (secureFields.includes(key)) {
+          sanitizedSettings[key] = value ? '***CONFIGURED***' : '';
         } else {
-          settingsObj[setting.key] = setting.value;
+          sanitizedSettings[key] = value;
         }
-      });
+      }
 
       const response: ApiResponse = {
         success: true,
-        data: settingsObj
+        data: sanitizedSettings
       };
 
       res.json(response);
@@ -293,29 +295,25 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
       const categoryMap: Record<string, string> = {
         githubToken: 'api_keys',
         openaiApiKey: 'api_keys',
-        claudeApiKey: 'api_keys',
         ampApiKey: 'api_keys',
         defaultCodingTool: 'general',
         branchPrefix: 'general',
         prTitlePrefix: 'general',
         baseBranch: 'general',
         commitSuffix: 'general',
-        autoMerge: 'general',
         maxRetries: 'general',
         pollInterval: 'github',
-        taskCheckInterval: 'general',
-        reviewCheckInterval: 'general',
         githubUsername: 'github'
       };
 
       // Update each setting
       for (const [key, value] of Object.entries(settings)) {
         // Skip empty API keys/tokens (means don't change the existing value)
-        if ((key.toLowerCase().includes('token') || key.toLowerCase().includes('apikey')) && 
-            (!value || value === '' || value === '***CONFIGURED***')) {
+        if ((key.toLowerCase().includes('token') || key.toLowerCase().includes('apikey')) &&
+          (!value || value === '' || value === '***CONFIGURED***')) {
           continue;
         }
-        
+
         const category = categoryMap[key] || 'general';
         db.setSetting(key, value as string, category);
       }

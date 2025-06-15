@@ -2,20 +2,20 @@ import { simpleGit, SimpleGit } from 'simple-git';
 import { withRetry } from '../utils/retry';
 import { logger } from '../utils/logger';
 import { DatabaseManager } from './database';
+import { SettingsManager } from './settings-manager';
 import { OpenAIManager } from './openai-manager';
-import { execCommand } from '../utils/exec';
-import * as fs from 'fs';
-import * as path from 'path';
 
 export class GitManager {
   private git: SimpleGit;
   private db: DatabaseManager;
+  private settings: SettingsManager;
   private openaiManager: OpenAIManager;
   private repoPath: string;
 
   constructor(db: DatabaseManager, repoPath: string = process.cwd(), openaiManager?: OpenAIManager) {
     this.git = simpleGit(repoPath);
     this.db = db;
+    this.settings = new SettingsManager(db);
     this.openaiManager = openaiManager || new OpenAIManager(db);
     this.repoPath = repoPath;
   }
@@ -39,13 +39,11 @@ export class GitManager {
   async createAndCheckoutBranch(baseBranchName: string, taskId: number, branchPrefix?: string): Promise<string> {
     return await withRetry(async () => {
       // Get base branch from settings
-      const baseBranchSetting = this.db.getSetting('baseBranch');
-      const baseBranch = baseBranchSetting?.value || 'main';
+      const baseBranch = this.settings.get('baseBranch');
 
       // Get branch prefix from settings if not provided
       if (!branchPrefix) {
-        const prefixSetting = this.db.getSetting('branchPrefix');
-        branchPrefix = prefixSetting?.value || 'duckling-';
+        branchPrefix = this.settings.get('branchPrefix');
       }
 
       logger.info(`Updating to latest ${baseBranch} and creating new branch`, taskId.toString());
@@ -101,7 +99,7 @@ export class GitManager {
       const message = await this.openaiManager.generateCommitMessage(taskDescription, changedFiles);
 
       // Apply commit suffix from settings
-      const suffix = this.db.getSetting('commitSuffix')?.value || ' [quack]';
+      const suffix = this.settings.get('commitSuffix');
       const finalMessage = message.endsWith(suffix) ? message : `${message}${suffix}`;
 
       // Commit changes
