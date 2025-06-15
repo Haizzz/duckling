@@ -1,7 +1,7 @@
-# Intern Development Guide
+# Duckling Development Guide
 
 ## Overview
-Intern is an automated coding tool that wraps CLI coding assistants (OpenAI Codex, Claude Code, Amp Code) to automate the entire development workflow from task assignment to PR merge.
+Duckling is an automated coding tool that wraps CLI coding assistants (OpenAI Codex, Claude Code, Amp Code) to automate the entire development workflow from task assignment to PR merge.
 
 ## Quick Start
 
@@ -19,22 +19,22 @@ npm run type-check # Check TypeScript types
 npm run lint       # Run ESLint
 ```
 
-### Running Intern
+### Running Duckling
 ```bash
 # Start the web server
-intern start
+duckling start
 
 # Check status
-intern status
+duckling status
 
 # Create a task via CLI
-intern task create
+duckling task create
 
 # List tasks
-intern task list
+duckling task list
 
 # Cancel a task
-intern task cancel <taskId>
+duckling task cancel <taskId>
 ```
 
 ## Architecture
@@ -68,8 +68,8 @@ intern task cancel <taskId>
 - **GitHub Username**: For PR comment filtering
 
 ### Optional Settings
-- Branch prefix (default: `intern/`)
-- PR title prefix (default: `[INTERN]`)
+- Branch prefix (default: `duckling/`)
+- PR title prefix (default: `[DUCKLING]`)
 - Commit suffix (default: ` [i]`)
 - Base branch (default: `main`)
 - Maximum retries (default: 3)
@@ -93,7 +93,7 @@ intern task cancel <taskId>
 ## Testing
 
 ### Manual Testing Flow
-1. Start Intern: `intern start`
+1. Start Duckling: `duckling start`
 2. Configure settings at http://localhost:3000/settings
 3. Create a test task through the web interface
 4. Monitor task progress in real-time
@@ -111,7 +111,7 @@ intern task cancel <taskId>
 ## Troubleshooting
 
 ### Common Issues
-1. **Database locked**: Check if another Intern instance is running
+1. **Database locked**: Check if another Duckling instance is running
 2. **Git errors**: Ensure working directory is a git repository
 3. **API failures**: Verify API keys and network connectivity
 4. **Permission errors**: Check GitHub token permissions
@@ -120,18 +120,18 @@ intern task cancel <taskId>
 ### Debug Commands
 ```bash
 # Check system status
-intern status
+duckling status
 
 # View task logs
 # Via web: http://localhost:3000/task/:id/logs
 
 # Database location
-ls ~/.intern/
+ls ~/.duckling/
 ```
 
 ### Log Locations
-- Application logs: `~/.intern/logs/`
-- Database: `~/.intern/intern.db`
+- Application logs: `~/.duckling/logs/`
+- Database: `~/.duckling/duckling.db`
 
 ## Development Patterns
 

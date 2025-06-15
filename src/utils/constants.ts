@@ -2,13 +2,13 @@ import path from 'path';
 import os from 'os';
 
 // Application constants
-export const APP_NAME = 'intern';
+export const APP_NAME = 'duckling';
 export const DEFAULT_PORT = 5050;
 
 // Paths
-export const INTERN_DIR = path.join(os.homedir(), '.intern');
-export const DATABASE_PATH = path.join(INTERN_DIR, 'intern.db');
-export const LOGS_DIR = path.join(INTERN_DIR, 'logs');
+export const DUCKLING_DIR = path.join(os.homedir(), '.duckling');
+export const DATABASE_PATH = path.join(DUCKLING_DIR, 'duckling.db');
+export const LOGS_DIR = path.join(DUCKLING_DIR, 'logs');
 
 // Supported coding tools
 export const CODING_TOOLS = ['amp', 'openai'] as const;
@@ -16,8 +16,8 @@ export type CodingTool = typeof CODING_TOOLS[number];
 
 // Default settings
 export const DEFAULT_SETTINGS = {
-  branchPrefix: 'intern/',
-  prTitlePrefix: '[INTERN]',
+  branchPrefix: 'duckling/',
+  prTitlePrefix: '[DUCKLING]',
   commitSuffix: ' [i]',
   maxRetries: 3,
   baseBranch: 'main',

@@ -84,7 +84,7 @@ export class APIServer {
 
     return new Promise((resolve) => {
       this.server = this.app.listen(port, () => {
-        console.log(`🚀 Intern server running on http://localhost:${port}`);
+        console.log(`🚀 Duckling server running on http://localhost:${port}`);
         resolve();
       });
     });

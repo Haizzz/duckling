@@ -3,8 +3,8 @@ import { CoreEngine } from './core/engine';
 import { APIServer } from './api/server';
 import { validateAndGetRepoInfo, getGitHubUrl } from './utils/git-utils';
 
-export async function startIntern(port: number = 5050): Promise<void> {
-  console.log('🚀 Starting Intern...');
+export async function startDuckling(port: number = 5050): Promise<void> {
+  console.log('🚀 Starting Duckling...');
   
   const db = new DatabaseManager();
   
@@ -22,15 +22,15 @@ export async function startIntern(port: number = 5050): Promise<void> {
   
   await server.start(port);
   
-  console.log(`✅ Intern is running at http://localhost:${port}`);
+  console.log(`✅ Duckling is running at http://localhost:${port}`);
   
   // Handle graceful shutdown
   const shutdown = async () => {
-    console.log('\n🛑 Shutting down Intern...');
+    console.log('\n🛑 Shutting down Duckling...');
     engine.shutdown();
     await server.stop();
     db.close();
-    console.log('✅ Intern shut down gracefully');
+    console.log('✅ Duckling shut down gracefully');
     process.exit(0);
   };
   
@@ -50,8 +50,8 @@ export * from './types';
 // If this file is run directly, start the server
 if (require.main === module) {
   const port = process.env.PORT ? parseInt(process.env.PORT) : 5050;
-  startIntern(port).catch(error => {
-    console.error('❌ Failed to start Intern:', error);
+  startDuckling(port).catch(error => {
+    console.error('❌ Failed to start Duckling:', error);
     process.exit(1);
   });
 }

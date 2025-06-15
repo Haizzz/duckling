@@ -59,7 +59,7 @@ export interface SystemConfig {
   updated_at: string;
 }
 
-export interface InternSettings {
+export interface DucklingSettings {
   // API Keys
   github_token: string;
   openai_api_key?: string;

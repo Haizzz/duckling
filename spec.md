@@ -1,7 +1,7 @@
-# Intern - Automated Coding Tool System Specification
+# Duckling - Automated Coding Tool System Specification
 
 ## Overview
-Intern is an automated development workflow orchestration system that integrates CLI coding assistants (OpenAI Codex, Claude Code, Amp Code) to handle the complete development lifecycle from task assignment to PR merge. The system emphasizes resilience, retry mechanisms, and real-time monitoring.
+Duckling is an automated development workflow orchestration system that integrates CLI coding assistants (OpenAI Codex, Claude Code, Amp Code) to handle the complete development lifecycle from task assignment to PR merge. The system emphasizes resilience, retry mechanisms, and real-time monitoring.
 
 ## System Architecture
 
@@ -517,8 +517,8 @@ interface APIKeysSettings {
 ```typescript
 interface GeneralSettings {
   defaultCodingTool: 'openai' | 'amp' | 'claude';
-  branchPrefix: string;            // Default: 'intern/'
-  prPrefix: string;                // Default: '[INTERN]'
+  branchPrefix: string;            // Default: 'duckling/'
+  prPrefix: string;                // Default: '[DUCKLING]'
   commitSuffix: string;            // Default: ' [i]'
   baseBranch: string;              // Default: 'main'
   autoMerge: boolean;              // Default: false
@@ -581,4 +581,4 @@ graph TB
 - **Git Providers**: GitLab, Bitbucket support
 - **Authentication**: OAuth, SSO integration
 
-This specification provides a comprehensive blueprint for implementing the Intern system while maintaining flexibility for future enhancements and ensuring robust, reliable operation in production environments.
+This specification provides a comprehensive blueprint for implementing the Duckling system while maintaining flexibility for future enhancements and ensuring robust, reliable operation in production environments.

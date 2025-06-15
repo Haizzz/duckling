@@ -1,0 +1,5 @@
+- [ ] redesign task detail page
+- [ ] turn FE into react
+- [ ] parallelize task processing with worktrees and multiple ducklings
+- [ ] Jira integration
+- [ ] Slack integration

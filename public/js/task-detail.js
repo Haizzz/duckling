@@ -280,14 +280,14 @@ class TaskDetail {
       }
     };
 
-    window.addEventListener('intern-task-update', this.taskUpdateHandler);
+    window.addEventListener('duckling-task-update', this.taskUpdateHandler);
     console.log('Listening for task updates via global EventSource');
   }
 
   stopEventStream() {
     // Remove the event listener
     if (this.taskUpdateHandler) {
-      window.removeEventListener('intern-task-update', this.taskUpdateHandler);
+      window.removeEventListener('duckling-task-update', this.taskUpdateHandler);
       this.taskUpdateHandler = null;
     }
   }

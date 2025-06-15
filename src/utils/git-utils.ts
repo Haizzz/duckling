@@ -18,7 +18,7 @@ export async function validateAndGetRepoInfo(workingDir: string): Promise<GitRep
     // Check if this is a git repository
     const isRepo = await git.checkIsRepo();
     if (!isRepo) {
-      throw new Error(`Directory ${workingDir} is not a git repository. Please run intern from within a git repository.`);
+      throw new Error(`Directory ${workingDir} is not a git repository. Please run duckling from within a git repository.`);
     }
 
     // Get remote URL

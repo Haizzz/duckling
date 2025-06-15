@@ -4,26 +4,26 @@ import { Command } from 'commander';
 import { DatabaseManager } from '../core/database';
 import { CoreEngine } from '../core/engine';
 import { CreateTaskRequest } from '../types';
-import { startIntern } from '../index';
+import { startDuckling } from '../index';
 
 const program = new Command();
 
 program
-  .name('intern')
+  .name('duckling')
   .description('Automated coding tool that wraps CLI coding assistants')
   .version('1.0.0');
 
 // Start command - launch the web server
 program
   .command('start')
-  .description('Start the Intern web server')
+  .description('Start the Duckling web server')
   .option('-p, --port <port>', 'Port to run the server on', '5050')
   .action(async (options) => {
     try {
       const port = parseInt(options.port);
-      await startIntern(port);
+      await startDuckling(port);
     } catch (error: any) {
-      console.error('❌ Failed to start Intern:', error.message);
+      console.error('❌ Failed to start Duckling:', error.message);
       process.exit(1);
     }
   });
@@ -31,7 +31,7 @@ program
 // Config command - initial setup
 program
   .command('config')
-  .description('Configure Intern settings')
+  .description('Configure Duckling settings')
   .action(async () => {
     try {
       const db = new DatabaseManager();
@@ -39,13 +39,13 @@ program
       // Check if already configured
       const githubToken = db.getSetting('github_token');
       if (githubToken) {
-        console.log('✅ Intern is already configured. Use "intern start" to run the server.');
+        console.log('✅ Duckling is already configured. Use "duckling start" to run the server.');
         console.log('💡 You can modify settings through the web interface at http://localhost:5050/settings');
         return;
       }
 
-      console.log('🔧 Intern needs to be configured through the web interface.');
-      console.log('📝 Run "intern start" and visit http://localhost:5050 to complete setup.');
+      console.log('🔧 Duckling needs to be configured through the web interface.');
+      console.log('📝 Run "duckling start" and visit http://localhost:5050 to complete setup.');
 
     } catch (error: any) {
       console.error('❌ Failed to check configuration:', error.message);
@@ -227,7 +227,7 @@ program
     try {
       const db = new DatabaseManager();
 
-      console.log('🔧 Intern System Status\n');
+      console.log('🔧 Duckling System Status\n');
 
       // Check configuration
       const githubToken = db.getSetting('github_token');
@@ -258,7 +258,7 @@ program
         console.log(`   Completed: ${completedTasks.length}`);
         console.log(`   Failed: ${failedTasks.length}`);
       } else {
-        console.log('\n💡 Run "intern start" and visit http://localhost:5050 to complete setup.');
+        console.log('\n💡 Run "duckling start" and visit http://localhost:5050 to complete setup.');
       }
 
       db.close();

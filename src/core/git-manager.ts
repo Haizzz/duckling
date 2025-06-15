@@ -45,7 +45,7 @@ export class GitManager {
       // Get branch prefix from settings if not provided
       if (!branchPrefix) {
         const prefixSetting = this.db.getSetting('branchPrefix');
-        branchPrefix = prefixSetting?.value || 'intern/';
+        branchPrefix = prefixSetting?.value || 'duckling/';
       }
 
       logger.info(`Updating to latest ${baseBranch} and creating new branch`, taskId.toString());

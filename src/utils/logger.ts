@@ -27,7 +27,7 @@ export class Logger {
     console.log(logEntry);
     
     // Write to file
-    const logFile = path.join(LOGS_DIR, `intern-${new Date().toISOString().split('T')[0]}.log`);
+    const logFile = path.join(LOGS_DIR, `duckling-${new Date().toISOString().split('T')[0]}.log`);
     fs.appendFileSync(logFile, logEntry + '\n');
     
     // Also write to task-specific log if taskId provided

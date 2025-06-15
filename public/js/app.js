@@ -56,7 +56,7 @@ window.App = {
       this.handleTaskUpdate(data);
       
       // Dispatch custom event for other components to listen to
-      window.dispatchEvent(new CustomEvent('intern-task-update', {
+      window.dispatchEvent(new CustomEvent('duckling-task-update', {
         detail: data
       }));
     } else if (data.type === 'heartbeat') {

@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import fs from 'fs';
 import { Task, TaskLog, Setting, PrecommitCheck, SystemConfig, Job } from '../types';
-import { INTERN_DIR, DATABASE_PATH, DEFAULT_SETTINGS } from '../utils/constants';
+import { DUCKLING_DIR, DATABASE_PATH, DEFAULT_SETTINGS } from '../utils/constants';
 import { logger } from '../utils/logger';
 
 export class DatabaseManager {
@@ -10,8 +10,8 @@ export class DatabaseManager {
 
   constructor() {
     // Ensure directory exists
-    if (!fs.existsSync(INTERN_DIR)) {
-      fs.mkdirSync(INTERN_DIR, { recursive: true });
+    if (!fs.existsSync(DUCKLING_DIR)) {
+      fs.mkdirSync(DUCKLING_DIR, { recursive: true });
     }
 
     this.dbPath = DATABASE_PATH;
