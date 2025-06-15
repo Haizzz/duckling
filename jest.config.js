@@ -4,7 +4,9 @@ module.exports = {
   roots: ['<rootDir>/src'],
   testMatch: ['<rootDir>/src/**/tests/*.test.ts'],
   transform: {
-    '^.+\\.ts$': 'ts-jest'
+    '^.+\\.ts$': ['ts-jest', {
+      useESM: true
+    }]
   },
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1'
@@ -13,11 +15,6 @@ module.exports = {
     'node_modules/(?!(execa)/)'
   ],
   extensionsToTreatAsEsm: ['.ts'],
-  globals: {
-    'ts-jest': {
-      useESM: true
-    }
-  },
   collectCoverageFrom: [
     'src/**/*.ts',
     '!src/**/*.d.ts',
