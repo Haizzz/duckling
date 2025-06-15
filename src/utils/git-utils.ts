@@ -1,6 +1,4 @@
 import { simpleGit } from 'simple-git';
-import path from 'path';
-import fs from 'fs';
 import { logger } from './logger';
 
 export interface GitRepoInfo {

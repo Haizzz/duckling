@@ -5,6 +5,7 @@ import { DatabaseManager } from '../core/database';
 import { CoreEngine } from '../core/engine';
 import { CreateTaskRequest } from '../types';
 import { startDuckling } from '../index';
+import * as readline from 'readline';
 
 const program = new Command();
 
@@ -64,14 +65,14 @@ taskCmd
   .description('Create a new task interactively')
   .action(async () => {
     try {
-      const readline = require('readline').createInterface({
+      const rl = readline.createInterface({
         input: process.stdin,
         output: process.stdout
       });
 
       const question = (prompt: string): Promise<string> => {
         return new Promise(resolve => {
-          readline.question(prompt, resolve);
+          rl.question(prompt, resolve);
         });
       };
 
@@ -80,25 +81,25 @@ taskCmd
       const title = await question('Task title: ');
       if (!title.trim()) {
         console.log('❌ Task title is required');
-        readline.close();
+        rl.close();
         return;
       }
 
       const description = await question('Task description: ');
       if (!description.trim()) {
         console.log('❌ Task description is required');
-        readline.close();
+        rl.close();
         return;
       }
 
       const codingTool = await question('Coding tool (amp/openai) [amp]: ') || 'amp';
       if (!['amp', 'openai'].includes(codingTool)) {
       console.log('❌ Invalid coding tool. Use: amp or openai');
-        readline.close();
+        rl.close();
         return;
       }
 
-      readline.close();
+      rl.close();
 
       const db = new DatabaseManager();
       const engine = new CoreEngine(db);

@@ -1,11 +1,7 @@
 import { execCommand, execCommandWithInput, execShellCommand } from '../exec';
 import { logger } from '../logger';
 
-jest.mock('execa', () => ({
-  execa: jest.fn()
-}));
-
-const { execa } = require('execa');
+import * as execaModule from 'execa';
 
 describe('exec utils', () => {
   describe('execCommand', () => {
@@ -19,7 +15,7 @@ describe('exec utils', () => {
         stderr: '', 
         exitCode: 0 
       };
-      execa.mockResolvedValue(mockResult);
+      jest.spyOn(execaModule, 'execa').mockResolvedValue(mockResult as any);
       
       const logCommandSpy = jest.spyOn(logger, 'logCommand').mockImplementation();
       const logResultSpy = jest.spyOn(logger, 'logCommandResult').mockImplementation();
@@ -33,7 +29,7 @@ describe('exec utils', () => {
 
     it('uses custom working directory when provided in options', async () => {
       const mockResult = { stdout: '', stderr: '', exitCode: 0 };
-      execa.mockResolvedValue(mockResult);
+      jest.spyOn(execaModule, 'execa').mockResolvedValue(mockResult as any);
       
       const logCommandSpy = jest.spyOn(logger, 'logCommand').mockImplementation();
       jest.spyOn(logger, 'logCommandResult').mockImplementation();
@@ -45,7 +41,7 @@ describe('exec utils', () => {
 
     it('includes taskId in logging when provided in options', async () => {
       const mockResult = { stdout: '', stderr: '', exitCode: 0 };
-      execa.mockResolvedValue(mockResult);
+      jest.spyOn(execaModule, 'execa').mockResolvedValue(mockResult as any);
       
       const logCommandSpy = jest.spyOn(logger, 'logCommand').mockImplementation();
       const logResultSpy = jest.spyOn(logger, 'logCommandResult').mockImplementation();
@@ -58,7 +54,7 @@ describe('exec utils', () => {
 
     it('handles command failure with non-zero exit code', async () => {
       const mockResult = { stdout: '', stderr: 'error', exitCode: 1 };
-      execa.mockResolvedValue(mockResult);
+      jest.spyOn(execaModule, 'execa').mockResolvedValue(mockResult as any);
       
       jest.spyOn(logger, 'logCommand').mockImplementation();
       const logResultSpy = jest.spyOn(logger, 'logCommandResult').mockImplementation();
@@ -76,7 +72,7 @@ describe('exec utils', () => {
         stderr: 'error message'
       });
       
-      execa.mockRejectedValue(error);
+      jest.spyOn(execaModule, 'execa').mockRejectedValue(error as any);
       
       jest.spyOn(logger, 'logCommand').mockImplementation();
       const logResultSpy = jest.spyOn(logger, 'logCommandResult').mockImplementation();
@@ -100,14 +96,14 @@ describe('exec utils', () => {
 
     it('passes input to command via stdin', async () => {
       const mockResult = { stdout: 'result', stderr: '', exitCode: 0 };
-      execa.mockResolvedValue(mockResult);
+      jest.spyOn(execaModule, 'execa').mockResolvedValue(mockResult as any);
       
       jest.spyOn(logger, 'logCommand').mockImplementation();
       jest.spyOn(logger, 'logCommandResult').mockImplementation();
 
       await execCommandWithInput('cat', 'test input');
 
-      expect(execa).toHaveBeenCalledWith('cat', [], {
+      expect(execaModule.execa).toHaveBeenCalledWith('cat', [], {
         reject: false,
         input: 'test input'
       });
@@ -121,14 +117,14 @@ describe('exec utils', () => {
 
     it('executes command through bash shell with -c flag', async () => {
       const mockResult = { stdout: 'output', stderr: '', exitCode: 0 };
-      execa.mockResolvedValue(mockResult);
+      jest.spyOn(execaModule, 'execa').mockResolvedValue(mockResult as any);
       
       jest.spyOn(logger, 'logCommand').mockImplementation();
       jest.spyOn(logger, 'logCommandResult').mockImplementation();
 
       await execShellCommand('echo hello');
 
-      expect(execa).toHaveBeenCalledWith('bash', ['-c', 'echo hello'], {
+      expect(execaModule.execa).toHaveBeenCalledWith('bash', ['-c', 'echo hello'], {
         reject: false
       });
     });

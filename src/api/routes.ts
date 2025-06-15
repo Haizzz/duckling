@@ -336,7 +336,7 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
 
   router.post('/precommit-checks', async (req: Request, res: Response) => {
     try {
-      const { name, command, required = false, enabled = true } = req.body;
+      const { name, command } = req.body;
 
       if (!name || !command) {
         return res.status(400).json({

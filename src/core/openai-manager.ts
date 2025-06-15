@@ -123,7 +123,7 @@ Branch name:`;
     return this.generateSimpleBranchName(taskDescription, maxBranchNameLength);
   }
 
-  async generatePRTitle(taskDescription: string, branchName: string): Promise<string> {
+  async generatePRTitle(taskDescription: string): Promise<string> {
     const prefix = this.settings.get('prTitlePrefix');
 
     if (!this.openai) {

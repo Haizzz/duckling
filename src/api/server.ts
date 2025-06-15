@@ -39,7 +39,7 @@ export class APIServer {
     });
 
     // Error handling middleware
-    this.app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    this.app.use((err: Error, req: express.Request, res: express.Response) => {
       console.error('Server error:', err);
       res.status(500).json({
         success: false,

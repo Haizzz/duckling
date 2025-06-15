@@ -51,7 +51,7 @@ export class PRManager {
     });
 
     // Generate intelligent title and description using OpenAI
-    const title = await this.openaiManager.generatePRTitle(taskDescription, branchName);
+    const title = await this.openaiManager.generatePRTitle(taskDescription);
     const description = await this.openaiManager.generatePRDescription(taskDescription, branchName);
 
     this.db.addTaskLog({

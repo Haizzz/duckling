@@ -6,7 +6,7 @@ import { CodingManager } from './coding-manager';
 import { PrecommitManager } from './precommit-manager';
 import { PRManager } from './pr-manager';
 import { OpenAIManager } from './openai-manager';
-import { Task, TaskStatus, CodingTool, TaskUpdateEvent, CreateTaskRequest } from '../types';
+import { Task, TaskStatus, TaskUpdateEvent, CreateTaskRequest } from '../types';
 import { taskExecutor } from './task-executor';
 import { logger } from '../utils/logger';
 
@@ -315,7 +315,7 @@ export class CoreEngine extends EventEmitter {
           });
 
           try {
-            const generatedCode = await this.codingManager.generateCode(
+            await this.codingManager.generateCode(
               task.coding_tool,
               task.description,
               { taskId }
@@ -471,7 +471,7 @@ export class CoreEngine extends EventEmitter {
       });
 
       // Request fixes from coding tool
-      const fixes = await this.codingManager.requestFixes(
+      await this.codingManager.requestFixes(
         task.coding_tool,
         task.description,
         firstResult.errors,
@@ -605,7 +605,7 @@ export class CoreEngine extends EventEmitter {
           });
 
           // Generate response/fixes based on all comments at once
-          const response = await this.codingManager.generateCode(
+          await this.codingManager.generateCode(
             task.coding_tool,
             `Original task: ${task.description}\n\nPR review comments to address:\n\n${concatenatedComments}\n\nPlease address all the feedback above in one go.`,
             { taskId }
