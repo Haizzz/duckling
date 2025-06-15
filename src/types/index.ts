@@ -37,18 +37,13 @@ export type LogLevel = 'info' | 'error' | 'debug' | 'warn';
 export interface Setting {
   key: string;
   value: string;
-  category: SettingCategory;
   updated_at: string;
 }
-
-export type SettingCategory = 'api_keys' | 'general' | 'github' | 'precommit';
 
 export interface PrecommitCheck {
   id: number;
   name: string;
   command: string;
-  required: boolean;
-  enabled: boolean;
   order_index: number;
   created_at: string;
 }

@@ -45,8 +45,8 @@ export class SettingsManager {
     return SettingsManager.DEFAULTS[key];
   }
 
-  set<K extends keyof SettingsDefaults>(key: K, value: SettingsDefaults[K], category: string = 'general'): void {
-    this.db.setSetting(key, String(value), category);
+  set<K extends keyof SettingsDefaults>(key: K, value: SettingsDefaults[K]): void {
+    this.db.setSetting(key, String(value));
   }
 
   getAll(): SettingsDefaults {

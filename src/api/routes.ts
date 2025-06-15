@@ -290,22 +290,6 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
   router.put('/settings', async (req: Request, res: Response) => {
     try {
       const settings = req.body;
-
-      // Define category mappings
-      const categoryMap: Record<string, string> = {
-        githubToken: 'api_keys',
-        openaiApiKey: 'api_keys',
-        ampApiKey: 'api_keys',
-        defaultCodingTool: 'general',
-        branchPrefix: 'general',
-        prTitlePrefix: 'general',
-        baseBranch: 'general',
-        commitSuffix: 'general',
-        maxRetries: 'general',
-        pollInterval: 'github',
-        githubUsername: 'github'
-      };
-
       // Update each setting
       for (const [key, value] of Object.entries(settings)) {
         // Skip empty API keys/tokens (means don't change the existing value)
@@ -314,8 +298,7 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
           continue;
         }
 
-        const category = categoryMap[key] || 'general';
-        db.setSetting(key, value as string, category);
+        db.setSetting(key, value as string);
       }
 
       const response: ApiResponse = {
@@ -365,8 +348,6 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
       const id = db.addPrecommitCheck({
         name,
         command,
-        required,
-        enabled,
         order_index: 0
       });
 

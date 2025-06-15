@@ -11,7 +11,7 @@ export class PrecommitManager {
     this.db = db;
   }
 
-  async runChecks(taskId: number, stopOnFirstFailure: boolean = false): Promise<{ passed: boolean; errors: string[] }> {
+  async runChecks(taskId: number): Promise<{ passed: boolean; errors: string[] }> {
     const checks = this.db.getEnabledPrecommitChecks();
     const errors: string[] = [];
 
@@ -25,11 +25,6 @@ export class PrecommitManager {
         const errorMessage = `${check.name}: ${error.message}`;
         errors.push(errorMessage);
         this.logCheckResult(taskId, check.name, false, error.message);
-
-        // If this is a required check and it failed, and we should stop on first failure
-        if (check.required && stopOnFirstFailure) {
-          break;
-        }
       }
     }
 

@@ -2,7 +2,6 @@ import Database from 'better-sqlite3';
 import fs from 'fs';
 import { Task, TaskLog, Setting, PrecommitCheck } from '../types';
 import { DUCKLING_DIR, DATABASE_PATH, DEFAULT_SETTINGS } from '../utils/constants';
-import { logger } from '../utils/logger';
 
 export class DatabaseManager {
   private db: Database.Database;
@@ -71,7 +70,6 @@ export class DatabaseManager {
       CREATE TABLE IF NOT EXISTS settings (
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL,
-        category TEXT NOT NULL,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);
@@ -82,16 +80,10 @@ export class DatabaseManager {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         command TEXT NOT NULL,
-        required BOOLEAN DEFAULT 1,
-        enabled BOOLEAN DEFAULT 1,
         order_index INTEGER DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);
-
-
-
-
 
     // Create indexes
     this.db.exec(`
@@ -106,23 +98,23 @@ export class DatabaseManager {
 
   private initDefaultSettings(): void {
     const defaultSettings = [
-      { key: 'defaultCodingTool', value: 'amp', category: 'general' },
-      { key: 'branchPrefix', value: DEFAULT_SETTINGS.branchPrefix, category: 'general' },
-      { key: 'prTitlePrefix', value: DEFAULT_SETTINGS.prTitlePrefix, category: 'general' },
-      { key: 'commitSuffix', value: DEFAULT_SETTINGS.commitSuffix, category: 'general' },
-      { key: 'maxRetries', value: DEFAULT_SETTINGS.maxRetries.toString(), category: 'general' },
-      { key: 'baseBranch', value: DEFAULT_SETTINGS.baseBranch, category: 'general' },
+      { key: 'defaultCodingTool', value: 'amp' },
+      { key: 'branchPrefix', value: DEFAULT_SETTINGS.branchPrefix },
+      { key: 'prTitlePrefix', value: DEFAULT_SETTINGS.prTitlePrefix },
+      { key: 'commitSuffix', value: DEFAULT_SETTINGS.commitSuffix },
+      { key: 'maxRetries', value: DEFAULT_SETTINGS.maxRetries.toString() },
+      { key: 'baseBranch', value: DEFAULT_SETTINGS.baseBranch },
 
 
     ];
 
     const insertSetting = this.db.prepare(`
-      INSERT OR IGNORE INTO settings (key, value, category) 
-      VALUES (?, ?, ?)
+      INSERT OR IGNORE INTO settings (key, value) 
+      VALUES (?, ?)
     `);
 
     for (const setting of defaultSettings) {
-      insertSetting.run(setting.key, setting.value, setting.category);
+      insertSetting.run(setting.key, setting.value);
     }
 
     // No default precommit checks - user configures them
@@ -254,26 +246,18 @@ export class DatabaseManager {
     return stmt.get(key) as Setting | null;
   }
 
-  getSettings(category?: string): Setting[] {
-    let query = 'SELECT * FROM settings';
-    const params: any[] = [];
-
-    if (category) {
-      query += ' WHERE category = ?';
-      params.push(category);
-    }
-
-    const stmt = this.db.prepare(query);
-    return stmt.all(...params) as Setting[];
+  getSettings(): Setting[] {
+    const stmt = this.db.prepare('SELECT * FROM settings');
+    return stmt.all() as Setting[];
   }
 
-  setSetting(key: string, value: string, category: string): void {
+  setSetting(key: string, value: string): void {
     const stmt = this.db.prepare(`
-      INSERT OR REPLACE INTO settings (key, value, category, updated_at)
-      VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+      INSERT OR REPLACE INTO settings (key, value, updated_at)
+      VALUES (?, ?, CURRENT_TIMESTAMP)
     `);
 
-    stmt.run(key, value, category);
+    stmt.run(key, value);
   }
 
 
@@ -283,15 +267,13 @@ export class DatabaseManager {
   // Precommit check operations
   addPrecommitCheck(check: Omit<PrecommitCheck, 'id' | 'created_at'>): number {
     const stmt = this.db.prepare(`
-      INSERT INTO precommit_checks (name, command, required, enabled, order_index)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO precommit_checks (name, command, order_index)
+      VALUES (?, ?, ?)
     `);
 
     const result = stmt.run(
       check.name,
       check.command,
-      check.required ? 1 : 0,
-      check.enabled ? 1 : 0,
       check.order_index
     );
 
@@ -306,13 +288,7 @@ export class DatabaseManager {
     if (fields.length === 0) return;
 
     const setClause = fields.map(field => `${field} = ?`).join(', ');
-    const values = fields.map(field => {
-      const value = (updates as any)[field];
-      if (field === 'required' || field === 'enabled') {
-        return value ? 1 : 0;
-      }
-      return value;
-    });
+    const values = fields.map(field => (updates as any)[field]);
 
     const stmt = this.db.prepare(`
       UPDATE precommit_checks 
@@ -331,7 +307,6 @@ export class DatabaseManager {
   getEnabledPrecommitChecks(): PrecommitCheck[] {
     const stmt = this.db.prepare(`
       SELECT * FROM precommit_checks 
-      WHERE enabled = 1 
       ORDER BY order_index ASC
     `);
 

@@ -188,7 +188,7 @@ export class CoreEngine extends EventEmitter {
       try {
         await this.gitManager.switchToBranch(task.branch_name, task.id);
         const result = await this.collectPRComments(task.id, task.pr_number);
-        
+
         // Handle status updates first (completed/cancelled)
         if (result.statusUpdate) {
           if (result.statusUpdate === 'completed') {
@@ -208,7 +208,7 @@ export class CoreEngine extends EventEmitter {
         // If there are new comments, concatenate them and address all at once
         if (result.comments.length > 0) {
           const concatenatedComments = result.comments.map(c => c.body).join('\n\n---\n\n');
-          
+
           this.db.addTaskLog({
             task_id: task.id,
             level: 'info',
@@ -216,10 +216,10 @@ export class CoreEngine extends EventEmitter {
           });
 
           await this.handleAllPRComments(task.id, concatenatedComments);
-          
+
           // Update last processed comment ID to the most recent one
           const lastCommentId = result.comments[result.comments.length - 1].id;
-          this.db.setSetting(`last_comment_${task.id}`, lastCommentId.toString(), 'system');
+          this.db.setSetting(`last_comment_${task.id}`, lastCommentId.toString());
         }
 
       } catch (error: any) {
@@ -451,7 +451,7 @@ export class CoreEngine extends EventEmitter {
     });
 
     // First run - stop on first failure to get focused error messages
-    const firstResult = await this.precommitManager.runChecks(taskId, true);
+    const firstResult = await this.precommitManager.runChecks(taskId);
 
     if (!firstResult.passed) {
       // Get task to retry with fixes
@@ -485,7 +485,7 @@ export class CoreEngine extends EventEmitter {
       });
 
       // Second run - run all checks without stopping, don't try to fix again
-      const secondResult = await this.precommitManager.runChecks(taskId, false);
+      const secondResult = await this.precommitManager.runChecks(taskId);
 
       if (!secondResult.passed) {
         this.db.addTaskLog({
