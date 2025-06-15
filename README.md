@@ -1,4 +1,4 @@
-# Duckling 🐥
+# Duckling
 
 <p align="center">
   <img src="public/assets/logo.png" alt="Duckling Logo" width="120" height="120">
