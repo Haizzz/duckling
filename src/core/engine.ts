@@ -18,8 +18,8 @@ export class CoreEngine extends EventEmitter {
   private prManager?: PRManager;
   private openaiManager: OpenAIManager;
   private isInitialized = false;
-  private taskProcessingTimeout?: NodeJS.Timeout;
-  private reviewProcessingTimeout?: NodeJS.Timeout;
+  private processingInterval?: NodeJS.Timeout;
+  private isProcessing = false;
 
   constructor(db: DatabaseManager, repoPath: string = process.cwd()) {
     super();
@@ -141,36 +141,27 @@ export class CoreEngine extends EventEmitter {
   }
 
   private startTaskProcessing(): void {
-    // Start task processing cycle
-    this.scheduleTaskProcessing();
-
-    // Start review processing cycle
-    this.scheduleReviewProcessing();
+    // Start processing cycle - handles both tasks and reviews
+    this.startProcessingInterval();
   }
 
-  private scheduleTaskProcessing(): void {
-    this.taskProcessingTimeout = setTimeout(async () => {
-      try {
-        await this.processPendingTasks();
-      } catch (error) {
-        logger.error(`Error in task processing: ${error}`);
+  private startProcessingInterval(): void {
+    this.processingInterval = setInterval(async () => {
+      // Skip if already processing to prevent overlap
+      if (this.isProcessing) {
+        logger.info('Processing already in progress, skipping cycle');
+        return;
       }
 
-      // Schedule next processing cycle
-      this.scheduleTaskProcessing();
-    }, 60000); // 1 minute
-  }
-
-  private scheduleReviewProcessing(): void {
-    this.reviewProcessingTimeout = setTimeout(async () => {
+      this.isProcessing = true;
       try {
         await this.processReviews();
+        await this.processPendingTasks();
       } catch (error) {
-        logger.error(`Error in review processing: ${error}`);
+        logger.error(`Error in processing cycle: ${error}`);
+      } finally {
+        this.isProcessing = false;
       }
-
-      // Schedule next processing cycle
-      this.scheduleReviewProcessing();
     }, 300000); // 5 minutes
   }
 
@@ -589,15 +580,10 @@ export class CoreEngine extends EventEmitter {
   shutdown(): void {
     console.log('🔄 Shutting down engine...');
 
-    // Clear processing timeouts
-    if (this.taskProcessingTimeout) {
-      clearTimeout(this.taskProcessingTimeout);
-      this.taskProcessingTimeout = undefined;
-    }
-
-    if (this.reviewProcessingTimeout) {
-      clearTimeout(this.reviewProcessingTimeout);
-      this.reviewProcessingTimeout = undefined;
+    // Clear processing interval
+    if (this.processingInterval) {
+      clearInterval(this.processingInterval);
+      this.processingInterval = undefined;
     }
 
     // Remove all event listeners

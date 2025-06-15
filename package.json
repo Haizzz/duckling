@@ -1,5 +1,5 @@
 {
-  "name": "intern",
+  "name": "duckling",
   "version": "1.0.0",
   "description": "Automated coding tool that wraps CLI coding assistants",
   "main": "dist/index.js",
@@ -13,7 +13,7 @@
     "test": "jest"
   },
   "bin": {
-    "intern": "./dist/cli/index.js"
+    "duckling": "./dist/cli/index.js"
   },
   "dependencies": {
     "@octokit/rest": "^20.0.2",
