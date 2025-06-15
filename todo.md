@@ -1,5 +1,53 @@
 - [ ] redesign task detail page
+  - [ ] improve visual hierarchy and layout
+  - [ ] add real-time log filtering and search
+  - [ ] implement expandable log sections
+  - [ ] add task timeline/progress visualization
+  - [ ] mobile-responsive design improvements
+  - [ ] add quick actions (retry, cancel, etc.)
+
 - [ ] turn FE into react
+  - [ ] create React component structure
+  - [ ] migrate dashboard to React with hooks
+  - [ ] convert task detail page to React component
+  - [ ] implement React context for global state
+  - [ ] migrate SSE handling to React hooks
+  - [ ] add TypeScript support for components
+  - [ ] setup build pipeline for React
+
+- [ ] multi repo
+  - [ ] extend database schema for multiple repos
+  - [ ] update settings UI for repo management
+  - [ ] modify git-manager for repo switching
+  - [ ] implement repo selection in task creation
+  - [ ] update API endpoints for repo context
+  - [ ] handle cross-repo dependencies
+  - [ ] add repo-specific configurations
+
 - [ ] parallelize task processing with worktrees and multiple ducklings
+  - [ ] implement git worktree management
+  - [ ] create worker pool architecture
+  - [ ] add task queue with priority handling
+  - [ ] implement resource locking per repo/branch
+  - [ ] create separate duckling instances per worker
+  - [ ] add load balancing for task distribution
+  - [ ] implement inter-process communication
+  - [ ] add monitoring for worker health
+
 - [ ] Jira integration
+  - [ ] add Jira API configuration to settings
+  - [ ] implement Jira ticket parsing from task descriptions
+  - [ ] create automatic ticket status updates
+  - [ ] add PR linking to Jira tickets
+  - [ ] implement comment synchronization
+  - [ ] add Jira webhook support for real-time updates
+  - [ ] create Jira ticket creation from failed tasks
+
 - [ ] Slack integration
+  - [ ] setup Slack app configuration
+  - [ ] implement task status notifications
+  - [ ] add slash commands for task management
+  - [ ] create PR notification system
+  - [ ] add interactive buttons for task actions
+  - [ ] implement thread-based task discussions
+  - [ ] add Slack bot for task queries and status
