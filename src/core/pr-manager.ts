@@ -44,9 +44,21 @@ export class PRManager {
   ): Promise<{ number: number; url: string }> {
     await this.ensureInitialized();
 
+    this.db.addTaskLog({
+      task_id: taskId,
+      level: 'info',
+      message: '🤖 Generating PR title and description...'
+    });
+
     // Generate intelligent title and description using OpenAI
     const title = await this.openaiManager.generatePRTitle(taskDescription, branchName);
     const description = await this.openaiManager.generatePRDescription(taskDescription, branchName);
+
+    this.db.addTaskLog({
+      task_id: taskId,
+      level: 'info',
+      message: `📋 Generated PR title: "${title}"`
+    });
 
     return this.createPR(branchName, title, description, taskId);
   }
@@ -60,9 +72,20 @@ export class PRManager {
     await this.ensureInitialized();
 
     return await withRetry(async () => {
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'info',
+        message: `🔍 Checking if PR already exists for branch: ${branchName}`
+      });
+
       // Check if PR already exists for this branch
       const existingPR = await this.findPRByBranch(branchName);
       if (existingPR) {
+        this.db.addTaskLog({
+          task_id: taskId,
+          level: 'info',
+          message: `✅ Found existing PR #${existingPR.number}: ${existingPR.html_url}`
+        });
         return {
           number: existingPR.number,
           url: existingPR.html_url
@@ -72,6 +95,12 @@ export class PRManager {
       // Get base branch from settings
       const baseBranch = this.settings.get('baseBranch');
 
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'info',
+        message: `🚀 Creating new PR from ${branchName} to ${baseBranch}...`
+      });
+
       // Create new PR
       const response = await this.octokit.rest.pulls.create({
         owner: this.repoOwner,
@@ -80,6 +109,12 @@ export class PRManager {
         body: description,
         head: branchName,
         base: baseBranch
+      });
+
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'info',
+        message: `✅ PR created successfully: #${response.data.number} - ${response.data.html_url}`
       });
 
       this.logPREvent(taskId, `PR created: #${response.data.number}`);
@@ -144,8 +179,8 @@ export class PRManager {
 
       // Filter comments from the target user and newer than last commit timestamp
       const newComments = reviewComments.filter(comment => {
-        const isFromTargetUser = comment.user.login.toLowerCase() === targetUsername.toLowerCase();
         logger.info(`comment time ${new Date(comment.created_at)}, commit time ${lastCommitTimestamp ? new Date(lastCommitTimestamp) : 'null'}`);
+        const isFromTargetUser = comment.user.login.toLowerCase() === targetUsername.toLowerCase();
         const isNewer = !lastCommitTimestamp || new Date(comment.created_at) > new Date(lastCommitTimestamp);
         return isFromTargetUser && isNewer;
       });

@@ -51,10 +51,11 @@ class TaskDetail {
   }
 
   renderTaskDetail(task) {
+    console.log('Rendering task detail with data:', task);
     const container = document.getElementById('task-detail-container');
 
-    const createdDate = new Date(task.created_at).toLocaleString();
-    const updatedDate = new Date(task.updated_at).toLocaleString();
+    const createdDate = Utils.formatLocalDateTime(task.created_at);
+    const updatedDate = Utils.formatLocalDateTime(task.updated_at);
 
     const statusBadge = this.getStatusBadge(task.status);
     const stageBadge = this.getStageBadge(task.current_stage);
@@ -129,9 +130,13 @@ class TaskDetail {
               ${task.completed_at ? `
                 <div class="flex justify-between">
                   <span class="text-gray-600">Completed:</span>
-                  <span>${new Date(task.completed_at).toLocaleString()}</span>
+                  <span>${Utils.formatLocalDateTime(task.completed_at)}</span>
                 </div>
               ` : ''}
+              <div class="flex justify-between pt-2 border-t border-gray-100">
+                <span class="text-gray-500 text-sm" id="last-updated">Real-time updates active</span>
+                <span class="text-gray-500 text-sm">🔄</span>
+              </div>
             </div>
           </div>
 
@@ -263,20 +268,32 @@ class TaskDetail {
     // Listen for task updates via custom events from the global EventSource
     this.taskUpdateHandler = (event) => {
       const taskUpdate = event.detail;
+      console.log('Task detail received SSE update:', taskUpdate);
+      
       if (taskUpdate.taskId == this.taskId) { // Note: == for type coercion
+        console.log('Update is for current task, processing...');
+        
         // Use the full task data from metadata if available, otherwise fall back to current task
         if (taskUpdate.metadata && taskUpdate.metadata.task) {
+          console.log('Using full task data from metadata:', taskUpdate.metadata.task);
           this.currentTask = taskUpdate.metadata.task;
           this.renderTaskDetail(taskUpdate.metadata.task);
+          
+          // Show visual indication of update
+          this.showUpdateIndicator();
         } else {
+          console.log('No task metadata, falling back to server refresh');
           // Fallback: refresh full task data from server
           this.loadTaskDetail();
         }
 
         // Stop log refresh if task is completed
         if (['completed', 'cancelled', 'failed'].includes(taskUpdate.status)) {
+          console.log('Task completed/cancelled/failed, stopping log refresh');
           this.stopLogRefresh();
         }
+      } else {
+        console.log(`Update is for different task (${taskUpdate.taskId} vs ${this.taskId}), ignoring`);
       }
     };
 
@@ -370,6 +387,20 @@ class TaskDetail {
         <a href="index.html" class="text-gray-600 hover:text-gray-800 underline">← Back to Dashboard</a>
       </div>
     `;
+  }
+
+  showUpdateIndicator() {
+    // Add a small visual indicator that the page was updated
+    const lastUpdated = document.getElementById('last-updated');
+    if (lastUpdated) {
+      lastUpdated.textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+      lastUpdated.style.color = '#10b981'; // Green color
+      
+      // Reset color after 2 seconds
+      setTimeout(() => {
+        lastUpdated.style.color = '#6b7280';
+      }, 2000);
+    }
   }
 
   escapeHtml(text) {

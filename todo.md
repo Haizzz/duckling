@@ -1,4 +1,5 @@
 - [ ] unit tests
+- [ ] improve base prompts
 - [ ] redesign task detail page
   - [ ] improve visual hierarchy and layout
   - [ ] add real-time log filtering and search

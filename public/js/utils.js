@@ -59,6 +59,18 @@ window.Utils = {
       .replace(/'/g, "&#039;");
   },
 
+  // Format date to local time with user-friendly format
+  formatLocalDateTime(timestamp) {
+    const date = new Date(timestamp);
+    return date.toLocaleString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  },
+
   // Parse query string
   parseQuery(queryString) {
     const params = new URLSearchParams(queryString);

@@ -164,7 +164,7 @@ export class CoreEngine extends EventEmitter {
       } finally {
         this.isProcessing = false;
       }
-    }, 300000); // 5 minutes
+    }, 60000); // 1 minute
   }
 
   private async processPendingTasks(): Promise<void> {
@@ -177,61 +177,57 @@ export class CoreEngine extends EventEmitter {
   }
 
   private async processReviews(): Promise<void> {
-    // Collect all new comments for all awaiting-review tasks first
     const awaitingReviewTasks = this.db.getTasks({ status: 'awaiting-review' });
-    const allNewComments: Array<{ taskId: number; comments: Array<{ id: string; body: string }> }> = [];
-    const taskStatusUpdates: Array<{ taskId: number; status: 'completed' | 'cancelled' }> = [];
 
-    // First pass: collect all new comments and check PR statuses
+    // Single pass: for each task, check for new reviews, address them, and update status
     for (const task of awaitingReviewTasks) {
-      if (task.pr_number) {
-        try {
-          const result = await this.collectPRComments(task.id, task.pr_number);
-          if (result.comments.length > 0) {
-            allNewComments.push({ taskId: task.id, comments: result.comments });
+      if (!task.pr_number || !task.branch_name) {
+        continue;
+      }
+
+      try {
+        await this.gitManager.switchToBranch(task.branch_name, task.id);
+        const result = await this.collectPRComments(task.id, task.pr_number);
+        
+        // Handle status updates first (completed/cancelled)
+        if (result.statusUpdate) {
+          if (result.statusUpdate === 'completed') {
+            this.db.updateTask(task.id, {
+              status: 'completed',
+              current_stage: 'completed',
+              completed_at: new Date().toISOString()
+            });
+            this.emitTaskUpdate(task.id, 'completed');
+          } else if (result.statusUpdate === 'cancelled') {
+            this.db.updateTask(task.id, { status: 'cancelled', current_stage: 'cancelled' });
+            this.emitTaskUpdate(task.id, 'cancelled');
           }
-          if (result.statusUpdate) {
-            taskStatusUpdates.push({ taskId: task.id, status: result.statusUpdate });
-          }
-        } catch (error: any) {
+          continue; // Skip comment processing if task is completed/cancelled
+        }
+
+        // If there are new comments, concatenate them and address all at once
+        if (result.comments.length > 0) {
+          const concatenatedComments = result.comments.map(c => c.body).join('\n\n---\n\n');
+          
           this.db.addTaskLog({
             task_id: task.id,
-            level: 'error',
-            message: `Error collecting PR comments: ${error.message}`
+            level: 'info',
+            message: `💬 Processing ${result.comments.length} PR review comment(s)...`
           });
-        }
-      }
-    }
 
-    // Second pass: handle all collected comments
-    for (const { taskId, comments } of allNewComments) {
-      for (const comment of comments) {
-        try {
-          await this.handlePRComment(taskId, comment.body);
-          // Update last processed comment ID
-          this.db.setSetting(`last_comment_${taskId}`, comment.id.toString(), 'system');
-        } catch (error: any) {
-          this.db.addTaskLog({
-            task_id: taskId,
-            level: 'error',
-            message: `Error handling PR comment: ${error.message}`
-          });
+          await this.handleAllPRComments(task.id, concatenatedComments);
+          
+          // Update last processed comment ID to the most recent one
+          const lastCommentId = result.comments[result.comments.length - 1].id;
+          this.db.setSetting(`last_comment_${task.id}`, lastCommentId.toString(), 'system');
         }
-      }
-    }
 
-    // Third pass: update task statuses based on PR status
-    for (const { taskId, status } of taskStatusUpdates) {
-      if (status === 'completed') {
-        this.db.updateTask(taskId, {
-          status: 'completed',
-          current_stage: 'completed',
-          completed_at: new Date().toISOString()
+      } catch (error: any) {
+        this.db.addTaskLog({
+          task_id: task.id,
+          level: 'error',
+          message: `❌ Error processing reviews: ${error.message}`
         });
-        this.emitTaskUpdate(taskId, 'completed');
-      } else if (status === 'cancelled') {
-        this.db.updateTask(taskId, { status: 'cancelled', current_stage: 'cancelled' });
-        this.emitTaskUpdate(taskId, 'cancelled');
       }
     }
   }
@@ -250,6 +246,11 @@ export class CoreEngine extends EventEmitter {
       execute: async () => {
         try {
           // Update status to in progress
+          this.db.addTaskLog({
+            task_id: taskId,
+            level: 'info',
+            message: '🎯 Task started - transitioning to in-progress status'
+          });
           this.db.updateTask(taskId, { status: 'in-progress', current_stage: 'creating_branch' });
           this.emitTaskUpdate(taskId, 'in-progress');
 
@@ -257,16 +258,33 @@ export class CoreEngine extends EventEmitter {
           let baseBranchName: string;
           let branchName: string;
 
+          this.db.addTaskLog({
+            task_id: taskId,
+            level: 'info',
+            message: '🌿 Generating branch name...'
+          });
+
           try {
-            baseBranchName = await this.openaiManager.generateBranchName(task.description);
+            baseBranchName = await this.openaiManager.generateBranchName(task.description, taskId);
+            this.db.addTaskLog({
+              task_id: taskId,
+              level: 'info',
+              message: `✅ Branch name generated: ${baseBranchName}`
+            });
           } catch (error: any) {
             this.db.addTaskLog({
               task_id: taskId,
               level: 'error',
-              message: `Failed to generate branch name: ${error.message}`
+              message: `❌ Failed to generate branch name: ${error.message}`
             });
             throw error;
           }
+
+          this.db.addTaskLog({
+            task_id: taskId,
+            level: 'info',
+            message: '🔄 Creating and checking out branch...'
+          });
 
           try {
             branchName = await this.gitManager.createAndCheckoutBranch(baseBranchName, taskId);
@@ -274,23 +292,26 @@ export class CoreEngine extends EventEmitter {
             this.db.addTaskLog({
               task_id: taskId,
               level: 'info',
-              message: `Branch created: ${branchName}`
+              message: `✅ Branch created and checked out: ${branchName}`
             });
+            // Emit update to notify UI of branch name
+            this.emitTaskUpdate(taskId, 'in-progress');
           } catch (error: any) {
             this.db.addTaskLog({
               task_id: taskId,
               level: 'error',
-              message: `Failed to create branch: ${error.message}`
+              message: `❌ Failed to create branch: ${error.message}`
             });
             throw error;
           }
 
           // Step 2: Generate code
           this.db.updateTask(taskId, { current_stage: 'generating_code' });
+          this.emitTaskUpdate(taskId, 'in-progress');
           this.db.addTaskLog({
             task_id: taskId,
             level: 'info',
-            message: `Calling ${task.coding_tool} to generate code...`
+            message: `💻 Starting code generation with ${task.coding_tool}...`
           });
 
           try {
@@ -303,72 +324,117 @@ export class CoreEngine extends EventEmitter {
             this.db.addTaskLog({
               task_id: taskId,
               level: 'info',
-              message: 'Code generation completed'
+              message: '✅ Code generation completed successfully'
             });
           } catch (error: any) {
             this.db.addTaskLog({
               task_id: taskId,
               level: 'error',
-              message: `Code generation failed: ${error.message}`
+              message: `❌ Code generation failed: ${error.message}`
             });
             throw error;
           }
 
           // Step 3: Run precommit checks
           this.db.updateTask(taskId, { current_stage: 'running_precommit_checks' });
+          this.emitTaskUpdate(taskId, 'in-progress');
+          this.db.addTaskLog({
+            task_id: taskId,
+            level: 'info',
+            message: '🔍 Starting precommit checks...'
+          });
 
           try {
             await this.runPrecommitChecks(taskId);
+            this.db.addTaskLog({
+              task_id: taskId,
+              level: 'info',
+              message: '✅ Precommit checks completed successfully'
+            });
           } catch (error: any) {
             this.db.addTaskLog({
               task_id: taskId,
               level: 'error',
-              message: `Precommit checks failed: ${error.message}`
+              message: `❌ Precommit checks failed: ${error.message}`
             });
             throw error;
           }
 
           // Step 4: Commit and push changes
           this.db.updateTask(taskId, { current_stage: 'committing_changes' });
+          this.emitTaskUpdate(taskId, 'in-progress');
+          this.db.addTaskLog({
+            task_id: taskId,
+            level: 'info',
+            message: '📝 Committing changes...'
+          });
 
           try {
             await this.gitManager.commitChanges(task.description, taskId);
+            this.db.addTaskLog({
+              task_id: taskId,
+              level: 'info',
+              message: '✅ Changes committed successfully'
+            });
+
+            this.db.addTaskLog({
+              task_id: taskId,
+              level: 'info',
+              message: '🚀 Pushing branch to remote...'
+            });
+
             await this.gitManager.pushBranch(branchName, taskId);
 
             this.db.addTaskLog({
               task_id: taskId,
               level: 'info',
-              message: 'Changes committed and pushed'
+              message: '✅ Branch pushed to remote successfully'
             });
           } catch (error: any) {
             this.db.addTaskLog({
               task_id: taskId,
               level: 'error',
-              message: `Failed to commit/push changes: ${error.message}`
+              message: `❌ Failed to commit/push changes: ${error.message}`
             });
             throw error;
           }
 
           // Step 5: Create PR
           this.db.updateTask(taskId, { current_stage: 'creating_pr' });
+          this.emitTaskUpdate(taskId, 'in-progress');
+          this.db.addTaskLog({
+            task_id: taskId,
+            level: 'info',
+            message: '🔄 Creating pull request...'
+          });
 
           try {
             await this.createPR(taskId, task, branchName);
+            this.db.addTaskLog({
+              task_id: taskId,
+              level: 'info',
+              message: '✅ Pull request created successfully'
+            });
           } catch (error: any) {
             this.db.addTaskLog({
               task_id: taskId,
               level: 'error',
-              message: `Failed to create PR: ${error.message}`
+              message: `❌ Failed to create PR: ${error.message}`
             });
             throw error;
           }
 
         } catch (error: any) {
+          this.db.addTaskLog({
+            task_id: taskId,
+            level: 'error',
+            message: '❌ Task failed - transitioning to failed status'
+          });
           this.db.updateTask(taskId, { status: 'failed', current_stage: 'failed' });
           this.db.addTaskLog({
             task_id: taskId,
             level: 'error',
-            message: `Task failed: ${error.message}`
+            message: `💥 Task failed: ${error.message}`
           });
           this.emitTaskUpdate(taskId, 'failed');
           throw error;
@@ -381,7 +447,7 @@ export class CoreEngine extends EventEmitter {
     this.db.addTaskLog({
       task_id: taskId,
       level: 'info',
-      message: 'Running precommit checks...'
+      message: '🧪 Running initial precommit checks...'
     });
 
     // First run - stop on first failure to get focused error messages
@@ -394,8 +460,14 @@ export class CoreEngine extends EventEmitter {
 
       this.db.addTaskLog({
         task_id: taskId,
+        level: 'warn',
+        message: `⚠️ Precommit checks failed (${firstResult.errors.length} errors), requesting fixes...`
+      });
+
+      this.db.addTaskLog({
+        task_id: taskId,
         level: 'info',
-        message: 'Precommit checks failed, requesting fixes...'
+        message: '🛠️ Generating fixes with coding assistant...'
       });
 
       // Request fixes from coding tool
@@ -409,7 +481,7 @@ export class CoreEngine extends EventEmitter {
       this.db.addTaskLog({
         task_id: taskId,
         level: 'info',
-        message: 'Fixes generated, re-running all precommit checks...'
+        message: '✅ Fixes generated, re-running all precommit checks...'
       });
 
       // Second run - run all checks without stopping, don't try to fix again
@@ -419,22 +491,34 @@ export class CoreEngine extends EventEmitter {
         this.db.addTaskLog({
           task_id: taskId,
           level: 'warn',
-          message: `Some precommit checks still failing, but continuing: ${secondResult.errors.join(', ')}`
+          message: `⚠️ Some precommit checks still failing, but continuing: ${secondResult.errors.join(', ')}`
+        });
+      } else {
+        this.db.addTaskLog({
+          task_id: taskId,
+          level: 'info',
+          message: '✅ All precommit checks now passing after fixes'
         });
       }
+    } else {
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'info',
+        message: '✅ All precommit checks passed on first run'
+      });
     }
-
-    this.db.addTaskLog({
-      task_id: taskId,
-      level: 'info',
-      message: 'Precommit checks completed'
-    });
   }
 
   private async createPR(taskId: number, task: Task, branchName: string): Promise<void> {
     try {
       const prManager = this.getPRManager();
       const pr = await prManager.createPRFromTask(branchName, task.description, taskId);
+
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'info',
+        message: '🎉 Task processing completed successfully - transitioning to awaiting-review'
+      });
 
       this.db.updateTask(taskId, {
         status: 'awaiting-review',
@@ -446,7 +530,7 @@ export class CoreEngine extends EventEmitter {
       this.db.addTaskLog({
         task_id: taskId,
         level: 'info',
-        message: `PR created: ${pr.url}`
+        message: `🔗 PR created: ${pr.url}`
       });
 
       this.emitTaskUpdate(taskId, 'awaiting-review');
@@ -478,8 +562,6 @@ export class CoreEngine extends EventEmitter {
     // Get last commit timestamp for the branch
     let lastCommitTimestamp: string | null = null;
     if (task.branch_name) {
-      await this.gitManager.switchToBranch(task.branch_name, taskId);
-
       try {
         lastCommitTimestamp = await this.gitManager.getLastCommitTimestamp(task.branch_name);
         logger.info(`last commit timestamp for branch ${task.branch_name}: ${lastCommitTimestamp}`);
@@ -505,40 +587,47 @@ export class CoreEngine extends EventEmitter {
     return { comments: newComments, statusUpdate };
   }
 
-  private async handlePRComment(taskId: number, comment: string): Promise<void> {
-    logger.info(`Handling PR comment for task: ${taskId} ${comment}`);
+  private async handleAllPRComments(taskId: number, concatenatedComments: string): Promise<void> {
+    logger.info(`Handling concatenated PR comments for task: ${taskId}`);
     const task = this.db.getTask(taskId);
     if (!task) return;
-
-    this.db.addTaskLog({
-      task_id: taskId,
-      level: 'info',
-      message: `Processing PR comment: ${comment.substring(0, 100)}...`
-    });
 
     // Use task executor to ensure only one task operation at a time
     await taskExecutor.executeTask({
       taskId: taskId,
-      operation: 'handle-pr-comment',
+      operation: 'handle-pr-comments',
       execute: async () => {
         try {
-          // Generate response/fixes based on comment
+          this.db.addTaskLog({
+            task_id: taskId,
+            level: 'info',
+            message: '🛠️ Generating fixes for all PR review comments...'
+          });
+
+          // Generate response/fixes based on all comments at once
           const response = await this.codingManager.generateCode(
             task.coding_tool,
-            `Original task: ${task.description}\n\nPR review comment: ${comment}\n\nPlease address this feedback.`,
+            `Original task: ${task.description}\n\nPR review comments to address:\n\n${concatenatedComments}\n\nPlease address all the feedback above in one go.`,
             { taskId }
           );
 
-          // Fetch latest changes and switch to task branch
-          if (task.branch_name) {
-            await this.gitManager.switchToBranch(task.branch_name, taskId);
-          }
+          this.db.addTaskLog({
+            task_id: taskId,
+            level: 'info',
+            message: '✅ Code changes generated, running precommit checks...'
+          });
 
           // Apply changes and run checks
           await this.runPrecommitChecks(taskId);
 
+          this.db.addTaskLog({
+            task_id: taskId,
+            level: 'info',
+            message: '📝 Committing and pushing fixes...'
+          });
+
           // Commit and push changes
-          await this.gitManager.commitChanges(`Address PR feedback: ${comment}`, taskId);
+          await this.gitManager.commitChanges(`Address PR feedback`, taskId);
           if (task.branch_name) {
             await this.gitManager.pushBranch(task.branch_name, taskId);
           }
@@ -546,14 +635,14 @@ export class CoreEngine extends EventEmitter {
           this.db.addTaskLog({
             task_id: taskId,
             level: 'info',
-            message: 'PR feedback addressed and changes pushed'
+            message: '✅ All PR feedback addressed and changes pushed'
           });
 
         } catch (error: any) {
           this.db.addTaskLog({
             task_id: taskId,
             level: 'error',
-            message: `Error handling PR comment: ${error.message}`
+            message: `❌ Error handling PR comments: ${error.message}`
           });
           throw error;
         }

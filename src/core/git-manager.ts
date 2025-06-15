@@ -25,7 +25,6 @@ export class GitManager {
       // Get the timestamp of the last commit
       logger.info(`Getting last commit timestamp for branch: ${branchName}`);
       const log = await this.git.log(['-1', "--format=%cI"]);
-      logger.info(JSON.stringify(log));
 
       if (log.latest) {
         // it's parsed wrong
@@ -48,8 +47,20 @@ export class GitManager {
 
       logger.info(`Updating to latest ${baseBranch} and creating new branch`, taskId.toString());
 
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'info',
+        message: `📥 Fetching latest changes from ${baseBranch}...`
+      });
+
       // First, fetch latest changes for the specific base branch
       await this.git.fetch('origin', baseBranch);
+
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'info',
+        message: `🔄 Switching to ${baseBranch} and pulling latest...`
+      });
 
       // Switch to base branch and pull latest  
       await this.git.checkout(baseBranch);
@@ -59,10 +70,30 @@ export class GitManager {
       let branchName = `${branchPrefix}${baseBranchName}`;
       let counter = 1;
 
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'info',
+        message: `🔍 Checking if branch name '${branchName}' is available...`
+      });
+
       while (await this.branchExists(branchName)) {
         branchName = `${branchPrefix}${baseBranchName}-${counter}`;
         counter++;
       }
+
+      if (counter > 1) {
+        this.db.addTaskLog({
+          task_id: taskId,
+          level: 'info',
+          message: `ℹ️ Branch name adjusted to avoid conflicts: ${branchName}`
+        });
+      }
+
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'info',
+        message: `🌱 Creating and checking out new branch: ${branchName}`
+      });
 
       // Create and checkout the new branch
       await this.git.checkoutLocalBranch(branchName);
@@ -83,24 +114,53 @@ export class GitManager {
 
   async commitChanges(taskDescription: string, taskId: number): Promise<void> {
     return await withRetry(async () => {
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'info',
+        message: '📁 Adding all changes to staging area...'
+      });
+
       // Add all changes
       await this.git.add('.');
+
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'info',
+        message: '🔍 Checking for changes to commit...'
+      });
 
       // Check if there are changes to commit
       const status = await this.git.status();
       if (status.files.length === 0) {
+        this.db.addTaskLog({
+          task_id: taskId,
+          level: 'error',
+          message: '❌ No changes to commit found'
+        });
         throw new Error('No changes to commit');
       }
 
       // Get list of changed files for context
       const changedFiles = [...status.modified, ...status.created, ...status.deleted];
 
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'info',
+        message: `📝 Found ${changedFiles.length} changed files, generating commit message...`
+      });
+
       // Generate intelligent commit message
-      const message = await this.openaiManager.generateCommitMessage(taskDescription, changedFiles);
+      const message = await this.openaiManager.generateCommitMessage(taskDescription, changedFiles, taskId);
 
       // Apply commit suffix from settings
       const suffix = this.settings.get('commitSuffix');
       const finalMessage = message.endsWith(suffix) ? message : `${message}${suffix}`;
+
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'info',
+        message: `💾 Committing with message: "${finalMessage}"`
+      });
 
       // Commit changes
       await this.git.commit(finalMessage);
@@ -111,6 +171,12 @@ export class GitManager {
 
   async pushBranch(branchName: string, taskId: number): Promise<void> {
     return await withRetry(async () => {
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'info',
+        message: `🚀 Pushing branch '${branchName}' to origin...`
+      });
+
       await this.git.push('origin', branchName);
       logger.info(`Pushed branch: ${branchName}`, taskId.toString());
     }, 'Push branch');

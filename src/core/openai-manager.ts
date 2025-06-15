@@ -50,13 +50,28 @@ export class OpenAIManager {
     }, 'OpenAI API call', 2);
   }
 
-  async generateBranchName(taskDescription: string): Promise<string> {
+  async generateBranchName(taskDescription: string, taskId?: number): Promise<string> {
     // Get branch prefix to calculate available space
     const branchPrefix = this.settings.get('branchPrefix');
     const maxBranchNameLength = 30 - branchPrefix.length; // Reserve space for prefix
 
+    if (taskId) {
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'info',
+        message: '🤖 Analyzing task description to generate branch name...'
+      });
+    }
+
     if (!this.openai) {
       // Fallback to simple generation if OpenAI not available
+      if (taskId) {
+        this.db.addTaskLog({
+          task_id: taskId,
+          level: 'info',
+          message: '⚠️ OpenAI not configured, using simple branch name generation'
+        });
+      }
       return this.generateSimpleBranchName(taskDescription, maxBranchNameLength);
     }
 
@@ -84,10 +99,24 @@ Branch name:`;
 
       if (cleanBranchName.length > 0) {
         logger.info(`Generated branch name via OpenAI: ${cleanBranchName} (${cleanBranchName.length}/${maxBranchNameLength} chars)`);
+        if (taskId) {
+          this.db.addTaskLog({
+            task_id: taskId,
+            level: 'info',
+            message: `🎯 Generated AI branch name: '${cleanBranchName}' (${cleanBranchName.length}/${maxBranchNameLength} chars)`
+          });
+        }
         return cleanBranchName;
       }
     } catch (error) {
       logger.warn(`Failed to generate branch name via OpenAI: ${error}. Using fallback.`);
+      if (taskId) {
+        this.db.addTaskLog({
+          task_id: taskId,
+          level: 'warn',
+          message: `⚠️ AI branch name generation failed: ${error}. Using fallback method`
+        });
+      }
     }
 
     // Fallback to simple generation
@@ -196,9 +225,24 @@ Summary:`;
     return taskDescription.substring(0, 80) + (taskDescription.length > 80 ? '...' : '');
   }
 
-  async generateCommitMessage(taskDescription: string, changes: string[]): Promise<string> {
+  async generateCommitMessage(taskDescription: string, changes: string[], taskId?: number): Promise<string> {
+    if (taskId) {
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'info',
+        message: `🤖 Analyzing ${changes.length} changed files to generate commit message...`
+      });
+    }
+
     if (!this.openai) {
       // Fallback to simple generation if OpenAI not available
+      if (taskId) {
+        this.db.addTaskLog({
+          task_id: taskId,
+          level: 'info',
+          message: '⚠️ OpenAI not configured, using simple commit message generation'
+        });
+      }
       return `${taskDescription.substring(0, 50)}${taskDescription.length > 50 ? '...' : ''}`;
     }
 
@@ -222,14 +266,36 @@ Commit message:`;
 
       if (cleanMessage.length > 0 && cleanMessage.length <= 50) {
         logger.info(`Generated commit message via OpenAI: ${cleanMessage}`);
+        if (taskId) {
+          this.db.addTaskLog({
+            task_id: taskId,
+            level: 'info',
+            message: `✅ Generated AI commit message: "${cleanMessage}"`
+          });
+        }
         return cleanMessage;
       }
     } catch (error) {
       logger.warn(`Failed to generate commit message via OpenAI: ${error}. Using fallback.`);
+      if (taskId) {
+        this.db.addTaskLog({
+          task_id: taskId,
+          level: 'warn',
+          message: `⚠️ AI commit message generation failed: ${error}. Using fallback method`
+        });
+      }
     }
 
     // Fallback to simple generation
-    return `${taskDescription.substring(0, 50)}${taskDescription.length > 50 ? '...' : ''}`;
+    const fallbackMessage = `${taskDescription.substring(0, 50)}${taskDescription.length > 50 ? '...' : ''}`;
+    if (taskId) {
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'info',
+        message: `📝 Using fallback commit message: "${fallbackMessage}"`
+      });
+    }
+    return fallbackMessage;
   }
 
   // Fallback methods for when OpenAI is not available
