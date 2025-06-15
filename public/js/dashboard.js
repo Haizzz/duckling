@@ -46,27 +46,107 @@ class Dashboard {
 
         // Check if required settings are present
         const hasGithubToken = settings.githubToken === '***CONFIGURED***';
-        const hasApiKey = settings.ampApiKey === '***CONFIGURED***' || settings.openaiApiKey === '***CONFIGURED***';
-
+        const hasGithubUsername = settings.githubUsername;
+        const hasAmpTool = settings.ampApiKey === '***CONFIGURED***';
+        const hasOpenAiTool = settings.openaiApiKey === '***CONFIGURED***';
+        const hasOpenAiForCommits = settings.openaiApiKey === '***CONFIGURED***'; // Required for both tools
+        
         const taskInput = document.getElementById('task-input');
         const submitBtn = document.getElementById('submit-task');
 
-        if (!hasGithubToken || !hasApiKey) {
+        // Determine what's missing
+        const missingRequirements = [];
+        
+        if (!hasGithubToken) missingRequirements.push('GitHub token');
+        if (!hasGithubUsername) missingRequirements.push('GitHub username');
+        if (!hasOpenAiForCommits) missingRequirements.push('OpenAI API key');
+        if (!hasAmpTool && !hasOpenAiTool) missingRequirements.push('at least one coding tool (Amp or OpenAI)');
+
+        if (missingRequirements.length > 0) {
           // Disable task creation
           taskInput.disabled = true;
-          taskInput.placeholder = 'Configure GitHub token and API key in settings to create tasks';
+          const missingText = missingRequirements.join(', ');
+          taskInput.placeholder = `Missing configuration: ${missingText}. Visit settings to configure.`;
           submitBtn.disabled = true;
           submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+          
+          // Show a helper message
+          this.showConfigurationHelper(missingRequirements);
         } else {
           // Enable task creation
           taskInput.disabled = false;
           taskInput.placeholder = 'What would you like me to work on?';
           submitBtn.disabled = false;
           submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+          
+          // Hide helper message if it exists
+          this.hideConfigurationHelper();
         }
       }
     } catch (error) {
       console.error('Failed to check settings:', error);
+    }
+  }
+
+  showConfigurationHelper(missingRequirements) {
+    let helperEl = document.getElementById('config-helper');
+    if (!helperEl) {
+      // Create the helper element
+      helperEl = document.createElement('div');
+      helperEl.id = 'config-helper';
+      helperEl.className = 'bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 max-w-2xl mx-auto';
+      
+      const taskInputContainer = document.querySelector('.max-w-2xl.mx-auto');
+      taskInputContainer.parentNode.insertBefore(helperEl, taskInputContainer);
+    }
+    
+    const toolsText = missingRequirements.includes('at least one coding tool (Amp or OpenAI)') 
+      ? '<li><strong>Coding Tool:</strong> Configure either Amp (requires Amp token) or OpenAI (requires OpenAI key)</li>'
+      : '';
+      
+    const githubText = missingRequirements.includes('GitHub token') 
+      ? '<li><strong>GitHub Token:</strong> Create a personal access token with repo permissions</li>'
+      : '';
+      
+    const usernameText = missingRequirements.includes('GitHub username') 
+      ? '<li><strong>GitHub Username:</strong> Your GitHub username for PR comment filtering</li>'
+      : '';
+      
+    const openaiText = missingRequirements.includes('OpenAI API key') 
+      ? '<li><strong>OpenAI API Key:</strong> Required for commit messages and task summaries</li>'
+      : '';
+    
+    helperEl.innerHTML = `
+      <div class="flex items-start">
+        <div class="flex-shrink-0">
+          <svg class="h-5 w-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+          </svg>
+        </div>
+        <div class="ml-3">
+          <h3 class="text-sm font-medium text-yellow-800">Configuration Required</h3>
+          <div class="mt-2 text-sm text-yellow-700">
+            <p class="mb-2">Before creating tasks, you need to configure:</p>
+            <ul class="list-disc list-inside space-y-1">
+              ${githubText}${usernameText}${openaiText}${toolsText}
+            </ul>
+            <p class="mt-3">
+              <a href="settings.html" class="font-medium underline hover:no-underline">
+                Go to Settings →
+              </a>
+            </p>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    helperEl.classList.remove('hidden');
+  }
+  
+  hideConfigurationHelper() {
+    const helperEl = document.getElementById('config-helper');
+    if (helperEl) {
+      helperEl.classList.add('hidden');
     }
   }
 
@@ -94,11 +174,12 @@ class Dashboard {
         // Refresh task list to show the new task immediately
         this.refreshTasks();
       } else {
-        throw new Error('Failed to create task');
+        const result = await response.json();
+        throw new Error(result.error || 'Failed to create task');
       }
     } catch (error) {
       console.error('Error creating task:', error);
-      this.showError('Failed to create task. Please try again.');
+      this.showError(error.message || 'Failed to create task. Please try again.');
     }
   }
 
@@ -243,28 +324,11 @@ class Dashboard {
   }
 
   getStatusBadge(status) {
-    const badges = {
-      'pending': 'bg-gray-100 text-gray-800',
-      'in-progress': 'bg-yellow-100 text-yellow-800',
-      'awaiting-review': 'bg-blue-100 text-blue-800',
-      'completed': 'bg-green-100 text-green-800',
-      'failed': 'bg-red-100 text-red-800',
-      'cancelled': 'bg-red-100 text-red-800'
-    };
-
-    const badgeClass = badges[status] || 'bg-gray-100 text-gray-800';
-    const displayStatus = status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase());
-
-    return `<span class="px-2 py-1 text-xs font-medium rounded-full ${badgeClass}">${displayStatus}</span>`;
+    return Utils.getStatusBadge(status);
   }
 
   getStageBadge(stage) {
-    if (!stage) return '';
-
-    const stageClass = 'bg-gray-50 text-gray-700 border border-gray-200';
-    const displayStage = stage.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
-
-    return `<span class="px-2 py-1 text-xs font-medium rounded ${stageClass}">${displayStage}</span>`;
+    return Utils.getStageBadge(stage);
   }
 
   updateLoadMoreButton() {
@@ -392,9 +456,7 @@ class Dashboard {
   }
 
   showError(message) {
-    // Simple error display - could be enhanced with a toast system
-    console.error(message);
-    // You could add a toast notification here
+    Utils.showToast(message, 'error');
   }
 
   async cancelTask(taskId) {
@@ -424,10 +486,7 @@ class Dashboard {
 
 
   escapeHtml(text) {
-    if (!text) return '';
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+    return Utils.escapeHtml(text || '');
   }
 }
 

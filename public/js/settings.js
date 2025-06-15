@@ -61,14 +61,16 @@ class Settings {
     this.setSecureField('openai-api-key', settings.openaiApiKey);
     
     // Task configuration
-    document.getElementById('branch-prefix').value = settings.branchPrefix || 'intern/';
+    document.getElementById('branch-prefix').value = settings.branchPrefix || 'duckling/';
     document.getElementById('base-branch').value = settings.baseBranch || 'main';
-    document.getElementById('pr-title-prefix').value = settings.prTitlePrefix || '[INTERN]';
-    document.getElementById('commit-suffix').value = settings.commitSuffix || ' [i]';
+    document.getElementById('pr-title-prefix').value = settings.prTitlePrefix || '[DUCKLING]';
+    document.getElementById('commit-suffix').value = settings.commitSuffix || ' [d]';
     document.getElementById('max-retries').value = settings.maxRetries || 3;
-    document.getElementById('poll-interval').value = settings.pollInterval || 30;
     document.getElementById('task-check-interval').value = settings.taskCheckInterval || 60;
     document.getElementById('review-check-interval').value = settings.reviewCheckInterval || 30;
+    
+    // Show configuration status
+    this.showConfigurationStatus(settings);
     
     // Load precommit checks
     this.loadPrecommitChecks();
@@ -85,7 +87,6 @@ class Settings {
     
     // Convert numeric fields
     settings.maxRetries = parseInt(settings.maxRetries);
-    settings.pollInterval = parseInt(settings.pollInterval);
     settings.taskCheckInterval = parseInt(settings.taskCheckInterval);
     settings.reviewCheckInterval = parseInt(settings.reviewCheckInterval);
     
@@ -108,16 +109,12 @@ class Settings {
   }
 
   showSuccess() {
-    const successEl = document.getElementById('success-message');
-    const errorEl = document.getElementById('error-message');
+    Utils.showToast('Settings saved successfully!', 'success');
     
-    errorEl.classList.add('hidden');
-    successEl.classList.remove('hidden');
-    
-    // Hide success message after 3 seconds
+    // Also refresh the configuration status
     setTimeout(() => {
-      successEl.classList.add('hidden');
-    }, 3000);
+      this.loadSettings();
+    }, 500);
   }
 
   setSecureField(fieldId, value) {
@@ -224,19 +221,85 @@ class Settings {
   }
 
   escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+    return Utils.escapeHtml(text || '');
+  }
+
+  showConfigurationStatus(settings) {
+    const statusEl = document.getElementById('config-status');
+    
+    // Check configuration completeness
+    const hasGithubToken = settings.githubToken === '***CONFIGURED***';
+    const hasGithubUsername = settings.githubUsername;
+    const hasAmpTool = settings.ampApiKey === '***CONFIGURED***';
+    const hasOpenAiTool = settings.openaiApiKey === '***CONFIGURED***';
+    const hasOpenAiForCommits = settings.openaiApiKey === '***CONFIGURED***';
+    
+    const missingRequirements = [];
+    if (!hasGithubToken) missingRequirements.push('GitHub token');
+    if (!hasGithubUsername) missingRequirements.push('GitHub username');
+    if (!hasOpenAiForCommits) missingRequirements.push('OpenAI API key');
+    if (!hasAmpTool && !hasOpenAiTool) missingRequirements.push('at least one coding tool (Amp or OpenAI)');
+    
+    if (missingRequirements.length === 0) {
+      // All requirements met
+      statusEl.className = 'bg-green-50 border border-green-200 rounded-lg p-4';
+      statusEl.innerHTML = `
+        <div class="flex items-center">
+          <div class="flex-shrink-0">
+            <svg class="h-5 w-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+            </svg>
+          </div>
+          <div class="ml-3">
+            <h3 class="text-sm font-medium text-green-800">Configuration Complete</h3>
+            <p class="text-sm text-green-700 mt-1">All required settings are configured. You can create tasks!</p>
+          </div>
+        </div>
+      `;
+    } else {
+      // Missing requirements
+      const toolsText = missingRequirements.includes('at least one coding tool (Amp or OpenAI)') 
+        ? '<li><strong>Coding Tool:</strong> Configure either Amp (requires Amp token) or OpenAI (for code generation)</li>'
+        : '';
+        
+      const githubText = missingRequirements.includes('GitHub token') 
+        ? '<li><strong>GitHub Token:</strong> Required for creating branches and PRs</li>'
+        : '';
+        
+      const usernameText = missingRequirements.includes('GitHub username') 
+        ? '<li><strong>GitHub Username:</strong> Required for PR comment filtering</li>'
+        : '';
+        
+      const openaiText = missingRequirements.includes('OpenAI API key') 
+        ? '<li><strong>OpenAI API Key:</strong> Required for commit messages and task summaries</li>'
+        : '';
+      
+      statusEl.className = 'bg-red-50 border border-red-200 rounded-lg p-4';
+      statusEl.innerHTML = `
+        <div class="flex items-start">
+          <div class="flex-shrink-0">
+            <svg class="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+            </svg>
+          </div>
+          <div class="ml-3">
+            <h3 class="text-sm font-medium text-red-800">Configuration Incomplete</h3>
+            <div class="mt-2 text-sm text-red-700">
+              <p class="mb-2">The following settings are required to create tasks:</p>
+              <ul class="list-disc list-inside space-y-1">
+                ${githubText}${usernameText}${openaiText}${toolsText}
+              </ul>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+    
+    statusEl.classList.remove('hidden');
   }
 
   showError(message) {
-    const successEl = document.getElementById('success-message');
-    const errorEl = document.getElementById('error-message');
-    const errorText = document.getElementById('error-text');
-    
-    successEl.classList.add('hidden');
-    errorText.textContent = message;
-    errorEl.classList.remove('hidden');
+    Utils.showToast(message, 'error');
   }
 }
 

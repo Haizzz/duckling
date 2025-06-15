@@ -126,5 +126,56 @@ window.Utils = {
     }
     
     return errors;
+  },
+
+  // Status badge generation (shared across dashboard and task detail)
+  getStatusBadge(status) {
+    const badges = {
+      'pending': 'bg-gray-100 text-gray-800',
+      'in-progress': 'bg-yellow-100 text-yellow-800',
+      'awaiting-review': 'bg-blue-100 text-blue-800',
+      'completed': 'bg-green-100 text-green-800',
+      'failed': 'bg-red-100 text-red-800',
+      'cancelled': 'bg-red-100 text-red-800'
+    };
+
+    const badgeClass = badges[status] || 'bg-gray-100 text-gray-800';
+    const displayStatus = status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase());
+
+    return `<span class="px-2 py-1 text-xs font-medium rounded-full ${badgeClass}">${displayStatus}</span>`;
+  },
+
+  // Stage badge generation (shared utility)
+  getStageBadge(stage) {
+    if (!stage) return '';
+
+    const stageClass = 'bg-gray-50 text-gray-700 border border-gray-200';
+    const displayStage = stage.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+
+    return `<span class="px-2 py-1 text-xs font-medium rounded ${stageClass}">${displayStage}</span>`;
+  },
+
+  // Error display helper
+  showError(message, containerId = 'error-container') {
+    console.error(message);
+    const container = document.getElementById(containerId);
+    if (container) {
+      container.innerHTML = `
+        <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div class="flex">
+            <div class="flex-shrink-0">
+              <svg class="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+              </svg>
+            </div>
+            <div class="ml-3">
+              <h3 class="text-sm font-medium text-red-800">Error</h3>
+              <p class="mt-1 text-sm text-red-700">${this.escapeHtml(message)}</p>
+            </div>
+          </div>
+        </div>
+      `;
+      container.classList.remove('hidden');
+    }
   }
 };

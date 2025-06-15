@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Settings - Intern</title>
+  <title>Settings - Duckling</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="/css/base.css">
 </head>
@@ -17,7 +17,7 @@
         <div class="flex justify-between h-16">
           <div class="flex items-center">
             <a href="index.html" class="flex items-center">
-              <img src="/assets/intern.png" alt="Intern" class="h-8 w-auto">
+              <img src="/assets/logo.png" alt="Duckling" class="h-12 w-auto">
             </a>
           </div>
           <div class="flex items-center">
@@ -43,6 +43,11 @@
       </div>
 
       <form id="settings-form" class="hidden space-y-8">
+        <h1 class="text-3xl font-bold text-gray-900">Duckling Settings</h1>
+        
+        <!-- Configuration Status -->
+        <div id="config-status" class="hidden"></div>
+        
         <!-- GitHub Configuration -->
         <div class="bg-white shadow rounded-lg">
           <div class="px-6 py-4 border-b border-gray-200">
@@ -65,6 +70,7 @@
               <p class="text-xs text-gray-500 mt-1">Your GitHub username for filtering PR comments and identifying
                 assignments</p>
             </div>
+
           </div>
         </div>
 
@@ -97,12 +103,12 @@
               </div>
             </div>
             <div>
-              <h3 class="text-sm font-medium text-gray-900 mb-3">OpenAI Codex</h3>
+              <h3 class="text-sm font-medium text-gray-900 mb-3">OpenAI <span class="text-red-500">*</span></h3>
               <div>
                 <label for="openai-api-key" class="block text-sm font-medium text-gray-700">API Key</label>
                 <input type="password" id="openai-api-key" name="openaiApiKey"
                   class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
-                <p class="text-xs text-gray-500 mt-1">OpenAI API key for GPT-powered code generation and completion</p>
+                <p class="text-xs text-gray-500 mt-1"><strong>Required:</strong> OpenAI API key for commit messages, task summaries, and code generation (if using OpenAI tool)</p>
               </div>
             </div>
           </div>
@@ -149,13 +155,7 @@
               <p class="text-xs text-gray-500 mt-1">Maximum number of retry attempts when tasks fail due to transient
                 errors</p>
             </div>
-            <div>
-              <label for="poll-interval" class="block text-sm font-medium text-gray-700">Poll Interval (seconds)</label>
-              <input type="number" id="poll-interval" name="pollInterval" value="30" min="10" max="300" step="1"
-                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
-              <p class="text-xs text-gray-500 mt-1">How often to check for new PR comments that might contain task
-                assignments</p>
-            </div>
+
             <div>
               <label for="task-check-interval" class="block text-sm font-medium text-gray-700">Task Check Interval
                 (seconds)</label>
@@ -220,6 +220,7 @@
     </div>
   </div>
 
+  <script src="/js/utils.js"></script>
   <script src="/js/settings.js"></script>
 </body>
 

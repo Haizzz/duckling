@@ -1,10 +1,14 @@
-# Intern
+# Duckling 🐥
 
-Automated coding tool that wraps CLI coding assistants (OpenAI Codex, Claude Code, Amp Code) to automate the entire development workflow from task assignment to PR merge.
+<p align="center">
+  <img src="public/assets/logo.png" alt="Duckling Logo" width="120" height="120">
+</p>
+
+**Duckling** is an automated coding assistant that wraps CLI coding tools (OpenAI Codex and Amp Code) to automate your entire development workflow from task assignment to PR merge.
 
 ## Features
 
-- 🤖 **AI-Powered Code Generation** - Integrates with Amp, OpenAI Codex, and Claude Code
+- 🤖 **AI-Powered Code Generation** - Integrates with Amp and OpenAI Codex
 - 🔄 **Complete Workflow Automation** - From task creation to PR merge
 - 🌐 **Web Interface** - Modern, responsive UI for task management
 - 📱 **Real-time Updates** - Live progress tracking via Server-Sent Events
@@ -20,15 +24,14 @@ Automated coding tool that wraps CLI coding assistants (OpenAI Codex, Claude Cod
 - Node.js 18+ 
 - Git repository (for task execution)
 - At least one coding assistant CLI tool installed:
-  - [Amp](https://www.amp.build/)
-  - [OpenAI CLI](https://platform.openai.com/docs/guides/cli)
-  - [Claude CLI](https://claude.ai/cli)
+  - [Amp](https://www.amp.build/) - Requires Amp token
+  - [OpenAI CLI](https://platform.openai.com/docs/guides/cli) - Requires OpenAI API key
 
 ### Installation
 
 ```bash
 # Clone or download the project
-cd intern
+cd duckling
 
 # Install dependencies
 npm install
@@ -36,8 +39,8 @@ npm install
 # Build the project
 npm run build
 
-# Start Intern
-npx intern start
+# Start Duckling
+npx duckling start
 ```
 
 ### First-Time Setup
@@ -45,8 +48,10 @@ npx intern start
 1. Visit http://localhost:3000
 2. Configure your settings:
    - **API Keys**: Configure your GitHub token and coding assistant API key
-   - **GitHub Settings**: Set repository URL and username
+   - **GitHub Settings**: Set your GitHub username
    - **Preferences**: Customize branch prefixes, retry limits, etc.
+
+⚠️ **Important**: You must configure at least one coding tool and your GitHub settings before creating tasks.
 
 ### Creating Your First Task
 
@@ -56,10 +61,55 @@ npx intern start
 3. Fill in title, description, and select coding tool
 4. Click "Create Task"
 
+*Note: If you haven't configured your coding tools, you'll be prompted to visit the settings page first.*
+
 #### Via CLI
 ```bash
-npx intern task create
+npx duckling task create
 ```
+
+## How Duckling Works
+
+Duckling automates your development workflow in these steps:
+
+1. **Task Creation** - You describe what you want implemented
+2. **Branch Creation** - Automatically creates a feature branch (`duckling/your-task`)
+3. **Code Generation** - Uses your chosen AI assistant (Amp or OpenAI) to write code
+4. **Precommit Checks** - Runs linting, tests, and type checking automatically
+5. **PR Creation** - Creates a pull request with the generated code
+6. **Review Loop** - Monitors PR comments and iterates based on feedback
+7. **Completion** - Marks task complete when PR is merged
+
+## Configuration Requirements
+
+### Required Settings
+
+Before you can create tasks, you need to configure:
+
+**For Amp Users:**
+- ✅ GitHub Token (with `repo` permissions)
+- ✅ Amp API Token  
+- ✅ OpenAI API Key (for commit messages and summaries)
+- ✅ GitHub Username
+
+**For OpenAI Users:**
+- ✅ GitHub Token (with `repo` permissions)
+- ✅ OpenAI API Key
+- ✅ GitHub Username
+
+### Getting API Keys
+
+- **GitHub Token**: Create at https://github.com/settings/personal-access-tokens
+- **Amp Token**: Get from your Amp dashboard
+- **OpenAI API Key**: Get from https://platform.openai.com/api-keys
+
+### Optional Settings
+
+- **Branch Prefix**: Prefix for generated branches (default: `duckling/`)
+- **PR Title Prefix**: Prefix for PR titles (default: `[DUCKLING]`)
+- **Maximum Retries**: Retry limit for failed operations (default: 3)
+- **Auto-merge**: Automatically merge PRs when checks pass (default: false)
+
 
 ## Usage
 
@@ -76,54 +126,23 @@ The web interface provides a complete task management experience:
 
 ```bash
 # Start the web server
-intern start [--port 3000]
+duckling start [--port 3000]
 
 # Check system status
-intern status
+duckling status
 
 # Task management
-intern task create          # Interactive task creation
-intern task list           # List all tasks
-intern task cancel <id>     # Cancel a specific task
+duckling task create          # Interactive task creation
+duckling task list           # List all tasks
+duckling task cancel <id>     # Cancel a specific task
 
 # Configuration
-intern config              # Check configuration status
+duckling config              # Check configuration status
 ```
 
-### How It Works
+## Precommit Checks
 
-1. **Task Creation**: Define what you want implemented
-2. **Branch Creation**: Automatically creates a feature branch
-3. **Code Generation**: Uses your chosen AI assistant to write code
-4. **Precommit Checks**: Runs linting, tests, and type checking
-5. **PR Creation**: Creates a pull request with generated code
-6. **Review Loop**: Monitors PR comments and iterates based on feedback
-7. **Completion**: Marks task complete when PR is merged
-
-## Configuration
-
-### Required Settings
-
-- **GitHub Token**: Personal access token with `repo` permissions
-  - Create at: https://github.com/settings/personal-access-tokens
-- **Coding Assistant API Key**: Choose at least one:
-  - Amp API Key
-  - OpenAI API Key 
-  - Claude API Key
-- **Repository URL**: Full GitHub repository URL
-- **GitHub Username**: Your GitHub username (for comment filtering)
-
-### Optional Settings
-
-- **Branch Prefix**: Prefix for generated branches (default: `intern/`)
-- **PR Title Prefix**: Prefix for PR titles (default: `[INTERN]`)
-- **Maximum Retries**: Retry limit for failed operations (default: 3)
-- **Auto-merge**: Automatically merge PRs when checks pass (default: false)
-- **Poll Interval**: How often to check for PR comments (default: 30 seconds)
-
-### Precommit Checks
-
-Configure custom precommit checks in the settings:
+Configure custom precommit checks in the settings to ensure code quality:
 
 ```bash
 # Example checks
@@ -136,19 +155,19 @@ npm test             # Unit tests
 
 ### System Components
 
-- **Core Engine**: Main orchestration with retry logic
-- **Express API**: RESTful backend with real-time events
+- **Core Engine**: Main orchestration with retry logic and timeout-based processing
+- **Express API**: RESTful backend with real-time Server-Sent Events
 - **SQLite Database**: Local storage for all data
-- **Job Queue**: Custom SQLite-based background processing
+- **Task Queue**: Prevents overlapping operations with proper scheduling
 - **Frontend**: Plain HTML/CSS/JS single-page application
 - **CLI**: Command-line interface for automation
 
 ### Data Storage
 
-All data is stored locally in `~/.intern/`:
+All data is stored locally in `~/.duckling/`:
 ```
-~/.intern/
-├── intern.db            # SQLite database
+~/.duckling/
+├── duckling.db          # SQLite database
 └── logs/                # Application logs
 ```
 
@@ -195,25 +214,21 @@ src/
 public/
 ├── js/               # Frontend JavaScript
 ├── css/              # Stylesheets
+├── assets/           # Images and static assets
 └── index.html        # Main HTML file
 ```
-
-### Adding New Features
-
-1. Update types in `src/types/index.ts`
-2. Add database changes in `src/core/database.ts`
-3. Implement core logic in appropriate manager
-4. Add API routes in `src/api/routes.ts`
-5. Update frontend in `public/js/`
-6. Add CLI commands if needed
 
 ## Troubleshooting
 
 ### Common Issues
 
+**Configuration Missing**
+- Visit the settings page to configure required API keys
+- Ensure you have both GitHub token and at least one coding tool configured
+
 **Database Locked**
-- Ensure only one Intern instance is running
-- Check for zombie processes: `ps aux | grep intern`
+- Ensure only one Duckling instance is running
+- Check for zombie processes: `ps aux | grep duckling`
 
 **Git Errors**
 - Verify working directory is a git repository
@@ -225,12 +240,12 @@ public/
 
 **CLI Tool Missing**
 - Install the required coding assistant CLI
-- Ensure it's in your PATH and working: `amp --version`
+- Ensure it's in your PATH: `amp --version` or check OpenAI CLI
 
 ### Getting Help
 
-- Check the logs in `~/.intern/logs/`
-- Use `intern status` to verify configuration
+- Check the logs in `~/.duckling/logs/`
+- Use `duckling status` to verify configuration
 - View detailed task logs in the web interface
 - Check the GitHub repository for issues and documentation
 

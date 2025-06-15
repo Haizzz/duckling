@@ -349,28 +349,11 @@ class TaskDetail {
   }
 
   getStatusBadge(status) {
-    const badges = {
-      'pending': 'bg-gray-100 text-gray-800',
-      'in-progress': 'bg-yellow-100 text-yellow-800',
-      'awaiting-review': 'bg-blue-100 text-blue-800',
-      'completed': 'bg-green-100 text-green-800',
-      'failed': 'bg-red-100 text-red-800',
-      'cancelled': 'bg-red-100 text-red-800'
-    };
-
-    const badgeClass = badges[status] || 'bg-gray-100 text-gray-800';
-    const displayStatus = status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase());
-
-    return `<span class="px-2 py-1 text-xs font-medium rounded-full ${badgeClass}">${displayStatus}</span>`;
+    return Utils.getStatusBadge(status);
   }
 
   getStageBadge(stage) {
-    if (!stage) return '';
-
-    const stageClass = 'bg-gray-50 text-gray-700 border border-gray-200';
-    const displayStage = stage.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
-
-    return `<span class="px-2 py-1 text-xs font-medium rounded ${stageClass}">${displayStage}</span>`;
+    return Utils.getStageBadge(stage);
   }
 
   showError(message) {
@@ -390,10 +373,7 @@ class TaskDetail {
   }
 
   escapeHtml(text) {
-    if (!text) return '';
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+    return Utils.escapeHtml(text || '');
   }
 }
 
