@@ -37,15 +37,6 @@ export class APIServer {
       console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
       next();
     });
-
-    // Error handling middleware
-    this.app.use((err: Error, req: express.Request, res: express.Response) => {
-      console.error('Server error:', err);
-      res.status(500).json({
-        success: false,
-        error: 'Internal server error',
-      });
-    });
   }
 
   private setupRoutes(): void {
@@ -73,6 +64,15 @@ export class APIServer {
     // Fallback for any other routes
     this.app.get('*', (req, res) => {
       res.redirect('/');
+    });
+
+    // Error handling middleware - must be last!
+    this.app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
+      console.error('Server error:', err);
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error',
+      });
     });
   }
 
