@@ -517,9 +517,9 @@ interface APIKeysSettings {
 ```typescript
 interface GeneralSettings {
   defaultCodingTool: 'openai' | 'amp' | 'claude';
-  branchPrefix: string;            // Default: 'duckling/'
+  branchPrefix: string;            // Default: 'duckling-'
   prPrefix: string;                // Default: '[DUCKLING]'
-  commitSuffix: string;            // Default: ' [i]'
+  commitSuffix: string;            // Default: ' [quack]'
   baseBranch: string;              // Default: 'main'
   autoMerge: boolean;              // Default: false
   maxRetries: number;              // Default: 3

@@ -33,11 +33,11 @@ class Settings {
   async loadSettings() {
     const loading = document.getElementById('loading-settings');
     const form = document.getElementById('settings-form');
-    
+
     try {
       const response = await fetch('/api/settings');
       const result = await response.json();
-      
+
       if (response.ok) {
         this.populateForm(result.data);
         loading.classList.add('hidden');
@@ -54,24 +54,24 @@ class Settings {
     // GitHub settings
     this.setSecureField('github-token', settings.githubToken);
     document.getElementById('github-username').value = settings.githubUsername || '';
-    
+
     // Coding tools
     document.getElementById('default-coding-tool').value = settings.defaultCodingTool || 'amp';
     this.setSecureField('amp-api-key', settings.ampApiKey);
     this.setSecureField('openai-api-key', settings.openaiApiKey);
-    
+
     // Task configuration
-    document.getElementById('branch-prefix').value = settings.branchPrefix || 'duckling/';
+    document.getElementById('branch-prefix').value = settings.branchPrefix || 'duckling-';
     document.getElementById('base-branch').value = settings.baseBranch || 'main';
     document.getElementById('pr-title-prefix').value = settings.prTitlePrefix || '[DUCKLING]';
     document.getElementById('commit-suffix').value = settings.commitSuffix || ' [d]';
     document.getElementById('max-retries').value = settings.maxRetries || 3;
     document.getElementById('task-check-interval').value = settings.taskCheckInterval || 60;
     document.getElementById('review-check-interval').value = settings.reviewCheckInterval || 30;
-    
+
     // Show configuration status
     this.showConfigurationStatus(settings);
-    
+
     // Load precommit checks
     this.loadPrecommitChecks();
   }
@@ -79,24 +79,24 @@ class Settings {
   async saveSettings() {
     const formData = new FormData(document.getElementById('settings-form'));
     const settings = {};
-    
+
     // Convert FormData to plain object
     for (const [key, value] of formData.entries()) {
       settings[key] = value;
     }
-    
+
     // Convert numeric fields
     settings.maxRetries = parseInt(settings.maxRetries);
     settings.taskCheckInterval = parseInt(settings.taskCheckInterval);
     settings.reviewCheckInterval = parseInt(settings.reviewCheckInterval);
-    
+
     try {
       const response = await fetch('/api/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(settings)
       });
-      
+
       if (response.ok) {
         this.showSuccess();
       } else {
@@ -110,7 +110,7 @@ class Settings {
 
   showSuccess() {
     Utils.showToast('Settings saved successfully!', 'success');
-    
+
     // Also refresh the configuration status
     setTimeout(() => {
       this.loadSettings();
@@ -119,7 +119,7 @@ class Settings {
 
   setSecureField(fieldId, value) {
     const field = document.getElementById(fieldId);
-    
+
     if (value === '***CONFIGURED***') {
       // Show that field is configured with placeholder
       field.value = '';
@@ -135,7 +135,7 @@ class Settings {
     try {
       const response = await fetch('/api/precommit-checks');
       const result = await response.json();
-      
+
       if (response.ok && result.success) {
         this.precommitChecks = result.data || [];
         this.renderPrecommitChecks();
@@ -148,12 +148,12 @@ class Settings {
   addPrecommitCheck() {
     const commandInput = document.getElementById('precommit-command');
     const command = commandInput.value.trim();
-    
+
     if (!command) return;
-    
+
     // Add to API
     this.savePrecommitCheck(command);
-    
+
     // Clear input
     commandInput.value = '';
   }
@@ -165,7 +165,7 @@ class Settings {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: command, command, required: true })
       });
-      
+
       if (response.ok) {
         // Reload the list
         this.loadPrecommitChecks();
@@ -182,7 +182,7 @@ class Settings {
       const response = await fetch(`/api/precommit-checks/${id}`, {
         method: 'DELETE'
       });
-      
+
       if (response.ok) {
         // Reload the list
         this.loadPrecommitChecks();
@@ -196,12 +196,12 @@ class Settings {
 
   renderPrecommitChecks() {
     const container = document.getElementById('precommit-list');
-    
+
     if (this.precommitChecks.length === 0) {
       container.innerHTML = '<p class="text-sm text-gray-500 italic">No precommit checks configured</p>';
       return;
     }
-    
+
     container.innerHTML = this.precommitChecks.map(check => `
       <div class="flex items-center justify-between p-3 bg-gray-50 rounded-md">
         <div class="flex-1">
@@ -226,20 +226,20 @@ class Settings {
 
   showConfigurationStatus(settings) {
     const statusEl = document.getElementById('config-status');
-    
+
     // Check configuration completeness
     const hasGithubToken = settings.githubToken === '***CONFIGURED***';
     const hasGithubUsername = settings.githubUsername;
     const hasAmpTool = settings.ampApiKey === '***CONFIGURED***';
     const hasOpenAiTool = settings.openaiApiKey === '***CONFIGURED***';
     const hasOpenAiForCommits = settings.openaiApiKey === '***CONFIGURED***';
-    
+
     const missingRequirements = [];
     if (!hasGithubToken) missingRequirements.push('GitHub token');
     if (!hasGithubUsername) missingRequirements.push('GitHub username');
     if (!hasOpenAiForCommits) missingRequirements.push('OpenAI API key');
     if (!hasAmpTool && !hasOpenAiTool) missingRequirements.push('at least one coding tool (Amp or OpenAI)');
-    
+
     if (missingRequirements.length === 0) {
       // All requirements met
       statusEl.className = 'bg-green-50 border border-green-200 rounded-lg p-4';
@@ -258,22 +258,22 @@ class Settings {
       `;
     } else {
       // Missing requirements
-      const toolsText = missingRequirements.includes('at least one coding tool (Amp or OpenAI)') 
+      const toolsText = missingRequirements.includes('at least one coding tool (Amp or OpenAI)')
         ? '<li><strong>Coding Tool:</strong> Configure either Amp (requires Amp token) or OpenAI (for code generation)</li>'
         : '';
-        
-      const githubText = missingRequirements.includes('GitHub token') 
+
+      const githubText = missingRequirements.includes('GitHub token')
         ? '<li><strong>GitHub Token:</strong> Required for creating branches and PRs</li>'
         : '';
-        
-      const usernameText = missingRequirements.includes('GitHub username') 
+
+      const usernameText = missingRequirements.includes('GitHub username')
         ? '<li><strong>GitHub Username:</strong> Required for PR comment filtering</li>'
         : '';
-        
-      const openaiText = missingRequirements.includes('OpenAI API key') 
+
+      const openaiText = missingRequirements.includes('OpenAI API key')
         ? '<li><strong>OpenAI API Key:</strong> Required for commit messages and task summaries</li>'
         : '';
-      
+
       statusEl.className = 'bg-red-50 border border-red-200 rounded-lg p-4';
       statusEl.innerHTML = `
         <div class="flex items-start">
@@ -294,7 +294,7 @@ class Settings {
         </div>
       `;
     }
-    
+
     statusEl.classList.remove('hidden');
   }
 

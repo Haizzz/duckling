@@ -73,7 +73,7 @@ npx duckling task create
 Duckling automates your development workflow in these steps:
 
 1. **Task Creation** - You describe what you want implemented
-2. **Branch Creation** - Automatically creates a feature branch (`duckling/your-task`)
+2. **Branch Creation** - Automatically creates a feature branch (`duckling-your-task`)
 3. **Code Generation** - Uses your chosen AI assistant (Amp or OpenAI) to write code
 4. **Precommit Checks** - Runs linting, tests, and type checking automatically
 5. **PR Creation** - Creates a pull request with the generated code
@@ -105,7 +105,7 @@ Before you can create tasks, you need to configure:
 
 ### Optional Settings
 
-- **Branch Prefix**: Prefix for generated branches (default: `duckling/`)
+- **Branch Prefix**: Prefix for generated branches (default: `duckling-`)
 - **PR Title Prefix**: Prefix for PR titles (default: `[DUCKLING]`)
 - **Maximum Retries**: Retry limit for failed operations (default: 3)
 - **Auto-merge**: Automatically merge PRs when checks pass (default: false)

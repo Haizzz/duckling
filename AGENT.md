@@ -68,9 +68,9 @@ duckling task cancel <taskId>
 - **GitHub Username**: For PR comment filtering
 
 ### Optional Settings
-- Branch prefix (default: `duckling/`)
+- Branch prefix (default: `duckling-`)
 - PR title prefix (default: `[DUCKLING]`)
-- Commit suffix (default: ` [i]`)
+- Commit suffix (default: ` [quack]`)
 - Base branch (default: `main`)
 - Maximum retries (default: 3)
 - Auto-merge (default: false)

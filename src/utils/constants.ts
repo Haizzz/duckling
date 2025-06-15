@@ -16,9 +16,9 @@ export type CodingTool = typeof CODING_TOOLS[number];
 
 // Default settings
 export const DEFAULT_SETTINGS = {
-  branchPrefix: 'duckling/',
+  branchPrefix: 'duckling-',
   prTitlePrefix: '[DUCKLING]',
-  commitSuffix: ' [i]',
+  commitSuffix: ' [quack]',
   maxRetries: 3,
   baseBranch: 'main',
 } as const;

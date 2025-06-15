@@ -45,7 +45,7 @@ export class GitManager {
       // Get branch prefix from settings if not provided
       if (!branchPrefix) {
         const prefixSetting = this.db.getSetting('branchPrefix');
-        branchPrefix = prefixSetting?.value || 'duckling/';
+        branchPrefix = prefixSetting?.value || 'duckling-';
       }
 
       logger.info(`Updating to latest ${baseBranch} and creating new branch`, taskId.toString());
@@ -101,7 +101,7 @@ export class GitManager {
       const message = await this.openaiManager.generateCommitMessage(taskDescription, changedFiles);
 
       // Apply commit suffix from settings
-      const suffix = this.db.getSetting('commitSuffix')?.value || ' [i]';
+      const suffix = this.db.getSetting('commitSuffix')?.value || ' [quack]';
       const finalMessage = message.endsWith(suffix) ? message : `${message}${suffix}`;
 
       // Commit changes

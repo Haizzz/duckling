@@ -50,7 +50,7 @@ export class OpenAIManager {
   async generateBranchName(taskDescription: string): Promise<string> {
     // Get branch prefix to calculate available space
     const prefixSetting = this.db.getSetting('branchPrefix');
-    const branchPrefix = prefixSetting?.value || 'duckling/';
+    const branchPrefix = prefixSetting?.value || 'duckling-';
     const maxBranchNameLength = 30 - branchPrefix.length; // Reserve space for prefix
 
     if (!this.openai) {
