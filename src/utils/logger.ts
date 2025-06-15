@@ -4,7 +4,7 @@ import { LOGS_DIR, LogLevel } from './constants';
 
 export class Logger {
   private static instance: Logger;
-  
+
   constructor() {
     // Ensure logs directory exists
     if (!fs.existsSync(LOGS_DIR)) {
@@ -22,14 +22,17 @@ export class Logger {
   private writeLog(level: LogLevel, message: string, taskId?: string): void {
     const timestamp = new Date().toISOString();
     const logEntry = `[${timestamp}] [${level.toUpperCase()}] ${taskId ? `[${taskId}] ` : ''}${message}`;
-    
+
     // Write to console
     console.log(logEntry);
-    
+
     // Write to file
-    const logFile = path.join(LOGS_DIR, `duckling-${new Date().toISOString().split('T')[0]}.log`);
+    const logFile = path.join(
+      LOGS_DIR,
+      `duckling-${new Date().toISOString().split('T')[0]}.log`
+    );
     fs.appendFileSync(logFile, logEntry + '\n');
-    
+
     // Also write to task-specific log if taskId provided
     if (taskId) {
       const taskLogFile = path.join(LOGS_DIR, `task-${taskId}.log`);
@@ -54,12 +57,23 @@ export class Logger {
   }
 
   // Log command execution
-  logCommand(command: string, args: string[], cwd: string, taskId?: string): void {
+  logCommand(
+    command: string,
+    args: string[],
+    cwd: string,
+    taskId?: string
+  ): void {
     this.info(`Executing: ${command} ${args.join(' ')} (cwd: ${cwd})`, taskId);
   }
 
   // Log command result
-  logCommandResult(command: string, exitCode: number, stdout?: string, stderr?: string, taskId?: string): void {
+  logCommandResult(
+    command: string,
+    exitCode: number,
+    stdout?: string,
+    stderr?: string,
+    taskId?: string
+  ): void {
     if (exitCode === 0) {
       this.info(`Command succeeded: ${command}`, taskId);
       if (stdout) {

@@ -1,11 +1,13 @@
 import { TaskExecutor } from '../task-executor';
+import { DatabaseManager } from '../database';
+import { createMockInstance } from '../../utils/test-utils';
 
 describe('TaskExecutor', () => {
   let taskExecutor: TaskExecutor;
 
   beforeEach(() => {
     taskExecutor = TaskExecutor.getInstance();
-    
+
     // Clear any existing state
     (taskExecutor as any).currentOperation = null;
     (taskExecutor as any).operationQueue = [];
@@ -27,7 +29,7 @@ describe('TaskExecutor', () => {
       const operation = {
         taskId: 123,
         operation: 'test-operation',
-        execute: mockExecute
+        execute: mockExecute,
       };
 
       await taskExecutor.executeTask(operation);
@@ -36,66 +38,77 @@ describe('TaskExecutor', () => {
     });
 
     it('executes task with database operations and calls mocked database methods', async () => {
-      const mockDb = {
-        updateTaskStatus: jest.fn(),
-        addTaskLog: jest.fn(),
-        getTask: jest.fn().mockResolvedValue({ id: 123 })
-      };
+      const mockDb = createMockInstance(DatabaseManager);
+      mockDb.getTask.mockReturnValue({ id: 123 } as any);
 
       const mockExecute = jest.fn(async () => {
-        mockDb.updateTaskStatus(123, 'in_progress');
-        mockDb.addTaskLog({ taskId: 123, message: 'Task started' });
+        mockDb.updateTask(123, { status: 'in-progress' });
+        mockDb.addTaskLog({
+          task_id: 123,
+          level: 'info',
+          message: 'Task started',
+        });
       });
 
       const operation = {
         taskId: 123,
         operation: 'database-operation',
-        execute: mockExecute
+        execute: mockExecute,
       };
 
       await taskExecutor.executeTask(operation);
 
       expect(mockExecute).toHaveBeenCalledTimes(1);
-      expect(mockDb.updateTaskStatus).toHaveBeenCalledWith(123, 'in_progress');
-      expect(mockDb.addTaskLog).toHaveBeenCalledWith({ taskId: 123, message: 'Task started' });
+      expect(mockDb.updateTask).toHaveBeenCalledWith(123, {
+        status: 'in-progress',
+      });
+      expect(mockDb.addTaskLog).toHaveBeenCalledWith({
+        task_id: 123,
+        level: 'info',
+        message: 'Task started',
+      });
     });
 
     it('emits operation-start event when task begins execution', async () => {
       const startSpy = jest.fn();
       taskExecutor.on('operation-start', startSpy);
-      
+
       const mockExecute = jest.fn().mockResolvedValue(undefined);
       const operation = {
         taskId: 123,
         operation: 'test-operation',
-        execute: mockExecute
+        execute: mockExecute,
       };
 
       await taskExecutor.executeTask(operation);
 
-      expect(startSpy).toHaveBeenCalledWith(expect.objectContaining({
-        taskId: 123,
-        operation: 'test-operation'
-      }));
+      expect(startSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          taskId: 123,
+          operation: 'test-operation',
+        })
+      );
     });
 
     it('emits operation-complete event when task finishes successfully', async () => {
       const completeSpy = jest.fn();
       taskExecutor.on('operation-complete', completeSpy);
-      
+
       const mockExecute = jest.fn().mockResolvedValue(undefined);
       const operation = {
         taskId: 123,
         operation: 'test-operation',
-        execute: mockExecute
+        execute: mockExecute,
       };
 
       await taskExecutor.executeTask(operation);
 
-      expect(completeSpy).toHaveBeenCalledWith(expect.objectContaining({
-        taskId: 123,
-        operation: 'test-operation'
-      }));
+      expect(completeSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          taskId: 123,
+          operation: 'test-operation',
+        })
+      );
     });
 
     it('rejects promise when task execution fails', async () => {
@@ -103,34 +116,39 @@ describe('TaskExecutor', () => {
       const mockExecute = jest.fn(async () => {
         throw error;
       });
-      
+
       const operation = {
         taskId: 123,
         operation: 'test-operation',
-        execute: mockExecute
+        execute: mockExecute,
       };
 
-      await expect(taskExecutor.executeTask(operation)).rejects.toThrow('Operation failed');
+      await expect(taskExecutor.executeTask(operation)).rejects.toThrow(
+        'Operation failed'
+      );
       expect(mockExecute).toHaveBeenCalledTimes(1);
     });
 
     it('handles database errors properly during task execution', async () => {
-      const mockDb = {
-        updateTaskStatus: jest.fn().mockRejectedValue(new Error('Database error'))
-      };
+      const mockDb = createMockInstance(DatabaseManager);
+      mockDb.updateTask.mockImplementation(() => {
+        throw new Error('Database error');
+      });
 
       const mockExecute = jest.fn(async () => {
-        await mockDb.updateTaskStatus(123, 'failed');
+        mockDb.updateTask(123, { status: 'failed' });
       });
 
       const operation = {
         taskId: 123,
         operation: 'failing-database-operation',
-        execute: mockExecute
+        execute: mockExecute,
       };
 
-      await expect(taskExecutor.executeTask(operation)).rejects.toThrow('Database error');
-      expect(mockDb.updateTaskStatus).toHaveBeenCalledWith(123, 'failed');
+      await expect(taskExecutor.executeTask(operation)).rejects.toThrow(
+        'Database error'
+      );
+      expect(mockDb.updateTask).toHaveBeenCalledWith(123, { status: 'failed' });
     });
 
     it('processes multiple tasks sequentially in queue order', async () => {
@@ -140,13 +158,13 @@ describe('TaskExecutor', () => {
       const task1 = taskExecutor.executeTask({
         taskId: 1,
         operation: 'task1',
-        execute: execute1
+        execute: execute1,
       });
 
       const task2 = taskExecutor.executeTask({
         taskId: 2,
-        operation: 'task2', 
-        execute: execute2
+        operation: 'task2',
+        execute: execute2,
       });
 
       await Promise.all([task1, task2]);
@@ -156,41 +174,58 @@ describe('TaskExecutor', () => {
     });
 
     it('executes multiple tasks with database operations in correct order', async () => {
-      const mockDb = {
-        updateTaskStatus: jest.fn(),
-        addTaskLog: jest.fn()
-      };
+      const mockDb = createMockInstance(DatabaseManager);
 
       const execute1 = jest.fn(async () => {
-        mockDb.updateTaskStatus(1, 'in_progress');
-        mockDb.addTaskLog({ taskId: 1, message: 'Task 1 started' });
+        mockDb.updateTask(1, { status: 'in-progress' });
+        mockDb.addTaskLog({
+          task_id: 1,
+          level: 'info',
+          message: 'Task 1 started',
+        });
       });
 
       const execute2 = jest.fn(async () => {
-        mockDb.updateTaskStatus(2, 'in_progress');
-        mockDb.addTaskLog({ taskId: 2, message: 'Task 2 started' });
+        mockDb.updateTask(2, { status: 'in-progress' });
+        mockDb.addTaskLog({
+          task_id: 2,
+          level: 'info',
+          message: 'Task 2 started',
+        });
       });
 
       const task1 = taskExecutor.executeTask({
         taskId: 1,
         operation: 'task1',
-        execute: execute1
+        execute: execute1,
       });
 
       const task2 = taskExecutor.executeTask({
         taskId: 2,
         operation: 'task2',
-        execute: execute2
+        execute: execute2,
       });
 
       await Promise.all([task1, task2]);
 
-      expect(mockDb.updateTaskStatus).toHaveBeenCalledTimes(2);
-      expect(mockDb.updateTaskStatus).toHaveBeenNthCalledWith(1, 1, 'in_progress');
-      expect(mockDb.updateTaskStatus).toHaveBeenNthCalledWith(2, 2, 'in_progress');
+      expect(mockDb.updateTask).toHaveBeenCalledTimes(2);
+      expect(mockDb.updateTask).toHaveBeenNthCalledWith(1, 1, {
+        status: 'in-progress',
+      });
+      expect(mockDb.updateTask).toHaveBeenNthCalledWith(2, 2, {
+        status: 'in-progress',
+      });
       expect(mockDb.addTaskLog).toHaveBeenCalledTimes(2);
-      expect(mockDb.addTaskLog).toHaveBeenNthCalledWith(1, { taskId: 1, message: 'Task 1 started' });
-      expect(mockDb.addTaskLog).toHaveBeenNthCalledWith(2, { taskId: 2, message: 'Task 2 started' });
+      expect(mockDb.addTaskLog).toHaveBeenNthCalledWith(1, {
+        task_id: 1,
+        level: 'info',
+        message: 'Task 1 started',
+      });
+      expect(mockDb.addTaskLog).toHaveBeenNthCalledWith(2, {
+        task_id: 2,
+        level: 'info',
+        message: 'Task 2 started',
+      });
     });
   });
 

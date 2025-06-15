@@ -15,28 +15,40 @@ export async function execCommand(
 ): Promise<ExecResult> {
   const { taskId, ...execaOptions } = options;
   const cwd = options.cwd || process.cwd();
-  
+
   // Log the command being executed
   logger.logCommand(command, args, cwd, taskId);
-  
+
   try {
     const result = await execa(command, args, {
       reject: false, // Don't throw on non-zero exit codes
-      ...execaOptions
+      ...execaOptions,
     });
-    
+
     // Log the result
-    logger.logCommandResult(command, result.exitCode, result.stdout, result.stderr, taskId);
-    
+    logger.logCommandResult(
+      command,
+      result.exitCode,
+      result.stdout,
+      result.stderr,
+      taskId
+    );
+
     return {
       stdout: result.stdout,
       stderr: result.stderr,
-      exitCode: result.exitCode
+      exitCode: result.exitCode,
     };
   } catch (error: any) {
     // Log the error
-    logger.logCommandResult(command, error.exitCode || 1, error.stdout, error.stderr, taskId);
-    
+    logger.logCommandResult(
+      command,
+      error.exitCode || 1,
+      error.stdout,
+      error.stderr,
+      taskId
+    );
+
     // Re-throw the error
     throw error;
   }
@@ -50,7 +62,7 @@ export async function execCommandWithInput(
 ): Promise<ExecResult> {
   return execCommand(command, args, {
     ...options,
-    input
+    input,
   });
 }
 

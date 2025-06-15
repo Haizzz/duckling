@@ -10,7 +10,10 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
 
   // Health check
   router.get('/health', (req: Request, res: Response) => {
-    res.json({ success: true, data: { status: 'healthy', timestamp: new Date().toISOString() } });
+    res.json({
+      success: true,
+      data: { status: 'healthy', timestamp: new Date().toISOString() },
+    });
   });
 
   // Tasks endpoints
@@ -24,7 +27,7 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
       const tasks = db.getTasks({
         status: status as string,
         limit: limitNum,
-        offset
+        offset,
       });
 
       // Get total count for pagination
@@ -39,16 +42,16 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
             currentPage: pageNum,
             limit: limitNum,
             total: totalCount,
-            totalPages: Math.ceil(totalCount / limitNum)
-          }
-        }
+            totalPages: Math.ceil(totalCount / limitNum),
+          },
+        },
       };
 
       res.json(response);
     } catch (error: any) {
       res.status(500).json({
         success: false,
-        error: error.message
+        error: error.message,
       });
     }
   });
@@ -61,32 +64,34 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
       if (!description) {
         return res.status(400).json({
           success: false,
-          error: 'Missing required field: description'
+          error: 'Missing required field: description',
         });
       }
 
       // Get default coding tool from settings
       const defaultCodingTool = db.getSetting('defaultCodingTool');
-      const codingTool = (defaultCodingTool?.value as 'amp' | 'openai') || 'amp'; // Default to amp if not set
+      const codingTool =
+        (defaultCodingTool?.value as 'amp' | 'openai') || 'amp'; // Default to amp if not set
 
       const taskRequest: CreateTaskRequest = {
-        title: description.substring(0, 50) + (description.length > 50 ? '...' : ''),
+        title:
+          description.substring(0, 50) + (description.length > 50 ? '...' : ''),
         description,
-        codingTool
+        codingTool,
       };
 
       const taskId = await engine.createTask(taskRequest);
 
       const response: ApiResponse = {
         success: true,
-        data: { taskId }
+        data: { taskId },
       };
 
       res.json(response);
     } catch (error: any) {
       res.status(500).json({
         success: false,
-        error: error.message
+        error: error.message,
       });
     }
   });
@@ -98,20 +103,20 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
       if (!task) {
         return res.status(404).json({
           success: false,
-          error: 'Task not found'
+          error: 'Task not found',
         });
       }
 
       const response: ApiResponse = {
         success: true,
-        data: task
+        data: task,
       };
 
       res.json(response);
     } catch (error: any) {
       res.status(500).json({
         success: false,
-        error: error.message
+        error: error.message,
       });
     }
   });
@@ -123,7 +128,7 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
       if (!task) {
         return res.status(404).json({
           success: false,
-          error: 'Task not found'
+          error: 'Task not found',
         });
       }
 
@@ -131,14 +136,14 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
 
       const response: ApiResponse = {
         success: true,
-        data: { message: 'Task updated successfully' }
+        data: { message: 'Task updated successfully' },
       };
 
       res.json(response);
     } catch (error: any) {
       res.status(500).json({
         success: false,
-        error: error.message
+        error: error.message,
       });
     }
   });
@@ -150,7 +155,7 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
       if (!task) {
         return res.status(404).json({
           success: false,
-          error: 'Task not found'
+          error: 'Task not found',
         });
       }
 
@@ -158,14 +163,14 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
 
       const response: ApiResponse = {
         success: true,
-        data: { message: 'Task cancelled successfully' }
+        data: { message: 'Task cancelled successfully' },
       };
 
       res.json(response);
     } catch (error: any) {
       res.status(500).json({
         success: false,
-        error: error.message
+        error: error.message,
       });
     }
   });
@@ -175,14 +180,14 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
       // For now, return empty array as commits aren't tracked yet
       const response: ApiResponse = {
         success: true,
-        data: []
+        data: [],
       };
 
       res.json(response);
     } catch (error: any) {
       res.status(500).json({
         success: false,
-        error: error.message
+        error: error.message,
       });
     }
   });
@@ -198,19 +203,19 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
         level: level as string,
         limit: limitNum,
         offset: after ? undefined : offset, // Don't use offset when using after
-        after: after ? parseInt(after as string) : undefined
+        after: after ? parseInt(after as string) : undefined,
       });
 
       const response: ApiResponse = {
         success: true,
-        data: logs
+        data: logs,
       };
 
       res.json(response);
     } catch (error: any) {
       res.status(500).json({
         success: false,
-        error: error.message
+        error: error.message,
       });
     }
   });
@@ -221,14 +226,14 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
 
       const response: ApiResponse = {
         success: true,
-        data: { message: 'Task retry initiated' }
+        data: { message: 'Task retry initiated' },
       };
 
       res.json(response);
     } catch (error: any) {
       res.status(400).json({
         success: false,
-        error: error.message
+        error: error.message,
       });
     }
   });
@@ -243,15 +248,15 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
         success: true,
         data: {
           owner: repoInfo.owner,
-          name: repoInfo.name
-        }
+          name: repoInfo.name,
+        },
       };
 
       res.json(response);
     } catch (error: any) {
       res.status(500).json({
         success: false,
-        error: error.message
+        error: error.message,
       });
     }
   });
@@ -275,14 +280,14 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
 
       const response: ApiResponse = {
         success: true,
-        data: sanitizedSettings
+        data: sanitizedSettings,
       };
 
       res.json(response);
     } catch (error: any) {
       res.status(500).json({
         success: false,
-        error: error.message
+        error: error.message,
       });
     }
   });
@@ -293,8 +298,11 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
       // Update each setting
       for (const [key, value] of Object.entries(settings)) {
         // Skip empty API keys/tokens (means don't change the existing value)
-        if ((key.toLowerCase().includes('token') || key.toLowerCase().includes('apikey')) &&
-          (!value || value === '' || value === '***CONFIGURED***')) {
+        if (
+          (key.toLowerCase().includes('token') ||
+            key.toLowerCase().includes('apikey')) &&
+          (!value || value === '' || value === '***CONFIGURED***')
+        ) {
           continue;
         }
 
@@ -303,14 +311,14 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
 
       const response: ApiResponse = {
         success: true,
-        data: { message: 'Settings updated successfully' }
+        data: { message: 'Settings updated successfully' },
       };
 
       res.json(response);
     } catch (error: any) {
       res.status(500).json({
         success: false,
-        error: error.message
+        error: error.message,
       });
     }
   });
@@ -322,14 +330,14 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
 
       const response: ApiResponse = {
         success: true,
-        data: checks
+        data: checks,
       };
 
       res.json(response);
     } catch (error: any) {
       res.status(500).json({
         success: false,
-        error: error.message
+        error: error.message,
       });
     }
   });
@@ -341,26 +349,26 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
       if (!name || !command) {
         return res.status(400).json({
           success: false,
-          error: 'Missing required fields: name and command'
+          error: 'Missing required fields: name and command',
         });
       }
 
       const id = db.addPrecommitCheck({
         name,
         command,
-        order_index: 0
+        order_index: 0,
       });
 
       const response: ApiResponse = {
         success: true,
-        data: { id }
+        data: { id },
       };
 
       res.json(response);
     } catch (error: any) {
       res.status(500).json({
         success: false,
-        error: error.message
+        error: error.message,
       });
     }
   });
@@ -374,37 +382,40 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
 
       const response: ApiResponse = {
         success: true,
-        data: { message: 'Precommit check updated successfully' }
+        data: { message: 'Precommit check updated successfully' },
       };
 
       res.json(response);
     } catch (error: any) {
       res.status(500).json({
         success: false,
-        error: error.message
+        error: error.message,
       });
     }
   });
 
-  router.delete('/precommit-checks/:id', async (req: Request, res: Response) => {
-    try {
-      const id = parseInt(req.params.id);
+  router.delete(
+    '/precommit-checks/:id',
+    async (req: Request, res: Response) => {
+      try {
+        const id = parseInt(req.params.id);
 
-      db.deletePrecommitCheck(id);
+        db.deletePrecommitCheck(id);
 
-      const response: ApiResponse = {
-        success: true,
-        data: { message: 'Precommit check deleted successfully' }
-      };
+        const response: ApiResponse = {
+          success: true,
+          data: { message: 'Precommit check deleted successfully' },
+        };
 
-      res.json(response);
-    } catch (error: any) {
-      res.status(500).json({
-        success: false,
-        error: error.message
-      });
+        res.json(response);
+      } catch (error: any) {
+        res.status(500).json({
+          success: false,
+          error: error.message,
+        });
+      }
     }
-  });
+  );
 
   // Server-Sent Events endpoint for real-time updates
   router.get('/events', (req: Request, res: Response) => {
@@ -412,24 +423,30 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
+      Connection: 'keep-alive',
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'Cache-Control'
+      'Access-Control-Allow-Headers': 'Cache-Control',
     });
 
     // Send initial connection message
-    res.write(`data: ${JSON.stringify({ type: 'connected', timestamp: Date.now() })}\n\n`);
+    res.write(
+      `data: ${JSON.stringify({ type: 'connected', timestamp: Date.now() })}\n\n`
+    );
 
     // Listen for task updates from engine
     const handleTaskUpdate = (event: any) => {
-      res.write(`data: ${JSON.stringify({ type: 'task-update', ...event })}\n\n`);
+      res.write(
+        `data: ${JSON.stringify({ type: 'task-update', ...event })}\n\n`
+      );
     };
 
     engine.on('task-update', handleTaskUpdate);
 
     // Send periodic heartbeat
     const heartbeat = setInterval(() => {
-      res.write(`data: ${JSON.stringify({ type: 'heartbeat', timestamp: Date.now() })}\n\n`);
+      res.write(
+        `data: ${JSON.stringify({ type: 'heartbeat', timestamp: Date.now() })}\n\n`
+      );
     }, 30000); // Every 30 seconds
 
     // Clean up on connection close

@@ -1,7 +1,11 @@
 import Database from 'better-sqlite3';
 import fs from 'fs';
 import { Task, TaskLog, Setting, PrecommitCheck } from '../types';
-import { DUCKLING_DIR, DATABASE_PATH, DEFAULT_SETTINGS } from '../utils/constants';
+import {
+  DUCKLING_DIR,
+  DATABASE_PATH,
+  DEFAULT_SETTINGS,
+} from '../utils/constants';
 
 export class DatabaseManager {
   private db: Database.Database;
@@ -104,8 +108,6 @@ export class DatabaseManager {
       { key: 'commitSuffix', value: DEFAULT_SETTINGS.commitSuffix },
       { key: 'maxRetries', value: DEFAULT_SETTINGS.maxRetries.toString() },
       { key: 'baseBranch', value: DEFAULT_SETTINGS.baseBranch },
-
-
     ];
 
     const insertSetting = this.db.prepare(`
@@ -144,11 +146,11 @@ export class DatabaseManager {
   }
 
   updateTask(id: number, updates: Partial<Task>): void {
-    const fields = Object.keys(updates).filter(key => key !== 'id');
+    const fields = Object.keys(updates).filter((key) => key !== 'id');
     if (fields.length === 0) return;
 
-    const setClause = fields.map(field => `${field} = ?`).join(', ');
-    const values = fields.map(field => (updates as any)[field]);
+    const setClause = fields.map((field) => `${field} = ?`).join(', ');
+    const values = fields.map((field) => (updates as any)[field]);
 
     const stmt = this.db.prepare(`
       UPDATE tasks 
@@ -209,7 +211,12 @@ export class DatabaseManager {
 
   getTaskLogs(
     taskId: number,
-    filters: { level?: string; limit?: number; offset?: number; after?: number } = {}
+    filters: {
+      level?: string;
+      limit?: number;
+      offset?: number;
+      after?: number;
+    } = {}
   ): TaskLog[] {
     let query = 'SELECT * FROM task_logs WHERE task_id = ?';
     const params: any[] = [taskId];
@@ -260,10 +267,6 @@ export class DatabaseManager {
     stmt.run(key, value);
   }
 
-
-
-
-
   // Precommit check operations
   addPrecommitCheck(check: Omit<PrecommitCheck, 'id' | 'created_at'>): number {
     const stmt = this.db.prepare(`
@@ -271,24 +274,20 @@ export class DatabaseManager {
       VALUES (?, ?, ?)
     `);
 
-    const result = stmt.run(
-      check.name,
-      check.command,
-      check.order_index
-    );
+    const result = stmt.run(check.name, check.command, check.order_index);
 
     return result.lastInsertRowid as number;
   }
 
   updatePrecommitCheck(id: number, updates: Partial<PrecommitCheck>): void {
-    const fields = Object.keys(updates).filter(key =>
-      key !== 'id' && key !== 'created_at'
+    const fields = Object.keys(updates).filter(
+      (key) => key !== 'id' && key !== 'created_at'
     );
 
     if (fields.length === 0) return;
 
-    const setClause = fields.map(field => `${field} = ?`).join(', ');
-    const values = fields.map(field => (updates as any)[field]);
+    const setClause = fields.map((field) => `${field} = ?`).join(', ');
+    const values = fields.map((field) => (updates as any)[field]);
 
     const stmt = this.db.prepare(`
       UPDATE precommit_checks 

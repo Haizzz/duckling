@@ -1,23 +1,23 @@
 import { SettingsManager } from '../settings-manager';
+import { createMockInstance } from '../../utils/test-utils';
+import { DatabaseManager } from '../database';
 
 describe('SettingsManager', () => {
   let settingsManager: SettingsManager;
-  let mockDb: {
-    getSetting: jest.Mock;
-    setSetting: jest.Mock;
-  };
+  let mockDb: jest.Mocked<DatabaseManager>;
 
   beforeEach(() => {
-    mockDb = {
-      getSetting: jest.fn(),
-      setSetting: jest.fn(),
-    };
-    settingsManager = new SettingsManager(mockDb as any);
+    mockDb = createMockInstance(DatabaseManager);
+    settingsManager = new SettingsManager(mockDb);
   });
 
   describe('get', () => {
     it('calls getSetting with key and returns value from database', () => {
-      mockDb.getSetting.mockReturnValue({ value: 'test-value', category: 'github' });
+      mockDb.getSetting.mockReturnValue({
+        key: 'githubToken',
+        value: 'test-value',
+        updated_at: '2023-01-01T10:00:00Z',
+      });
 
       const result = settingsManager.get('githubToken');
 
@@ -35,7 +35,11 @@ describe('SettingsManager', () => {
     });
 
     it('converts string numbers to numbers for numeric keys', () => {
-      mockDb.getSetting.mockReturnValue({ value: '5', category: 'general' });
+      mockDb.getSetting.mockReturnValue({
+        key: 'maxRetries',
+        value: '5',
+        updated_at: '2023-01-01T10:00:00Z',
+      });
 
       const result = settingsManager.get('maxRetries');
 
@@ -49,13 +53,16 @@ describe('SettingsManager', () => {
     it('calls setSetting with key, value and default general category', () => {
       settingsManager.set('branchPrefix', 'feature-');
 
-      expect(mockDb.setSetting).toHaveBeenCalledWith('branchPrefix', 'feature-', 'general');
+      expect(mockDb.setSetting).toHaveBeenCalledWith(
+        'branchPrefix',
+        'feature-'
+      );
     });
 
     it('converts numbers to strings when calling setSetting', () => {
       settingsManager.set('maxRetries', 3);
 
-      expect(mockDb.setSetting).toHaveBeenCalledWith('maxRetries', '3', 'general');
+      expect(mockDb.setSetting).toHaveBeenCalledWith('maxRetries', '3');
     });
 
     it('calls setSetting with custom category when provided', () => {
@@ -69,16 +76,55 @@ describe('SettingsManager', () => {
     it('returns all settings with proper type conversion from database', () => {
       // Mock database responses for different settings
       mockDb.getSetting.mockImplementation((key: string) => {
-        const settings: Record<string, { value: string; category: string } | null> = {
-          githubUsername: { value: 'testuser', category: 'github' },
-          githubToken: { value: 'token123', category: 'github' },
-          repositoryUrl: { value: 'https://github.com/test/repo', category: 'github' },
-          defaultCodingTool: { value: 'amp', category: 'general' },
-          branchPrefix: { value: 'feature-', category: 'general' },
-          baseBranch: { value: 'main', category: 'general' },
-          prTitlePrefix: { value: '[DUCKLING]', category: 'general' },
-          commitSuffix: { value: ' [quack]', category: 'general' },
-          maxRetries: { value: '5', category: 'general' },
+        const settings: Record<
+          string,
+          { key: string; value: string; updated_at: string } | null
+        > = {
+          githubUsername: {
+            key: 'githubUsername',
+            value: 'testuser',
+            updated_at: '2023-01-01T10:00:00Z',
+          },
+          githubToken: {
+            key: 'githubToken',
+            value: 'token123',
+            updated_at: '2023-01-01T10:00:00Z',
+          },
+          repositoryUrl: {
+            key: 'repositoryUrl',
+            value: 'https://github.com/test/repo',
+            updated_at: '2023-01-01T10:00:00Z',
+          },
+          defaultCodingTool: {
+            key: 'defaultCodingTool',
+            value: 'amp',
+            updated_at: '2023-01-01T10:00:00Z',
+          },
+          branchPrefix: {
+            key: 'branchPrefix',
+            value: 'feature-',
+            updated_at: '2023-01-01T10:00:00Z',
+          },
+          baseBranch: {
+            key: 'baseBranch',
+            value: 'main',
+            updated_at: '2023-01-01T10:00:00Z',
+          },
+          prTitlePrefix: {
+            key: 'prTitlePrefix',
+            value: '[DUCKLING]',
+            updated_at: '2023-01-01T10:00:00Z',
+          },
+          commitSuffix: {
+            key: 'commitSuffix',
+            value: ' [quack]',
+            updated_at: '2023-01-01T10:00:00Z',
+          },
+          maxRetries: {
+            key: 'maxRetries',
+            value: '5',
+            updated_at: '2023-01-01T10:00:00Z',
+          },
           ampApiKey: null,
           openaiApiKey: null,
           claudeApiKey: null,

@@ -15,7 +15,11 @@ export class PRManager {
   private repoName: string = '';
   private initialized: boolean = false;
 
-  constructor(githubToken: string, db: DatabaseManager, openaiManager: OpenAIManager) {
+  constructor(
+    githubToken: string,
+    db: DatabaseManager,
+    openaiManager: OpenAIManager
+  ) {
     this.octokit = new Octokit({
       auth: githubToken,
     });
@@ -47,17 +51,20 @@ export class PRManager {
     this.db.addTaskLog({
       task_id: taskId,
       level: 'info',
-      message: '🤖 Generating PR title and description...'
+      message: '🤖 Generating PR title and description...',
     });
 
     // Generate intelligent title and description using OpenAI
     const title = await this.openaiManager.generatePRTitle(taskDescription);
-    const description = await this.openaiManager.generatePRDescription(taskDescription, branchName);
+    const description = await this.openaiManager.generatePRDescription(
+      taskDescription,
+      branchName
+    );
 
     this.db.addTaskLog({
       task_id: taskId,
       level: 'info',
-      message: `📋 Generated PR title: "${title}"`
+      message: `📋 Generated PR title: "${title}"`,
     });
 
     return this.createPR(branchName, title, description, taskId);
@@ -71,59 +78,63 @@ export class PRManager {
   ): Promise<{ number: number; url: string }> {
     await this.ensureInitialized();
 
-    return await withRetry(async () => {
-      this.db.addTaskLog({
-        task_id: taskId,
-        level: 'info',
-        message: `🔍 Checking if PR already exists for branch: ${branchName}`
-      });
-
-      // Check if PR already exists for this branch
-      const existingPR = await this.findPRByBranch(branchName);
-      if (existingPR) {
+    return await withRetry(
+      async () => {
         this.db.addTaskLog({
           task_id: taskId,
           level: 'info',
-          message: `✅ Found existing PR #${existingPR.number}: ${existingPR.html_url}`
+          message: `🔍 Checking if PR already exists for branch: ${branchName}`,
         });
+
+        // Check if PR already exists for this branch
+        const existingPR = await this.findPRByBranch(branchName);
+        if (existingPR) {
+          this.db.addTaskLog({
+            task_id: taskId,
+            level: 'info',
+            message: `✅ Found existing PR #${existingPR.number}: ${existingPR.html_url}`,
+          });
+          return {
+            number: existingPR.number,
+            url: existingPR.html_url,
+          };
+        }
+
+        // Get base branch from settings
+        const baseBranch = this.settings.get('baseBranch');
+
+        this.db.addTaskLog({
+          task_id: taskId,
+          level: 'info',
+          message: `🚀 Creating new PR from ${branchName} to ${baseBranch}...`,
+        });
+
+        // Create new PR
+        const response = await this.octokit.rest.pulls.create({
+          owner: this.repoOwner,
+          repo: this.repoName,
+          title,
+          body: description,
+          head: branchName,
+          base: baseBranch,
+        });
+
+        this.db.addTaskLog({
+          task_id: taskId,
+          level: 'info',
+          message: `✅ PR created successfully: #${response.data.number} - ${response.data.html_url}`,
+        });
+
+        this.logPREvent(taskId, `PR created: #${response.data.number}`);
+
         return {
-          number: existingPR.number,
-          url: existingPR.html_url
+          number: response.data.number,
+          url: response.data.html_url,
         };
-      }
-
-      // Get base branch from settings
-      const baseBranch = this.settings.get('baseBranch');
-
-      this.db.addTaskLog({
-        task_id: taskId,
-        level: 'info',
-        message: `🚀 Creating new PR from ${branchName} to ${baseBranch}...`
-      });
-
-      // Create new PR
-      const response = await this.octokit.rest.pulls.create({
-        owner: this.repoOwner,
-        repo: this.repoName,
-        title,
-        body: description,
-        head: branchName,
-        base: baseBranch
-      });
-
-      this.db.addTaskLog({
-        task_id: taskId,
-        level: 'info',
-        message: `✅ PR created successfully: #${response.data.number} - ${response.data.html_url}`
-      });
-
-      this.logPREvent(taskId, `PR created: #${response.data.number}`);
-
-      return {
-        number: response.data.number,
-        url: response.data.html_url
-      };
-    }, 'Create PR', 3);
+      },
+      'Create PR',
+      3
+    );
   }
 
   async updatePR(
@@ -132,25 +143,29 @@ export class PRManager {
     description?: string,
     taskId?: number
   ): Promise<void> {
-    return await withRetry(async () => {
-      const updateData: any = {};
+    return await withRetry(
+      async () => {
+        const updateData: any = {};
 
-      if (title) updateData.title = title;
-      if (description) updateData.body = description;
+        if (title) updateData.title = title;
+        if (description) updateData.body = description;
 
-      if (Object.keys(updateData).length === 0) return;
+        if (Object.keys(updateData).length === 0) return;
 
-      await this.octokit.rest.pulls.update({
-        owner: this.repoOwner,
-        repo: this.repoName,
-        pull_number: prNumber,
-        ...updateData
-      });
+        await this.octokit.rest.pulls.update({
+          owner: this.repoOwner,
+          repo: this.repoName,
+          pull_number: prNumber,
+          ...updateData,
+        });
 
-      if (taskId) {
-        this.logPREvent(taskId, `PR updated: #${prNumber}`);
-      }
-    }, 'Update PR', 3);
+        if (taskId) {
+          this.logPREvent(taskId, `PR updated: #${prNumber}`);
+        }
+      },
+      'Update PR',
+      3
+    );
   }
 
   async findPRByBranch(branchName: string): Promise<any> {
@@ -159,7 +174,7 @@ export class PRManager {
         owner: this.repoOwner,
         repo: this.repoName,
         head: `${this.repoOwner}:${branchName}`,
-        state: 'open'
+        state: 'open',
       });
 
       return response.data.length > 0 ? response.data[0] : null;
@@ -178,10 +193,15 @@ export class PRManager {
       const reviewComments = await this.getPRReviewComments(prNumber);
 
       // Filter comments from the target user and newer than last commit timestamp
-      const newComments = reviewComments.filter(comment => {
-        logger.info(`comment time ${new Date(comment.created_at)}, commit time ${lastCommitTimestamp ? new Date(lastCommitTimestamp) : 'null'}`);
-        const isFromTargetUser = comment.user.login.toLowerCase() === targetUsername.toLowerCase();
-        const isNewer = !lastCommitTimestamp || new Date(comment.created_at) > new Date(lastCommitTimestamp);
+      const newComments = reviewComments.filter((comment) => {
+        logger.info(
+          `comment time ${new Date(comment.created_at)}, commit time ${lastCommitTimestamp ? new Date(lastCommitTimestamp) : 'null'}`
+        );
+        const isFromTargetUser =
+          comment.user.login.toLowerCase() === targetUsername.toLowerCase();
+        const isNewer =
+          !lastCommitTimestamp ||
+          new Date(comment.created_at) > new Date(lastCommitTimestamp);
         return isFromTargetUser && isNewer;
       });
 
@@ -193,33 +213,46 @@ export class PRManager {
   }
 
   async getPRReviewComments(prNumber: number): Promise<any[]> {
-    return await withRetry(async () => {
-      await this.ensureInitialized();
+    return await withRetry(
+      async () => {
+        await this.ensureInitialized();
 
-      const params = {
-        owner: this.repoOwner,
-        repo: this.repoName,
-        pull_number: prNumber
-      };
+        const params = {
+          owner: this.repoOwner,
+          repo: this.repoName,
+          pull_number: prNumber,
+        };
 
-      const response = await this.octokit.rest.pulls.listReviewComments(params);
-      return response.data;
-    }, 'Get PR review comments', 2);
+        const response =
+          await this.octokit.rest.pulls.listReviewComments(params);
+        return response.data;
+      },
+      'Get PR review comments',
+      2
+    );
   }
 
-  async addComment(prNumber: number, comment: string, taskId?: number): Promise<void> {
-    return await withRetry(async () => {
-      await this.octokit.rest.issues.createComment({
-        owner: this.repoOwner,
-        repo: this.repoName,
-        issue_number: prNumber,
-        body: comment
-      });
+  async addComment(
+    prNumber: number,
+    comment: string,
+    taskId?: number
+  ): Promise<void> {
+    return await withRetry(
+      async () => {
+        await this.octokit.rest.issues.createComment({
+          owner: this.repoOwner,
+          repo: this.repoName,
+          issue_number: prNumber,
+          body: comment,
+        });
 
-      if (taskId) {
-        this.logPREvent(taskId, `Comment added to PR #${prNumber}`);
-      }
-    }, 'Add PR comment', 2);
+        if (taskId) {
+          this.logPREvent(taskId, `Comment added to PR #${prNumber}`);
+        }
+      },
+      'Add PR comment',
+      2
+    );
   }
 
   async getPRStatus(prNumber: number): Promise<{
@@ -229,19 +262,23 @@ export class PRManager {
   }> {
     await this.ensureInitialized();
 
-    return await withRetry(async () => {
-      const response = await this.octokit.rest.pulls.get({
-        owner: this.repoOwner,
-        repo: this.repoName,
-        pull_number: prNumber
-      });
+    return await withRetry(
+      async () => {
+        const response = await this.octokit.rest.pulls.get({
+          owner: this.repoOwner,
+          repo: this.repoName,
+          pull_number: prNumber,
+        });
 
-      return {
-        state: response.data.state,
-        mergeable: response.data.mergeable,
-        merged: response.data.merged
-      };
-    }, 'Get PR status', 2);
+        return {
+          state: response.data.state,
+          mergeable: response.data.mergeable,
+          merged: response.data.merged,
+        };
+      },
+      'Get PR status',
+      2
+    );
   }
 
   // Note: PR merge and close functionality removed per requirements
@@ -251,7 +288,7 @@ export class PRManager {
     this.db.addTaskLog({
       task_id: taskId,
       level: 'info',
-      message
+      message,
     });
   }
 }

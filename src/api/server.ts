@@ -43,7 +43,7 @@ export class APIServer {
       console.error('Server error:', err);
       res.status(500).json({
         success: false,
-        error: 'Internal server error'
+        error: 'Internal server error',
       });
     });
   }
@@ -69,8 +69,6 @@ export class APIServer {
     this.app.get('/settings', (req, res) => {
       res.sendFile(path.join(__dirname, '../../public/settings.html'));
     });
-
-
 
     // Fallback for any other routes
     this.app.get('*', (req, res) => {

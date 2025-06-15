@@ -11,7 +11,9 @@ export class PrecommitManager {
     this.db = db;
   }
 
-  async runChecks(taskId: number): Promise<{ passed: boolean; errors: string[] }> {
+  async runChecks(
+    taskId: number
+  ): Promise<{ passed: boolean; errors: string[] }> {
     const checks = this.db.getEnabledPrecommitChecks();
     const errors: string[] = [];
 
@@ -29,37 +31,51 @@ export class PrecommitManager {
     }
 
     const passed = errors.length === 0;
-    logger.info(`Precommit checks ${passed ? 'passed' : 'failed'} (${errors.length} errors)`, taskId.toString());
+    logger.info(
+      `Precommit checks ${passed ? 'passed' : 'failed'} (${errors.length} errors)`,
+      taskId.toString()
+    );
 
     return {
       passed,
-      errors
+      errors,
     };
   }
 
-  private async runSingleCheck(check: PrecommitCheck, taskId: number): Promise<void> {
+  private async runSingleCheck(
+    check: PrecommitCheck,
+    taskId: number
+  ): Promise<void> {
     logger.info(`Running precommit check: ${check.name}`, taskId.toString());
 
-    await withRetry(async () => {
-      const result = await execShellCommand(check.command, {
-        taskId: taskId.toString(),
-        timeout: 300000, // 5 minutes timeout
-        cwd: process.cwd()
-      });
+    await withRetry(
+      async () => {
+        const result = await execShellCommand(check.command, {
+          taskId: taskId.toString(),
+          timeout: 300000, // 5 minutes timeout
+          cwd: process.cwd(),
+        });
 
-      if (result.exitCode !== 0) {
-        // Command failed
-        const errorOutput = result.stderr || result.stdout || 'Command failed with no output';
-        throw new Error(errorOutput);
-      }
+        if (result.exitCode !== 0) {
+          // Command failed
+          const errorOutput =
+            result.stderr || result.stdout || 'Command failed with no output';
+          throw new Error(errorOutput);
+        }
 
-      return result.stdout;
-    }, `Run precommit check: ${check.name}`, 2);
+        return result.stdout;
+      },
+      `Run precommit check: ${check.name}`,
+      2
+    );
   }
 
-
-
-  private logCheckResult(taskId: number, checkName: string, passed: boolean, error: string | null): void {
+  private logCheckResult(
+    taskId: number,
+    checkName: string,
+    passed: boolean,
+    error: string | null
+  ): void {
     const level = passed ? 'info' : 'error';
     const message = passed
       ? `Precommit check '${checkName}' passed`
@@ -68,16 +84,21 @@ export class PrecommitManager {
     this.db.addTaskLog({
       task_id: taskId,
       level,
-      message
+      message,
     });
   }
 
   // Delegate to database manager for CRUD operations
-  async addCheck(check: Omit<PrecommitCheck, 'id' | 'created_at'>): Promise<number> {
+  async addCheck(
+    check: Omit<PrecommitCheck, 'id' | 'created_at'>
+  ): Promise<number> {
     return this.db.addPrecommitCheck(check);
   }
 
-  async updateCheck(id: number, updates: Partial<PrecommitCheck>): Promise<void> {
+  async updateCheck(
+    id: number,
+    updates: Partial<PrecommitCheck>
+  ): Promise<void> {
     return this.db.updatePrecommitCheck(id, updates);
   }
 

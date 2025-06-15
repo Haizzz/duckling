@@ -48,8 +48,6 @@ export interface PrecommitCheck {
   created_at: string;
 }
 
-
-
 export interface DucklingSettings {
   // API Keys
   github_token: string;
@@ -91,5 +89,3 @@ export interface CreateTaskRequest {
   branchPrefix?: string;
   prPrefix?: string;
 }
-
-

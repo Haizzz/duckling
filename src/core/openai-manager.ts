@@ -19,38 +19,47 @@ export class OpenAIManager {
     const apiKey = this.settings.get('openaiApiKey');
     if (apiKey) {
       this.openai = new OpenAI({
-        apiKey: apiKey
+        apiKey: apiKey,
       });
     }
   }
 
   private async callOpenAI(prompt: string): Promise<string> {
     if (!this.openai) {
-      throw new Error('OpenAI client not initialized. Please configure OpenAI API key in settings.');
+      throw new Error(
+        'OpenAI client not initialized. Please configure OpenAI API key in settings.'
+      );
     }
 
-    return await withRetry(async () => {
-      const response = await this.openai!.chat.completions.create({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-      });
+    return await withRetry(
+      async () => {
+        const response = await this.openai!.chat.completions.create({
+          model: 'gpt-4o',
+          messages: [
+            {
+              role: 'user',
+              content: prompt,
+            },
+          ],
+        });
 
-      const content = response.choices[0]?.message?.content?.trim();
-      logger.info(content || 'No response from OpenAI');
-      if (!content) {
-        throw new Error('No response from OpenAI');
-      }
+        const content = response.choices[0]?.message?.content?.trim();
+        logger.info(content || 'No response from OpenAI');
+        if (!content) {
+          throw new Error('No response from OpenAI');
+        }
 
-      return content;
-    }, 'OpenAI API call', 2);
+        return content;
+      },
+      'OpenAI API call',
+      2
+    );
   }
 
-  async generateBranchName(taskDescription: string, taskId?: number): Promise<string> {
+  async generateBranchName(
+    taskDescription: string,
+    taskId?: number
+  ): Promise<string> {
     // Get branch prefix to calculate available space
     const branchPrefix = this.settings.get('branchPrefix');
     const maxBranchNameLength = 30 - branchPrefix.length; // Reserve space for prefix
@@ -59,7 +68,7 @@ export class OpenAIManager {
       this.db.addTaskLog({
         task_id: taskId,
         level: 'info',
-        message: '🤖 Analyzing task description to generate branch name...'
+        message: '🤖 Analyzing task description to generate branch name...',
       });
     }
 
@@ -69,10 +78,14 @@ export class OpenAIManager {
         this.db.addTaskLog({
           task_id: taskId,
           level: 'info',
-          message: '⚠️ OpenAI not configured, using simple branch name generation'
+          message:
+            '⚠️ OpenAI not configured, using simple branch name generation',
         });
       }
-      return this.generateSimpleBranchName(taskDescription, maxBranchNameLength);
+      return this.generateSimpleBranchName(
+        taskDescription,
+        maxBranchNameLength
+      );
     }
 
     try {
@@ -98,23 +111,27 @@ Branch name:`;
         .substring(0, maxBranchNameLength);
 
       if (cleanBranchName.length > 0) {
-        logger.info(`Generated branch name via OpenAI: ${cleanBranchName} (${cleanBranchName.length}/${maxBranchNameLength} chars)`);
+        logger.info(
+          `Generated branch name via OpenAI: ${cleanBranchName} (${cleanBranchName.length}/${maxBranchNameLength} chars)`
+        );
         if (taskId) {
           this.db.addTaskLog({
             task_id: taskId,
             level: 'info',
-            message: `🎯 Generated AI branch name: '${cleanBranchName}' (${cleanBranchName.length}/${maxBranchNameLength} chars)`
+            message: `🎯 Generated AI branch name: '${cleanBranchName}' (${cleanBranchName.length}/${maxBranchNameLength} chars)`,
           });
         }
         return cleanBranchName;
       }
     } catch (error) {
-      logger.warn(`Failed to generate branch name via OpenAI: ${error}. Using fallback.`);
+      logger.warn(
+        `Failed to generate branch name via OpenAI: ${error}. Using fallback.`
+      );
       if (taskId) {
         this.db.addTaskLog({
           task_id: taskId,
           level: 'warn',
-          message: `⚠️ AI branch name generation failed: ${error}. Using fallback method`
+          message: `⚠️ AI branch name generation failed: ${error}. Using fallback method`,
         });
       }
     }
@@ -153,14 +170,19 @@ PR title:`;
         return fullTitle;
       }
     } catch (error) {
-      logger.warn(`Failed to generate PR title via OpenAI: ${error}. Using fallback.`);
+      logger.warn(
+        `Failed to generate PR title via OpenAI: ${error}. Using fallback.`
+      );
     }
 
     // Fallback to simple generation
-    return `${prefix} ${taskDescription.substring(0, 80 - prefix.length)}${taskDescription.length > (80 - prefix.length) ? '...' : ''}`;
+    return `${prefix} ${taskDescription.substring(0, 80 - prefix.length)}${taskDescription.length > 80 - prefix.length ? '...' : ''}`;
   }
 
-  async generatePRDescription(taskDescription: string, branchName: string): Promise<string> {
+  async generatePRDescription(
+    taskDescription: string,
+    branchName: string
+  ): Promise<string> {
     if (!this.openai) {
       // Fallback to simple generation if OpenAI not available
       return this.generateSimplePRDescription(taskDescription, branchName);
@@ -185,7 +207,9 @@ PR description:`;
         return description;
       }
     } catch (error) {
-      logger.warn(`Failed to generate PR description via OpenAI: ${error}. Using fallback.`);
+      logger.warn(
+        `Failed to generate PR description via OpenAI: ${error}. Using fallback.`
+      );
     }
 
     // Fallback to simple generation
@@ -195,7 +219,10 @@ PR description:`;
   async generateTaskSummary(taskDescription: string): Promise<string> {
     if (!this.openai) {
       // Fallback to simple generation if OpenAI not available
-      return taskDescription.substring(0, 80) + (taskDescription.length > 80 ? '...' : '');
+      return (
+        taskDescription.substring(0, 80) +
+        (taskDescription.length > 80 ? '...' : '')
+      );
     }
 
     try {
@@ -218,19 +245,28 @@ Summary:`;
         return cleanSummary;
       }
     } catch (error) {
-      logger.warn(`Failed to generate task summary via OpenAI: ${error}. Using fallback.`);
+      logger.warn(
+        `Failed to generate task summary via OpenAI: ${error}. Using fallback.`
+      );
     }
 
     // Fallback to simple generation
-    return taskDescription.substring(0, 80) + (taskDescription.length > 80 ? '...' : '');
+    return (
+      taskDescription.substring(0, 80) +
+      (taskDescription.length > 80 ? '...' : '')
+    );
   }
 
-  async generateCommitMessage(taskDescription: string, changes: string[], taskId?: number): Promise<string> {
+  async generateCommitMessage(
+    taskDescription: string,
+    changes: string[],
+    taskId?: number
+  ): Promise<string> {
     if (taskId) {
       this.db.addTaskLog({
         task_id: taskId,
         level: 'info',
-        message: `🤖 Analyzing ${changes.length} changed files to generate commit message...`
+        message: `🤖 Analyzing ${changes.length} changed files to generate commit message...`,
       });
     }
 
@@ -240,14 +276,18 @@ Summary:`;
         this.db.addTaskLog({
           task_id: taskId,
           level: 'info',
-          message: '⚠️ OpenAI not configured, using simple commit message generation'
+          message:
+            '⚠️ OpenAI not configured, using simple commit message generation',
         });
       }
       return `${taskDescription.substring(0, 50)}${taskDescription.length > 50 ? '...' : ''}`;
     }
 
     try {
-      const changesText = changes.length > 0 ? `\nFiles changed: ${changes.slice(0, 5).join(', ')}` : '';
+      const changesText =
+        changes.length > 0
+          ? `\nFiles changed: ${changes.slice(0, 5).join(', ')}`
+          : '';
 
       const prompt = `Generate a concise git commit message for this task: "${taskDescription}".${changesText}
 Rules:
@@ -262,7 +302,10 @@ Commit message:`;
       const result = await this.callOpenAI(prompt);
 
       // Clean up the result
-      const cleanMessage = result.replace(/^["']|["']$/g, '').replace(/\.$/, '').trim();
+      const cleanMessage = result
+        .replace(/^["']|["']$/g, '')
+        .replace(/\.$/, '')
+        .trim();
 
       if (cleanMessage.length > 0 && cleanMessage.length <= 50) {
         logger.info(`Generated commit message via OpenAI: ${cleanMessage}`);
@@ -270,18 +313,20 @@ Commit message:`;
           this.db.addTaskLog({
             task_id: taskId,
             level: 'info',
-            message: `✅ Generated AI commit message: "${cleanMessage}"`
+            message: `✅ Generated AI commit message: "${cleanMessage}"`,
           });
         }
         return cleanMessage;
       }
     } catch (error) {
-      logger.warn(`Failed to generate commit message via OpenAI: ${error}. Using fallback.`);
+      logger.warn(
+        `Failed to generate commit message via OpenAI: ${error}. Using fallback.`
+      );
       if (taskId) {
         this.db.addTaskLog({
           task_id: taskId,
           level: 'warn',
-          message: `⚠️ AI commit message generation failed: ${error}. Using fallback method`
+          message: `⚠️ AI commit message generation failed: ${error}. Using fallback method`,
         });
       }
     }
@@ -292,14 +337,17 @@ Commit message:`;
       this.db.addTaskLog({
         task_id: taskId,
         level: 'info',
-        message: `📝 Using fallback commit message: "${fallbackMessage}"`
+        message: `📝 Using fallback commit message: "${fallbackMessage}"`,
       });
     }
     return fallbackMessage;
   }
 
   // Fallback methods for when OpenAI is not available
-  private generateSimpleBranchName(description: string, maxLength: number = 30): string {
+  private generateSimpleBranchName(
+    description: string,
+    maxLength: number = 30
+  ): string {
     return description
       .toLowerCase()
       .replace(/[^a-z0-9\s]/g, '')
@@ -310,7 +358,10 @@ Commit message:`;
       .substring(0, maxLength);
   }
 
-  private generateSimplePRDescription(taskDescription: string, branchName: string): string {
+  private generateSimplePRDescription(
+    taskDescription: string,
+    branchName: string
+  ): string {
     return `## Summary
 
 ${taskDescription}

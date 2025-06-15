@@ -12,7 +12,7 @@ module.exports = {
     '^@/(.*)$': '<rootDir>/src/$1'
   },
   transformIgnorePatterns: [
-    'node_modules/(?!(execa)/)'
+    'node_modules/(?!(execa|node-gyp-build)/)'
   ],
   extensionsToTreatAsEsm: ['.ts'],
   collectCoverageFrom: [

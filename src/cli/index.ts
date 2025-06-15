@@ -40,14 +40,21 @@ program
       // Check if already configured
       const githubToken = db.getSetting('github_token');
       if (githubToken) {
-        console.log('✅ Duckling is already configured. Use "duckling start" to run the server.');
-        console.log('💡 You can modify settings through the web interface at http://localhost:5050/settings');
+        console.log(
+          '✅ Duckling is already configured. Use "duckling start" to run the server.'
+        );
+        console.log(
+          '💡 You can modify settings through the web interface at http://localhost:5050/settings'
+        );
         return;
       }
 
-      console.log('🔧 Duckling needs to be configured through the web interface.');
-      console.log('📝 Run "duckling start" and visit http://localhost:5050 to complete setup.');
-
+      console.log(
+        '🔧 Duckling needs to be configured through the web interface.'
+      );
+      console.log(
+        '📝 Run "duckling start" and visit http://localhost:5050 to complete setup.'
+      );
     } catch (error: any) {
       console.error('❌ Failed to check configuration:', error.message);
       process.exit(1);
@@ -55,9 +62,7 @@ program
   });
 
 // Task command group
-const taskCmd = program
-  .command('task')
-  .description('Manage tasks');
+const taskCmd = program.command('task').description('Manage tasks');
 
 // Create task command
 taskCmd
@@ -67,11 +72,11 @@ taskCmd
     try {
       const rl = readline.createInterface({
         input: process.stdin,
-        output: process.stdout
+        output: process.stdout,
       });
 
       const question = (prompt: string): Promise<string> => {
-        return new Promise(resolve => {
+        return new Promise((resolve) => {
           rl.question(prompt, resolve);
         });
       };
@@ -92,9 +97,10 @@ taskCmd
         return;
       }
 
-      const codingTool = await question('Coding tool (amp/openai) [amp]: ') || 'amp';
+      const codingTool =
+        (await question('Coding tool (amp/openai) [amp]: ')) || 'amp';
       if (!['amp', 'openai'].includes(codingTool)) {
-      console.log('❌ Invalid coding tool. Use: amp or openai');
+        console.log('❌ Invalid coding tool. Use: amp or openai');
         rl.close();
         return;
       }
@@ -108,7 +114,7 @@ taskCmd
       const taskRequest: CreateTaskRequest = {
         title: title.trim(),
         description: description.trim(),
-        codingTool: codingTool as any
+        codingTool: codingTool as any,
       };
 
       const taskId = await engine.createTask(taskRequest);
@@ -119,7 +125,6 @@ taskCmd
 
       engine.shutdown();
       db.close();
-
     } catch (error: any) {
       console.error('❌ Failed to create task:', error.message);
       process.exit(1);
@@ -130,14 +135,17 @@ taskCmd
 taskCmd
   .command('list')
   .description('List all tasks')
-  .option('-s, --status <status>', 'Filter by status (pending/in-progress/awaiting-review/completed/failed/cancelled)')
+  .option(
+    '-s, --status <status>',
+    'Filter by status (pending/in-progress/awaiting-review/completed/failed/cancelled)'
+  )
   .option('-l, --limit <limit>', 'Limit number of results', '10')
   .action(async (options) => {
     try {
       const db = new DatabaseManager();
 
       const filters: any = {
-        limit: parseInt(options.limit)
+        limit: parseInt(options.limit),
       };
 
       if (options.status) {
@@ -153,21 +161,24 @@ taskCmd
 
       console.log(`📋 Found ${tasks.length} task(s):\n`);
 
-      tasks.forEach(task => {
-        const statusEmoji = {
-          'pending': '⏳',
-          'in-progress': '🔄',
-          'awaiting-review': '👀',
-          'completed': '✅',
-          'failed': '❌',
-          'cancelled': '🚫'
-        }[task.status] || '❓';
+      tasks.forEach((task) => {
+        const statusEmoji =
+          {
+            pending: '⏳',
+            'in-progress': '🔄',
+            'awaiting-review': '👀',
+            completed: '✅',
+            failed: '❌',
+            cancelled: '🚫',
+          }[task.status] || '❓';
 
         console.log(`${statusEmoji} ${task.title}`);
         console.log(`   ID: ${task.id}`);
         console.log(`   Status: ${task.status}`);
         console.log(`   Tool: ${task.coding_tool}`);
-        console.log(`   Created: ${new Date(task.created_at).toLocaleString()}`);
+        console.log(
+          `   Created: ${new Date(task.created_at).toLocaleString()}`
+        );
         if (task.pr_url) {
           console.log(`   PR: ${task.pr_url}`);
         }
@@ -175,7 +186,6 @@ taskCmd
       });
 
       db.close();
-
     } catch (error: any) {
       console.error('❌ Failed to list tasks:', error.message);
       process.exit(1);
@@ -213,7 +223,6 @@ taskCmd
 
       engine.shutdown();
       db.close();
-
     } catch (error: any) {
       console.error('❌ Failed to cancel task:', error.message);
       process.exit(1);
@@ -234,7 +243,9 @@ program
       const githubToken = db.getSetting('github_token');
       const isConfigured = !!githubToken;
 
-      console.log(`Configuration: ${isConfigured ? '✅ Complete' : '❌ Incomplete'}`);
+      console.log(
+        `Configuration: ${isConfigured ? '✅ Complete' : '❌ Incomplete'}`
+      );
 
       if (isConfigured) {
         // Show configuration details
@@ -259,11 +270,12 @@ program
         console.log(`   Completed: ${completedTasks.length}`);
         console.log(`   Failed: ${failedTasks.length}`);
       } else {
-        console.log('\n💡 Run "duckling start" and visit http://localhost:5050 to complete setup.');
+        console.log(
+          '\n💡 Run "duckling start" and visit http://localhost:5050 to complete setup.'
+        );
       }
 
       db.close();
-
     } catch (error: any) {
       console.error('❌ Failed to get status:', error.message);
       process.exit(1);

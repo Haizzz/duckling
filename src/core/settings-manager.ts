@@ -35,7 +35,6 @@ export class SettingsManager {
   get<K extends keyof SettingsDefaults>(key: K): SettingsDefaults[K] {
     const setting = this.db.getSetting(key);
     if (setting?.value !== undefined) {
-
       // Handle number conversion
       if (typeof SettingsManager.DEFAULTS[key] === 'number') {
         return parseInt(setting.value) as SettingsDefaults[K];
@@ -45,13 +44,18 @@ export class SettingsManager {
     return SettingsManager.DEFAULTS[key];
   }
 
-  set<K extends keyof SettingsDefaults>(key: K, value: SettingsDefaults[K]): void {
+  set<K extends keyof SettingsDefaults>(
+    key: K,
+    value: SettingsDefaults[K]
+  ): void {
     this.db.setSetting(key, String(value));
   }
 
   getAll(): SettingsDefaults {
     const settings: Record<string, any> = {};
-    for (const key of Object.keys(SettingsManager.DEFAULTS) as Array<keyof SettingsDefaults>) {
+    for (const key of Object.keys(SettingsManager.DEFAULTS) as Array<
+      keyof SettingsDefaults
+    >) {
       settings[key] = this.get(key);
     }
     return settings as SettingsDefaults;

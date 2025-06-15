@@ -12,7 +12,7 @@ export const LOGS_DIR = path.join(DUCKLING_DIR, 'logs');
 
 // Supported coding tools
 export const CODING_TOOLS = ['amp', 'openai'] as const;
-export type CodingTool = typeof CODING_TOOLS[number];
+export type CodingTool = (typeof CODING_TOOLS)[number];
 
 // Default settings
 export const DEFAULT_SETTINGS = {
@@ -37,4 +37,4 @@ export const API_CONFIG = {
 
 // Log levels
 export const LOG_LEVELS = ['debug', 'info', 'warn', 'error'] as const;
-export type LogLevel = typeof LOG_LEVELS[number];
+export type LogLevel = (typeof LOG_LEVELS)[number];

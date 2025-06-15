@@ -17,6 +17,7 @@ npm run dev        # Start in development mode
 npm run build      # Build TypeScript
 npm run type-check # Check TypeScript types
 npm run lint       # Run ESLint
+npm run check      # Run full check: type-check, lint, format, and test
 ```
 
 ### Running Duckling
@@ -148,6 +149,15 @@ ls ~/.duckling/
 - Log errors to database with task association
 - Emit task updates for real-time UI updates
 - Provide meaningful error messages to users
+
+### Code Quality & Validation
+- **ALWAYS run `npm run check` after making changes** to verify:
+  - TypeScript compilation passes
+  - Linting rules are followed
+  - Code is properly formatted
+  - All tests pass
+- Fix any issues found before considering work complete
+- The check command is comprehensive and catches most problems early
 
 ### Code Style
 - Use TypeScript strict mode
