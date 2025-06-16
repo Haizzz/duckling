@@ -67,13 +67,21 @@ export class APIServer {
     });
 
     // Error handling middleware - must be last!
-    this.app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-      console.error('Server error:', err);
-      res.status(500).json({
-        success: false,
-        error: 'Internal server error',
-      });
-    });
+    this.app.use(
+      (
+        err: Error,
+        _req: express.Request,
+        res: express.Response,
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        _next: express.NextFunction
+      ) => {
+        console.error('Server error:', err);
+        res.status(500).json({
+          success: false,
+          error: 'Internal server error',
+        });
+      }
+    );
   }
 
   async start(port: number = 3000): Promise<void> {
