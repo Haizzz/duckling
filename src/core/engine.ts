@@ -448,65 +448,7 @@ export class CoreEngine extends EventEmitter {
       message: '🧪 Running initial precommit checks...',
     });
 
-    // First run
-    const firstResult = await this.precommitManager.runChecks(
-      taskId,
-      task.repository_path
-    );
-
-    if (!firstResult.passed) {
-      this.db.addTaskLog({
-        task_id: taskId,
-        level: 'warn',
-        message: `⚠️ Precommit checks failed (${firstResult.errors.length} errors), requesting fixes...`,
-      });
-
-      this.db.addTaskLog({
-        task_id: taskId,
-        level: 'info',
-        message: '🛠️ Generating fixes with coding assistant...',
-      });
-
-      // Request fixes from coding tool
-      await this.codingManager.requestFixes(
-        task.coding_tool,
-        task.description,
-        firstResult.errors,
-        { taskId, repositoryPath: task.repository_path }
-      );
-
-      this.db.addTaskLog({
-        task_id: taskId,
-        level: 'info',
-        message: '✅ Fixes generated, re-running all precommit checks...',
-      });
-
-      // Second run - run all checks without stopping, don't try to fix again
-      const secondResult = await this.precommitManager.runChecks(
-        taskId,
-        task.repository_path
-      );
-
-      if (!secondResult.passed) {
-        this.db.addTaskLog({
-          task_id: taskId,
-          level: 'warn',
-          message: `⚠️ Some precommit checks still failing, but continuing: ${secondResult.errors.join(', ')}`,
-        });
-      } else {
-        this.db.addTaskLog({
-          task_id: taskId,
-          level: 'info',
-          message: '✅ All precommit checks now passing after fixes',
-        });
-      }
-    } else {
-      this.db.addTaskLog({
-        task_id: taskId,
-        level: 'info',
-        message: '✅ All precommit checks passed on first run',
-      });
-    }
+    await this.precommitManager.runChecks(taskId, task.repository_path);
   }
 
   private async createPR(

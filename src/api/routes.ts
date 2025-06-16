@@ -6,7 +6,6 @@ import { DatabaseManager } from '../core/database';
 import { SettingsManager } from '../core/settings-manager';
 import { CoreEngine } from '../core/engine';
 import { ApiResponse, CreateTaskRequest } from '../types';
-import { validateAndGetRepoInfo } from '../utils/git-utils';
 
 export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
   const router = Router();
@@ -253,28 +252,6 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
       res.json(response);
     } catch (error: any) {
       res.status(400).json({
-        success: false,
-        error: error.message,
-      });
-    }
-  });
-
-  // Repo info endpoint
-  router.get('/repo-info', async (req: Request, res: Response) => {
-    try {
-      const repoInfo = await validateAndGetRepoInfo(process.cwd());
-
-      const response: ApiResponse = {
-        success: true,
-        data: {
-          owner: repoInfo.owner,
-          name: repoInfo.name,
-        },
-      };
-
-      res.json(response);
-    } catch (error: any) {
-      res.status(500).json({
         success: false,
         error: error.message,
       });

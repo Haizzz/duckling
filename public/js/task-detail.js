@@ -122,7 +122,7 @@ class TaskDetail {
               ${task.branch_name ? `
                 <div class="flex justify-between">
                   <span class="text-gray-600">Branch:</span>
-                  ${this.getBranchLink(task.branch_name)}
+                  ${this.escapeHtml(branchName)}
                 </div>
               ` : ''}
               ${task.pr_url ? `
@@ -281,16 +281,16 @@ class TaskDetail {
     this.taskUpdateHandler = (event) => {
       const taskUpdate = event.detail;
       console.log('Task detail received SSE update:', taskUpdate);
-      
+
       if (taskUpdate.taskId == this.taskId) { // Note: == for type coercion
         console.log('Update is for current task, processing...');
-        
+
         // Use the full task data from metadata if available, otherwise fall back to current task
         if (taskUpdate.metadata && taskUpdate.metadata.task) {
           console.log('Using full task data from metadata:', taskUpdate.metadata.task);
           this.currentTask = taskUpdate.metadata.task;
           this.renderTaskDetail(taskUpdate.metadata.task);
-          
+
           // Show visual indication of update
           this.showUpdateIndicator();
         } else {
@@ -318,29 +318,6 @@ class TaskDetail {
     if (this.taskUpdateHandler) {
       window.removeEventListener('duckling-task-update', this.taskUpdateHandler);
       this.taskUpdateHandler = null;
-    }
-  }
-
-  getBranchLink(branchName) {
-    return `<a href="javascript:void(0)" onclick="TaskDetailInstance.openBranchUrl('${this.escapeHtml(branchName)}')" class="font-mono text-sm text-blue-600 hover:text-blue-800 underline">${this.escapeHtml(branchName)}</a>`;
-  }
-
-  async openBranchUrl(branchName) {
-    try {
-      // Get repo info from server
-      const response = await fetch('/api/repo-info');
-      if (response.ok) {
-        const result = await response.json();
-        const repoUrl = `https://github.com/${result.owner}/${result.name}/tree/${encodeURIComponent(branchName)}`;
-        window.open(repoUrl, '_blank');
-      } else {
-        // Fallback - just copy branch name to clipboard or show error
-        navigator.clipboard.writeText(branchName);
-        alert('Copied branch name to clipboard');
-      }
-    } catch (error) {
-      navigator.clipboard.writeText(branchName);
-      alert('Copied branch name to clipboard');
     }
   }
 
@@ -407,7 +384,7 @@ class TaskDetail {
     if (lastUpdated) {
       lastUpdated.textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
       lastUpdated.style.color = '#10b981'; // Green color
-      
+
       // Reset color after 2 seconds
       setTimeout(() => {
         lastUpdated.style.color = '#6b7280';
@@ -436,12 +413,12 @@ class TaskDetail {
 
   getRepositoryInfo(task) {
     if (!task.repository_path) return '';
-    
+
     const repository = this.repositories.find(repo => repo.path === task.repository_path);
-    const repositoryDisplay = repository ? 
+    const repositoryDisplay = repository ?
       `${repository.name} <span class="text-gray-500">(${repository.owner})</span>` :
       `<span class="font-mono text-sm">${this.escapeHtml(task.repository_path)}</span>`;
-    
+
     return `
       <div class="flex justify-between">
         <span class="text-gray-600">Repository:</span>

@@ -1,4 +1,3 @@
-import { withRetry } from '../utils/retry';
 import { DatabaseManager } from './database';
 import { PrecommitCheck } from '../types';
 import { logger } from '../utils/logger';
@@ -50,26 +49,18 @@ export class PrecommitManager {
   ): Promise<void> {
     logger.info(`Running precommit check: ${check.name}`, taskId.toString());
 
-    await withRetry(
-      async () => {
-        const result = await execShellCommand(check.command, {
-          taskId: taskId.toString(),
-          timeout: 300000, // 5 minutes timeout
-          cwd: repositoryPath,
-        });
+    const result = await execShellCommand(check.command, {
+      taskId: taskId.toString(),
+      timeout: 300000, // 5 minutes timeout
+      cwd: repositoryPath,
+    });
 
-        if (result.exitCode !== 0) {
-          // Command failed
-          const errorOutput =
-            result.stderr || result.stdout || 'Command failed with no output';
-          throw new Error(errorOutput);
-        }
-
-        return result.stdout;
-      },
-      `Run precommit check: ${check.name}`,
-      2
-    );
+    if (result.exitCode !== 0) {
+      // Command failed
+      const errorOutput =
+        result.stderr || result.stdout || 'Command failed with no output';
+      throw new Error(errorOutput);
+    }
   }
 
   private logCheckResult(
