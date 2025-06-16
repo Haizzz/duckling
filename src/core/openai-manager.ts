@@ -72,6 +72,11 @@ export class OpenAIManager {
       });
     }
 
+    // Try to initialize client if not available but token exists
+    if (!this.openai) {
+      this.initializeClient();
+    }
+
     if (!this.openai) {
       // Fallback to simple generation if OpenAI not available
       if (taskId) {
