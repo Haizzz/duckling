@@ -4,20 +4,21 @@
   <img src="public/assets/logo.png" alt="Duckling Logo" width="120" height="120">
 </p>
 
-**Duckling** is an automated coding assistant that wraps CLI coding tools (OpenAI Codex and Amp Code) to automate your entire development workflow from task assignment to PR merge.
-
-## Why?
-
-- Large repositories are too complex for online coding tools like Codex web interface, requiring local processing
-- Local repositories already have optimized tooling, build systems, and dependencies configured
-- Existing tools require active hand holding
-
-## Goals
+**Duckling** is an automated asynchronous coding assistant that wraps CLI coding tools (OpenAI Codex and Amp Code) to automate code development workflow from task assignment to PR merge.
 
 - Automate the PR life cycle from task assignment to PR merge
 - Autonomously and asynchronously work on tasks
 - Continuously monitor PR comments and implement requested changes
 - Control workflow outside of code generation to restrict blast radius
+
+https://github.com/user-attachments/assets/9ffb6b6f-62be-4500-a099-cde1c9521835
+
+## Why?
+
+All I've ever wanted is Codex web interface, however:
+- Large repositories are too complex for online coding tools like Codex web interface to setup
+- Local repositories already have optimized tooling, build systems, and dependencies configured
+- Existing tools require active hand holding one task at a time
 
 ## Setup
 
