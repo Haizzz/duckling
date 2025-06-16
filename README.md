@@ -6,252 +6,101 @@
 
 **Duckling** is an automated coding assistant that wraps CLI coding tools (OpenAI Codex and Amp Code) to automate your entire development workflow from task assignment to PR merge.
 
-## Features
+## Why?
 
-- 🤖 **AI-Powered Code Generation** - Integrates with Amp and OpenAI Codex
-- 🔄 **Complete Workflow Automation** - From task creation to PR merge
-- 🌐 **Web Interface** - Modern, responsive UI for task management
-- 📱 **Real-time Updates** - Live progress tracking via Server-Sent Events
-- 🔧 **Precommit Checks** - Automated code quality enforcement
-- 📊 **Task Management** - Comprehensive tracking and logging
-- 🛠️ **CLI Interface** - Command-line tools for automation
-- 🔐 **Secure Configuration** - Local SQLite storage for all settings
+- Large repositories are too complex for online coding tools like Codex web interface, requiring local processing
+- Local repositories already have optimized tooling, build systems, and dependencies configured
+- Existing tools require active hand holding
 
-## Quick Start
+## Goals
+
+- Automate the PR life cycle from task assignment to PR merge
+- Autonomously and asynchronously work on tasks
+- Continuously monitor PR comments and implement requested changes
+- Control workflow outside of code generation to restrict blast radius
+
+## Setup
 
 ### Prerequisites
 
-- Node.js 18+ 
-- Git repository (for task execution)
-- At least one coding assistant CLI tool installed:
-  - [Amp](https://www.amp.build/) - Requires Amp token
-  - [OpenAI CLI](https://platform.openai.com/docs/guides/cli) - Requires OpenAI API key
+- Node.js 20+
+- Git repository
+- One of the following CLI tools:
+  - [Amp](https://www.amp.build/)
+  - [OpenAI CLI](https://platform.openai.com/docs/guides/cli)
 
 ### Installation
 
 ```bash
-# Clone or download the project
-cd duckling
-
-# Install dependencies
-npm install
-
-# Build the project
-npm run build
-
-# Start Duckling
-npx duckling start
+# Run directly from GitHub
+npx github:haizzz/duckling start
 ```
 
-### First-Time Setup
+### Configuration
 
-1. Visit http://localhost:3000
-2. Configure your settings:
-   - **API Keys**: Configure your GitHub token and coding assistant API key
-   - **GitHub Settings**: Set your GitHub username
-   - **Preferences**: Customize branch prefixes, retry limits, etc.
+1. **API Keys Required:**
+   - **GitHub Token**: https://github.com/settings/personal-access-tokens (requires repo permissions)
+   - **Amp Token**: Available from Amp dashboard
+   - **OpenAI API Key**: https://platform.openai.com/api-keys
 
-⚠️ **Important**: You must configure at least one coding tool and your GitHub settings before creating tasks.
+2. **Setup:**
+   - Access web interface at http://localhost:5050
+   - Navigate to Settings
+   - Add API keys and GitHub username
+   - Select coding tool preference
+   - Set base branch
 
-### Creating Your First Task
+## Usage
 
-#### Via Web Interface
-1. Go to http://localhost:3000
-2. Click "New Task"
-3. Fill in title, description, and select coding tool
-4. Click "Create Task"
+### Task Creation
 
-*Note: If you haven't configured your coding tools, you'll be prompted to visit the settings page first.*
+**Web Interface:**
+1. Go to http://localhost:5050
+2. Enter task description in the text area
+3. Press the arrow button or Enter to submit
 
-#### Via CLI
+**CLI:**
 ```bash
 npx duckling task create
 ```
 
-## How Duckling Works
-
-Duckling automates your development workflow in these steps:
-
-1. **Task Creation** - You describe what you want implemented
-2. **Branch Creation** - Automatically creates a feature branch (`duckling-your-task`)
-3. **Code Generation** - Uses your chosen AI assistant (Amp or OpenAI) to write code
-4. **Precommit Checks** - Runs linting, tests, and type checking automatically
-5. **PR Creation** - Creates a pull request with the generated code
-6. **Review Loop** - Monitors PR comments and iterates based on feedback
-7. **Completion** - Marks task complete when PR is merged
-
-## Configuration Requirements
-
-### Required Settings
-
-Before you can create tasks, you need to configure:
-
-**For Amp Users:**
-- ✅ GitHub Token (with `repo` permissions)
-- ✅ Amp API Token  
-- ✅ OpenAI API Key (for commit messages and summaries)
-- ✅ GitHub Username
-
-**For OpenAI Users:**
-- ✅ GitHub Token (with `repo` permissions)
-- ✅ OpenAI API Key
-- ✅ GitHub Username
-
-### Getting API Keys
-
-- **GitHub Token**: Create at https://github.com/settings/personal-access-tokens
-- **Amp Token**: Get from your Amp dashboard
-- **OpenAI API Key**: Get from https://platform.openai.com/api-keys
-
-### Optional Settings
-
-- **Branch Prefix**: Prefix for generated branches (default: `duckling-`)
-- **PR Title Prefix**: Prefix for PR titles (default: `[DUCKLING]`)
-- **Maximum Retries**: Retry limit for failed operations (default: 3)
-- **Auto-merge**: Automatically merge PRs when checks pass (default: false)
-
-
-## Usage
-
-### Web Interface
-
-The web interface provides a complete task management experience:
-
-- **Dashboard**: View all tasks with filtering and search
-- **Task Details**: Monitor progress, view logs, and manage tasks
-- **Settings**: Configure API keys, preferences, and precommit checks
-- **Real-time Updates**: Live progress tracking as tasks execute
-
-### CLI Commands
+### Command Reference
 
 ```bash
-# Start the web server
-duckling start [--port 3000]
-
-# Check system status
-duckling status
-
-# Task management
-duckling task create          # Interactive task creation
-duckling task list           # List all tasks
-duckling task cancel <id>     # Cancel a specific task
-
-# Configuration
-duckling config              # Check configuration status
+duckling start [--port 5050]    # Start web server
+duckling status                 # Check configuration
+duckling task list             # List all tasks  
+duckling task cancel <id>      # Cancel task
+duckling config               # View configuration status
 ```
 
-## Precommit Checks
+## Workflow Process
 
-Configure custom precommit checks in the settings to ensure code quality:
+1. **Task Input** - Natural language task description
+2. **Branch Creation** - Creates feature branch with `duckling-` prefix
+3. **Code Generation** - Executes chosen AI assistant with task context
+4. **Precommit Execution** - Runs configured checks (lint, test, typecheck)
+5. **PR Creation** - Opens GitHub pull request with generated changes
+6. **Review Monitoring** - Polls PR comments for feedback
+7. **Iteration** - Implements requested changes automatically
+8. **Completion** - Marks task done when PR is merged
 
-```bash
-# Example checks
-npm run type-check    # TypeScript type checking
-npm run lint          # ESLint
-npm test             # Unit tests
-```
+## Data Storage
 
-## Architecture
-
-### System Components
-
-- **Core Engine**: Main orchestration with retry logic and timeout-based processing
-- **Express API**: RESTful backend with real-time Server-Sent Events
-- **SQLite Database**: Local storage for all data
-- **Task Queue**: Prevents overlapping operations with proper scheduling
-- **Frontend**: Plain HTML/CSS/JS single-page application
-- **CLI**: Command-line interface for automation
-
-### Data Storage
-
-All data is stored locally in `~/.duckling/`:
+Local SQLite database at `~/.duckling/`:
 ```
 ~/.duckling/
-├── duckling.db          # SQLite database
+├── duckling.db          # Tasks, settings, logs
 └── logs/                # Application logs
 ```
 
-### Technology Stack
+## FAQ
 
-- **Backend**: TypeScript, Express.js, SQLite
-- **Frontend**: Vanilla JavaScript, Tailwind CSS
-- **CLI**: Commander.js
-- **Git Operations**: simple-git
-- **GitHub Integration**: Octokit
-- **Process Management**: execa
+**Q: Where are API keys stored?**
+A: Locally in SQLite database at `~/.duckling/duckling.db` with restricted file permissions.
 
-## Development
+**Q: Why separate PR review handling from the coding tool?**
+A: PR monitoring requires continuous GitHub API polling, git operations, and coordination of multiple tools (precommit checks, branch management). The tools themselves can technically run shell commands to do this but risks an edge case deleting all your PRs or adding gibberish commits. The structured workflow limits it to just coding.
 
-### Setup
-
-```bash
-# Install dependencies
-npm install
-
-# Development mode (auto-reload)
-npm run dev
-
-# Build TypeScript
-npm run build
-
-# Type checking
-npm run type-check
-
-# Linting
-npm run lint
-```
-
-### Project Structure
-
-```
-src/
-├── api/              # Express.js API routes and server
-├── cli/              # Command-line interface
-├── core/             # Core business logic
-├── types/            # TypeScript type definitions
-└── utils/            # Utility functions
-
-public/
-├── js/               # Frontend JavaScript
-├── css/              # Stylesheets
-├── assets/           # Images and static assets
-└── index.html        # Main HTML file
-```
-
-## Troubleshooting
-
-### Common Issues
-
-**Configuration Missing**
-- Visit the settings page to configure required API keys
-- Ensure you have both GitHub token and at least one coding tool configured
-
-**Database Locked**
-- Ensure only one Duckling instance is running
-- Check for zombie processes: `ps aux | grep duckling`
-
-**Git Errors**
-- Verify working directory is a git repository
-- Check git configuration and permissions
-
-**API Failures**
-- Verify API keys are correct and have proper permissions
-- Check network connectivity and rate limits
-
-**CLI Tool Missing**
-- Install the required coding assistant CLI
-- Ensure it's in your PATH: `amp --version` or check OpenAI CLI
-
-### Getting Help
-
-- Check the logs in `~/.duckling/logs/`
-- Use `duckling status` to verify configuration
-- View detailed task logs in the web interface
-- Check the GitHub repository for issues and documentation
-
-## Security
-
-- API keys are stored locally in SQLite with restricted file permissions
-- No secrets are transmitted over the network unnecessarily
-- All external API calls use secure HTTPS connections
-- Input validation on all user-provided data
+**Q: Where are logs located?**
+A: Application logs in `~/.duckling/logs/`, task logs in the SQLite database viewable via web interface.
