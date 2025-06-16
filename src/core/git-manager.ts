@@ -46,12 +46,16 @@ export class GitManager {
 
   async createAndCheckoutBranch(
     generatedBranchName: string,
-    taskId: number,
+    taskId: number
   ): Promise<string> {
     return await withRetry(async () => {
       const branchPrefix = this.settings.get('branchPrefix');
       const githubToken = this.settings.get('githubToken');
-      const githubManager = new GitHubManager(githubToken, this.db, this.openaiManager);
+      const githubManager = new GitHubManager(
+        githubToken,
+        this.db,
+        this.openaiManager
+      );
       const defaultBranch = await githubManager.getDefaultBranch(this.repoPath);
 
       logger.info(

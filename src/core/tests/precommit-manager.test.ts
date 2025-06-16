@@ -140,14 +140,20 @@ describe('PrecommitManager', () => {
 
       const result = await precommitManager.runChecks(123, '/test/repo');
 
-      expect(execSpy).toHaveBeenCalledWith('npm run lint', expect.objectContaining({
-        taskId: '123',
-        cwd: '/test/repo',
-      }));
-      expect(execSpy).toHaveBeenCalledWith('npm test', expect.objectContaining({
-        taskId: '123',
-        cwd: '/test/repo',
-      }));
+      expect(execSpy).toHaveBeenCalledWith(
+        'npm run lint',
+        expect.objectContaining({
+          taskId: '123',
+          cwd: '/test/repo',
+        })
+      );
+      expect(execSpy).toHaveBeenCalledWith(
+        'npm test',
+        expect.objectContaining({
+          taskId: '123',
+          cwd: '/test/repo',
+        })
+      );
       expect(result.errors).toHaveLength(1);
     });
 

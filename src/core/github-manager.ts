@@ -214,7 +214,7 @@ export class GitHubManager {
       const newComments = reviewComments.filter((comment) => {
         logger.info(
           `comment author ${comment.user.login}, target ${targetUsername}, ` +
-          `comment time ${new Date(comment.created_at)}, commit time ${lastCommitTimestamp ? new Date(lastCommitTimestamp) : 'null'}`
+            `comment time ${new Date(comment.created_at)}, commit time ${lastCommitTimestamp ? new Date(lastCommitTimestamp) : 'null'}`
         );
 
         const isFromTargetUser =

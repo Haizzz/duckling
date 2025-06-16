@@ -51,9 +51,7 @@ export async function validateAndGetRepoInfo(
       name,
     };
 
-    logger.info(
-      `Git repository validated: ${owner}/${name}`
-    );
+    logger.info(`Git repository validated: ${owner}/${name}`);
 
     return repoInfo;
   } catch (error: any) {

@@ -53,9 +53,9 @@ describe('CodingManager', () => {
 
       expect(result).toBe('Generated code');
       expect(mockDb.getSetting).toHaveBeenCalledWith('ampApiKey');
-      expect(whichSpy).toHaveBeenCalledWith('which', ['amp'], { 
+      expect(whichSpy).toHaveBeenCalledWith('which', ['amp'], {
         taskId: '123',
-        cwd: '/test/repo'
+        cwd: '/test/repo',
       });
       expect(execSpy).toHaveBeenCalledWith(
         'amp',
@@ -110,10 +110,10 @@ describe('CodingManager', () => {
         'codex',
         [
           '--disable-response-storage',
-          '--auto-edit', 
+          '--auto-edit',
           '--quiet',
           '--full-stdout',
-          'Create a class'
+          'Create a class',
         ],
         expect.objectContaining({
           taskId: '456',
