@@ -11,7 +11,8 @@
 - Continuously monitor PR comments and implement requested changes
 - Control workflow outside of code generation to restrict blast radius
 
-https://github.com/Haizzz/duckling/raw/refs/heads/main/assets/demo.mov
+https://github.com/user-attachments/assets/cde6ba32-d299-4d4e-8fce-7a0f2a5d01df
+
 
 ## Why?
 
