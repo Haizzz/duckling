@@ -177,6 +177,9 @@ export class DatabaseManager {
       params.push(filters.status);
     }
 
+    // Order by newest first
+    query += ' ORDER BY created_at DESC';
+
     if (filters.limit) {
       query += ' LIMIT ?';
       params.push(filters.limit);

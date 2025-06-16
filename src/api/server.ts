@@ -67,7 +67,7 @@ export class APIServer {
     });
 
     // Error handling middleware - must be last!
-    this.app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    this.app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
       console.error('Server error:', err);
       res.status(500).json({
         success: false,
