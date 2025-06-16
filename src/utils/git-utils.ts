@@ -6,7 +6,6 @@ export interface GitRepoInfo {
   remoteUrl: string;
   owner: string;
   name: string;
-  currentBranch: string;
 }
 
 export async function validateAndGetRepoInfo(
@@ -45,21 +44,14 @@ export async function validateAndGetRepoInfo(
     const owner = githubMatch[1];
     const name = githubMatch[2];
 
-    // Get current branch
-    const status = await git.status();
-    const currentBranch = status.current || 'main';
-
     const repoInfo: GitRepoInfo = {
       repoPath: workingDir,
       remoteUrl: remoteUrl.replace(/\.git$/, ''),
       owner,
       name,
-      currentBranch,
     };
 
-    logger.info(
-      `Git repository validated: ${owner}/${name} (${currentBranch})`
-    );
+    logger.info(`Git repository validated: ${owner}/${name}`);
 
     return repoInfo;
   } catch (error: any) {

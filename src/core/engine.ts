@@ -4,52 +4,59 @@ import { SettingsManager } from './settings-manager';
 import { GitManager } from './git-manager';
 import { CodingManager } from './coding-manager';
 import { PrecommitManager } from './precommit-manager';
-import { PRManager } from './pr-manager';
+import { GitHubManager } from './github-manager';
 import { OpenAIManager } from './openai-manager';
 import { Task, TaskStatus, TaskUpdateEvent, CreateTaskRequest } from '../types';
 import { taskExecutor } from './task-executor';
 import { logger } from '../utils/logger';
+import { withTaskLogMessages } from '../utils/task-logging';
 
 export class CoreEngine extends EventEmitter {
   private db: DatabaseManager;
   private settings: SettingsManager;
-  private gitManager: GitManager;
   private codingManager: CodingManager;
   private precommitManager: PrecommitManager;
-  private prManager?: PRManager;
+  private githubManager?: GitHubManager;
   private openaiManager: OpenAIManager;
   private isInitialized = false;
   private processingInterval?: NodeJS.Timeout;
   private isProcessing = false;
 
-  constructor(db: DatabaseManager, repoPath: string = process.cwd()) {
+  constructor(db: DatabaseManager) {
     super();
     this.db = db;
     this.settings = new SettingsManager(db);
     this.openaiManager = new OpenAIManager(db);
-    this.gitManager = new GitManager(db, repoPath, this.openaiManager);
     this.codingManager = new CodingManager(db);
     this.precommitManager = new PrecommitManager(db);
   }
 
-  private getPRManager(): PRManager {
-    if (this.prManager) {
-      return this.prManager;
+  private getGitManager(repositoryPath: string): GitManager {
+    return new GitManager(this.db, repositoryPath, this.openaiManager);
+  }
+
+  private getGitHubManager(): GitHubManager {
+    if (this.githubManager) {
+      return this.githubManager;
     }
 
     const githubToken = this.settings.get('githubToken');
     if (!githubToken) {
       logger.error(
-        'GitHub token not configured. PR operations will be skipped. Please configure GitHub settings.'
+        'GitHub token not configured. GitHub operations will be skipped. Please configure GitHub settings.'
       );
       throw new Error(
-        'GitHub token not configured. PR operations will be skipped. Please configure GitHub settings.'
+        'GitHub token not configured. GitHub operations will be skipped. Please configure GitHub settings.'
       );
     }
 
     try {
-      this.prManager = new PRManager(githubToken, this.db, this.openaiManager);
-      return this.prManager;
+      this.githubManager = new GitHubManager(
+        githubToken,
+        this.db,
+        this.openaiManager
+      );
+      return this.githubManager;
     } catch (error) {
       const errorMsg = `Failed to initialize PR manager: ${error}`;
       logger.error(errorMsg);
@@ -86,6 +93,7 @@ export class CoreEngine extends EventEmitter {
       summary,
       status: 'pending' as TaskStatus,
       coding_tool: request.codingTool,
+      repository_path: request.repositoryPath,
     };
 
     // Store task in database - returns auto-generated ID
@@ -192,7 +200,8 @@ export class CoreEngine extends EventEmitter {
       }
 
       try {
-        await this.gitManager.switchToBranch(task.branch_name, task.id);
+        const gitManager = this.getGitManager(task.repository_path);
+        await gitManager.switchToBranch(task.branch_name, task.id);
         const result = await this.collectPRComments(task.id, task.pr_number);
 
         // Handle status updates first (completed/cancelled)
@@ -252,12 +261,21 @@ export class CoreEngine extends EventEmitter {
       throw new Error('Task not found');
     }
 
+    // Get git manager for the task's repository
+    const gitManager = this.getGitManager(task.repository_path);
+
     // Use task executor to ensure only one task operation at a time
     await taskExecutor.executeTask({
       taskId: taskId,
       operation: 'process-task',
       execute: async () => {
         try {
+          // Log which repository we're working on
+          this.db.addTaskLog({
+            task_id: taskId,
+            level: 'info',
+            message: `🏠 Working on repository: ${task.repository_path}`,
+          });
           // Update status to in progress
           this.db.addTaskLog({
             task_id: taskId,
@@ -271,182 +289,133 @@ export class CoreEngine extends EventEmitter {
           this.emitTaskUpdate(taskId, 'in-progress');
 
           // Step 1: Create branch
-          let baseBranchName: string;
-          let branchName: string;
+          const generatedBranchName = await withTaskLogMessages(
+            {
+              taskId,
+              startMessage: '🌿 Generating branch name...',
+              completeMessage: `✅ Branch name generation completed`,
+              failureMessage: '❌ Failed to generate branch name',
+            },
+            async () => {
+              const name = await this.openaiManager.generateBranchName(
+                task.description,
+                taskId
+              );
+              // Update the completion message with the actual name
+              this.db.addTaskLog({
+                task_id: taskId,
+                level: 'info',
+                message: `✅ Branch name generated: ${name}`,
+              });
+              return name;
+            }
+          );
 
-          this.db.addTaskLog({
-            task_id: taskId,
-            level: 'info',
-            message: '🌿 Generating branch name...',
-          });
-
-          try {
-            baseBranchName = await this.openaiManager.generateBranchName(
-              task.description,
-              taskId
-            );
-            this.db.addTaskLog({
-              task_id: taskId,
-              level: 'info',
-              message: `✅ Branch name generated: ${baseBranchName}`,
-            });
-          } catch (error: any) {
-            this.db.addTaskLog({
-              task_id: taskId,
-              level: 'error',
-              message: `❌ Failed to generate branch name: ${error.message}`,
-            });
-            throw error;
-          }
-
-          this.db.addTaskLog({
-            task_id: taskId,
-            level: 'info',
-            message: '🔄 Creating and checking out branch...',
-          });
-
-          try {
-            branchName = await this.gitManager.createAndCheckoutBranch(
-              baseBranchName,
-              taskId
-            );
-            this.db.updateTask(taskId, { branch_name: branchName });
-            this.db.addTaskLog({
-              task_id: taskId,
-              level: 'info',
-              message: `✅ Branch created and checked out: ${branchName}`,
-            });
-            // Emit update to notify UI of branch name
-            this.emitTaskUpdate(taskId, 'in-progress');
-          } catch (error: any) {
-            this.db.addTaskLog({
-              task_id: taskId,
-              level: 'error',
-              message: `❌ Failed to create branch: ${error.message}`,
-            });
-            throw error;
-          }
+          const branchName = await withTaskLogMessages(
+            {
+              taskId,
+              startMessage: '🔄 Creating and checking out branch...',
+              completeMessage: `✅ Branch created and checked out`,
+              failureMessage: '❌ Failed to create branch',
+            },
+            async () => {
+              const name = await gitManager.createAndCheckoutBranch(
+                generatedBranchName,
+                taskId
+              );
+              this.db.updateTask(taskId, { branch_name: name });
+              this.db.addTaskLog({
+                task_id: taskId,
+                level: 'info',
+                message: `✅ Branch created and checked out: ${name}`,
+              });
+              // Emit update to notify UI of branch name
+              this.emitTaskUpdate(taskId, 'in-progress');
+              return name;
+            }
+          );
 
           // Step 2: Generate code
           this.db.updateTask(taskId, { current_stage: 'generating_code' });
           this.emitTaskUpdate(taskId, 'in-progress');
-          this.db.addTaskLog({
-            task_id: taskId,
-            level: 'info',
-            message: `💻 Starting code generation with ${task.coding_tool}...`,
-          });
 
-          try {
-            await this.codingManager.generateCode(
-              task.coding_tool,
-              task.description,
-              { taskId }
-            );
-
-            this.db.addTaskLog({
-              task_id: taskId,
-              level: 'info',
-              message: '✅ Code generation completed successfully',
-            });
-          } catch (error: any) {
-            this.db.addTaskLog({
-              task_id: taskId,
-              level: 'error',
-              message: `❌ Code generation failed: ${error.message}`,
-            });
-            throw error;
-          }
+          await withTaskLogMessages(
+            {
+              taskId,
+              startMessage: `💻 Starting code generation with ${task.coding_tool}...`,
+              completeMessage: '✅ Code generation completed successfully',
+              failureMessage: '❌ Code generation failed',
+            },
+            async () => {
+              await this.codingManager.generateCode(
+                task.coding_tool,
+                task.description,
+                { taskId, repositoryPath: task.repository_path }
+              );
+            }
+          );
 
           // Step 3: Run precommit checks
           this.db.updateTask(taskId, {
             current_stage: 'running_precommit_checks',
           });
           this.emitTaskUpdate(taskId, 'in-progress');
-          this.db.addTaskLog({
-            task_id: taskId,
-            level: 'info',
-            message: '🔍 Starting precommit checks...',
-          });
 
-          try {
-            await this.runPrecommitChecks(taskId);
-            this.db.addTaskLog({
-              task_id: taskId,
-              level: 'info',
-              message: '✅ Precommit checks completed successfully',
-            });
-          } catch (error: any) {
-            this.db.addTaskLog({
-              task_id: taskId,
-              level: 'error',
-              message: `❌ Precommit checks failed: ${error.message}`,
-            });
-            throw error;
-          }
+          await withTaskLogMessages(
+            {
+              taskId,
+              startMessage: '🔍 Starting precommit checks...',
+              completeMessage: '✅ Precommit checks completed successfully',
+              failureMessage: '❌ Precommit checks failed',
+            },
+            async () => {
+              await this.runPrecommitChecks(taskId);
+            }
+          );
 
           // Step 4: Commit and push changes
           this.db.updateTask(taskId, { current_stage: 'committing_changes' });
           this.emitTaskUpdate(taskId, 'in-progress');
-          this.db.addTaskLog({
-            task_id: taskId,
-            level: 'info',
-            message: '📝 Committing changes...',
-          });
 
-          try {
-            await this.gitManager.commitChanges(task.description, taskId);
-            this.db.addTaskLog({
-              task_id: taskId,
-              level: 'info',
-              message: '✅ Changes committed successfully',
-            });
+          await withTaskLogMessages(
+            {
+              taskId,
+              startMessage: '📝 Committing changes...',
+              completeMessage: '✅ Changes committed successfully',
+              failureMessage: '❌ Failed to commit changes',
+            },
+            async () => {
+              await gitManager.commitChanges(task.description, taskId);
+            }
+          );
 
-            this.db.addTaskLog({
-              task_id: taskId,
-              level: 'info',
-              message: '🚀 Pushing branch to remote...',
-            });
-
-            await this.gitManager.pushBranch(branchName, taskId);
-
-            this.db.addTaskLog({
-              task_id: taskId,
-              level: 'info',
-              message: '✅ Branch pushed to remote successfully',
-            });
-          } catch (error: any) {
-            this.db.addTaskLog({
-              task_id: taskId,
-              level: 'error',
-              message: `❌ Failed to commit/push changes: ${error.message}`,
-            });
-            throw error;
-          }
+          await withTaskLogMessages(
+            {
+              taskId,
+              startMessage: '🚀 Pushing branch to remote...',
+              completeMessage: '✅ Branch pushed to remote successfully',
+              failureMessage: '❌ Failed to push branch',
+            },
+            async () => {
+              await gitManager.pushBranch(branchName, taskId);
+            }
+          );
 
           // Step 5: Create PR
           this.db.updateTask(taskId, { current_stage: 'creating_pr' });
           this.emitTaskUpdate(taskId, 'in-progress');
-          this.db.addTaskLog({
-            task_id: taskId,
-            level: 'info',
-            message: '🔄 Creating pull request...',
-          });
 
-          try {
-            await this.createPR(taskId, task, branchName);
-            this.db.addTaskLog({
-              task_id: taskId,
-              level: 'info',
-              message: '✅ Pull request created successfully',
-            });
-          } catch (error: any) {
-            this.db.addTaskLog({
-              task_id: taskId,
-              level: 'error',
-              message: `❌ Failed to create PR: ${error.message}`,
-            });
-            throw error;
-          }
+          await withTaskLogMessages(
+            {
+              taskId,
+              startMessage: '🔄 Creating pull request...',
+              completeMessage: '✅ Pull request created successfully',
+              failureMessage: '❌ Failed to create PR',
+            },
+            async () => {
+              await this.createPR(taskId, task, branchName);
+            }
+          );
         } catch (error: any) {
           this.db.addTaskLog({
             task_id: taskId,
@@ -470,69 +439,16 @@ export class CoreEngine extends EventEmitter {
   }
 
   private async runPrecommitChecks(taskId: number): Promise<void> {
+    const task = this.db.getTask(taskId);
+    if (!task) throw new Error('Task not found');
+
     this.db.addTaskLog({
       task_id: taskId,
       level: 'info',
       message: '🧪 Running initial precommit checks...',
     });
 
-    // First run - stop on first failure to get focused error messages
-    const firstResult = await this.precommitManager.runChecks(taskId);
-
-    if (!firstResult.passed) {
-      // Get task to retry with fixes
-      const task = this.db.getTask(taskId);
-      if (!task) throw new Error('Task not found');
-
-      this.db.addTaskLog({
-        task_id: taskId,
-        level: 'warn',
-        message: `⚠️ Precommit checks failed (${firstResult.errors.length} errors), requesting fixes...`,
-      });
-
-      this.db.addTaskLog({
-        task_id: taskId,
-        level: 'info',
-        message: '🛠️ Generating fixes with coding assistant...',
-      });
-
-      // Request fixes from coding tool
-      await this.codingManager.requestFixes(
-        task.coding_tool,
-        task.description,
-        firstResult.errors,
-        { taskId }
-      );
-
-      this.db.addTaskLog({
-        task_id: taskId,
-        level: 'info',
-        message: '✅ Fixes generated, re-running all precommit checks...',
-      });
-
-      // Second run - run all checks without stopping, don't try to fix again
-      const secondResult = await this.precommitManager.runChecks(taskId);
-
-      if (!secondResult.passed) {
-        this.db.addTaskLog({
-          task_id: taskId,
-          level: 'warn',
-          message: `⚠️ Some precommit checks still failing, but continuing: ${secondResult.errors.join(', ')}`,
-        });
-      } else {
-        this.db.addTaskLog({
-          task_id: taskId,
-          level: 'info',
-          message: '✅ All precommit checks now passing after fixes',
-        });
-      }
-    } else {
-      this.db.addTaskLog({
-        task_id: taskId,
-        level: 'info',
-        message: '✅ All precommit checks passed on first run',
-      });
-    }
+    await this.precommitManager.runChecks(taskId, task.repository_path);
   }
 
   private async createPR(
@@ -541,11 +457,12 @@ export class CoreEngine extends EventEmitter {
     branchName: string
   ): Promise<void> {
     try {
-      const prManager = this.getPRManager();
-      const pr = await prManager.createPRFromTask(
+      const githubManager = this.getGitHubManager();
+      const pr = await githubManager.createPRFromTask(
         branchName,
         task.description,
-        taskId
+        taskId,
+        task.repository_path
       );
 
       this.db.addTaskLog({
@@ -577,12 +494,12 @@ export class CoreEngine extends EventEmitter {
         level: 'error',
         message: `Failed to create PR: ${error}`,
       });
-      // Update task to completed since we can't create PR
+      // Update task to failed since we can't create PR
       this.db.updateTask(taskId, {
-        status: 'completed',
-        current_stage: 'completed',
+        status: 'failed',
+        current_stage: 'failed',
       });
-      this.emitTaskUpdate(taskId, 'completed');
+      this.emitTaskUpdate(taskId, 'failed');
     }
   }
 
@@ -599,7 +516,7 @@ export class CoreEngine extends EventEmitter {
       return { comments: [] }; // Task completed or cancelled
     }
 
-    const prManager = this.getPRManager();
+    const githubManager = this.getGitHubManager();
     const githubUsername = this.settings.get('githubUsername');
     if (!githubUsername) return { comments: [] };
 
@@ -607,7 +524,8 @@ export class CoreEngine extends EventEmitter {
     let lastCommitTimestamp: string | null = null;
     if (task.branch_name) {
       try {
-        lastCommitTimestamp = await this.gitManager.getLastCommitTimestamp(
+        const gitManager = this.getGitManager(task.repository_path);
+        lastCommitTimestamp = await gitManager.getLastCommitTimestamp(
           task.branch_name
         );
         logger.info(
@@ -623,14 +541,18 @@ export class CoreEngine extends EventEmitter {
     }
 
     // Poll for new comments since last commit
-    const newComments = await prManager.pollForComments(
+    const newComments = await githubManager.pollForComments(
       prNumber,
       lastCommitTimestamp,
-      githubUsername
+      githubUsername,
+      task.repository_path
     );
 
     // Check PR status
-    const prStatus = await prManager.getPRStatus(prNumber);
+    const prStatus = await githubManager.getPRStatus(
+      prNumber,
+      task.repository_path
+    );
     let statusUpdate: 'completed' | 'cancelled' | undefined;
 
     if (prStatus.merged) {
@@ -666,7 +588,7 @@ export class CoreEngine extends EventEmitter {
           await this.codingManager.generateCode(
             task.coding_tool,
             `Original task: ${task.description}\n\nPR review comments to address:\n\n${concatenatedComments}\n\nPlease address all the feedback above in one go.`,
-            { taskId }
+            { taskId, repositoryPath: task.repository_path }
           );
 
           this.db.addTaskLog({
@@ -685,9 +607,10 @@ export class CoreEngine extends EventEmitter {
           });
 
           // Commit and push changes
-          await this.gitManager.commitChanges(`Address PR feedback`, taskId);
+          const gitManager = this.getGitManager(task.repository_path);
+          await gitManager.commitChanges(`Address PR feedback`, taskId);
           if (task.branch_name) {
-            await this.gitManager.pushBranch(task.branch_name, taskId);
+            await gitManager.pushBranch(task.branch_name, taskId);
           }
 
           this.db.addTaskLog({

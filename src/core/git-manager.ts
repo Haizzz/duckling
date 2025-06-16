@@ -4,6 +4,7 @@ import { logger } from '../utils/logger';
 import { DatabaseManager } from './database';
 import { SettingsManager } from './settings-manager';
 import { OpenAIManager } from './openai-manager';
+import { GitHubManager } from './github-manager';
 
 export class GitManager {
   private git: SimpleGit;
@@ -14,7 +15,7 @@ export class GitManager {
 
   constructor(
     db: DatabaseManager,
-    repoPath: string = process.cwd(),
+    repoPath: string,
     openaiManager?: OpenAIManager
   ) {
     this.git = simpleGit(repoPath);
@@ -44,47 +45,45 @@ export class GitManager {
   }
 
   async createAndCheckoutBranch(
-    baseBranchName: string,
-    taskId: number,
-    branchPrefix?: string
+    generatedBranchName: string,
+    taskId: number
   ): Promise<string> {
     return await withRetry(async () => {
-      // Get base branch from settings
-      const baseBranch = this.settings.get('baseBranch');
-
-      // Get branch prefix from settings if not provided
-      if (!branchPrefix) {
-        branchPrefix = this.settings.get('branchPrefix');
-      }
+      const branchPrefix = this.settings.get('branchPrefix');
+      const githubToken = this.settings.get('githubToken');
+      const githubManager = new GitHubManager(
+        githubToken,
+        this.db,
+        this.openaiManager
+      );
+      const defaultBranch = await githubManager.getDefaultBranch(this.repoPath);
 
       logger.info(
-        `Updating to latest ${baseBranch} and creating new branch`,
+        `Updating to latest ${defaultBranch} and creating new branch`,
         taskId.toString()
       );
 
       this.db.addTaskLog({
         task_id: taskId,
         level: 'info',
-        message: `📥 Fetching latest changes from ${baseBranch}...`,
+        message: `📥 Fetching latest changes from ${defaultBranch}...`,
       });
 
-      // First, fetch latest changes for the specific base branch
-      await this.git.fetch('origin', baseBranch);
-
+      // First, get latest changes for the default branch
       this.db.addTaskLog({
         task_id: taskId,
         level: 'info',
-        message: `🔄 Switching to ${baseBranch} and pulling latest...`,
+        message: `🔄 Switching to ${defaultBranch} and pulling latest...`,
       });
 
       // Discard any local changes and untracked files, then switch to base branch
       await this.git.reset(['--hard']);
       await this.git.clean('f', ['-d']);
-      await this.git.checkout(baseBranch);
-      await this.git.pull('origin', baseBranch);
+      await this.git.checkout(defaultBranch);
+      await this.git.pull('origin', defaultBranch);
 
       // Generate unique branch name
-      let branchName = `${branchPrefix}${baseBranchName}`;
+      let branchName = `${branchPrefix}${generatedBranchName}`;
       let counter = 1;
 
       this.db.addTaskLog({
@@ -94,7 +93,7 @@ export class GitManager {
       });
 
       while (await this.branchExists(branchName)) {
-        branchName = `${branchPrefix}${baseBranchName}-${counter}`;
+        branchName = `${branchPrefix}${generatedBranchName}-${counter}`;
         counter++;
       }
 

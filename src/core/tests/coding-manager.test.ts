@@ -47,18 +47,23 @@ describe('CodingManager', () => {
         'Create a function',
         {
           taskId: 123,
+          repositoryPath: '/test/repo',
         }
       );
 
       expect(result).toBe('Generated code');
       expect(mockDb.getSetting).toHaveBeenCalledWith('ampApiKey');
-      expect(whichSpy).toHaveBeenCalledWith('which', ['amp'], { taskId: 123 });
+      expect(whichSpy).toHaveBeenCalledWith('which', ['amp'], {
+        taskId: '123',
+        cwd: '/test/repo',
+      });
       expect(execSpy).toHaveBeenCalledWith(
         'amp',
         'Create a function',
         [],
         expect.objectContaining({
-          taskId: 123,
+          taskId: '123',
+          cwd: '/test/repo',
           env: expect.objectContaining({
             AMP_API_KEY: 'amp-key-123',
           }),
@@ -91,19 +96,28 @@ describe('CodingManager', () => {
         'Create a class',
         {
           taskId: 456,
+          repositoryPath: '/test/repo',
         }
       );
 
       expect(result).toBe('AI generated code');
       expect(mockDb.getSetting).toHaveBeenCalledWith('openaiApiKey');
       expect(whichSpy).toHaveBeenCalledWith('which', ['codex'], {
-        taskId: 456,
+        taskId: '456',
+        cwd: '/test/repo',
       });
       expect(whichSpy).toHaveBeenCalledWith(
         'codex',
-        ['-q', 'Create a class'],
+        [
+          '--disable-response-storage',
+          '--auto-edit',
+          '--quiet',
+          '--full-stdout',
+          'Create a class',
+        ],
         expect.objectContaining({
-          taskId: 456,
+          taskId: '456',
+          cwd: '/test/repo',
           env: expect.objectContaining({
             OPENAI_API_KEY: 'openai-key-456',
           }),
@@ -115,7 +129,10 @@ describe('CodingManager', () => {
       mockDb.getSetting.mockReturnValue(null);
 
       await expect(
-        codingManager.generateCode('amp', 'task', { taskId: 123 })
+        codingManager.generateCode('amp', 'task', {
+          taskId: 123,
+          repositoryPath: '/test/repo',
+        })
       ).rejects.toThrow('Amp API key not configured');
 
       expect(mockDb.getSetting).toHaveBeenCalledWith('ampApiKey');
@@ -141,7 +158,10 @@ describe('CodingManager', () => {
       });
 
       await expect(
-        codingManager.generateCode('amp', 'task', { taskId: 123 })
+        codingManager.generateCode('amp', 'task', {
+          taskId: 123,
+          repositoryPath: '/test/repo',
+        })
       ).rejects.toThrow('Command failed');
 
       expect(mockDb.getSetting).toHaveBeenCalledWith('ampApiKey');
@@ -160,7 +180,10 @@ describe('CodingManager', () => {
       jest.spyOn(execModule, 'execCommand').mockRejectedValue(error);
 
       await expect(
-        codingManager.generateCode('amp', 'task', { taskId: 123 })
+        codingManager.generateCode('amp', 'task', {
+          taskId: 123,
+          repositoryPath: '/test/repo',
+        })
       ).rejects.toThrow('Amp CLI not found');
 
       expect(mockDb.getSetting).toHaveBeenCalledWith('ampApiKey');
@@ -178,19 +201,19 @@ describe('CodingManager', () => {
         'amp',
         'Original task',
         errors,
-        { taskId: 789 }
+        { taskId: 789, repositoryPath: '/test/repo' }
       );
 
       expect(result).toBe('Fixed code');
       expect(generateCodeSpy).toHaveBeenCalledWith(
         'amp',
         expect.stringContaining('Original request: Original task'),
-        { taskId: 789 }
+        { taskId: 789, repositoryPath: '/test/repo' }
       );
       expect(generateCodeSpy).toHaveBeenCalledWith(
         'amp',
         expect.stringContaining('Missing semicolon'),
-        { taskId: 789 }
+        { taskId: 789, repositoryPath: '/test/repo' }
       );
     });
   });

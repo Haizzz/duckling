@@ -1,4 +1,3 @@
-import { withRetry } from '../utils/retry';
 import { DatabaseManager } from './database';
 import { PrecommitCheck } from '../types';
 import { logger } from '../utils/logger';
@@ -12,7 +11,8 @@ export class PrecommitManager {
   }
 
   async runChecks(
-    taskId: number
+    taskId: number,
+    repositoryPath: string
   ): Promise<{ passed: boolean; errors: string[] }> {
     const checks = this.db.getEnabledPrecommitChecks();
     const errors: string[] = [];
@@ -21,7 +21,7 @@ export class PrecommitManager {
 
     for (const check of checks) {
       try {
-        await this.runSingleCheck(check, taskId);
+        await this.runSingleCheck(check, taskId, repositoryPath);
         this.logCheckResult(taskId, check.name, true, null);
       } catch (error: any) {
         const errorMessage = `${check.name}: ${error.message}`;
@@ -44,30 +44,23 @@ export class PrecommitManager {
 
   private async runSingleCheck(
     check: PrecommitCheck,
-    taskId: number
+    taskId: number,
+    repositoryPath: string
   ): Promise<void> {
     logger.info(`Running precommit check: ${check.name}`, taskId.toString());
 
-    await withRetry(
-      async () => {
-        const result = await execShellCommand(check.command, {
-          taskId: taskId.toString(),
-          timeout: 300000, // 5 minutes timeout
-          cwd: process.cwd(),
-        });
+    const result = await execShellCommand(check.command, {
+      taskId: taskId.toString(),
+      timeout: 300000, // 5 minutes timeout
+      cwd: repositoryPath,
+    });
 
-        if (result.exitCode !== 0) {
-          // Command failed
-          const errorOutput =
-            result.stderr || result.stdout || 'Command failed with no output';
-          throw new Error(errorOutput);
-        }
-
-        return result.stdout;
-      },
-      `Run precommit check: ${check.name}`,
-      2
-    );
+    if (result.exitCode !== 0) {
+      // Command failed
+      const errorOutput =
+        result.stderr || result.stdout || 'Command failed with no output';
+      throw new Error(errorOutput);
+    }
   }
 
   private logCheckResult(

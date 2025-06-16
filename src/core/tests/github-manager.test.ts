@@ -5,7 +5,7 @@ jest.mock('../../utils/git-utils');
 jest.mock('../../utils/retry');
 jest.mock('../../utils/logger');
 
-import { PRManager } from '../pr-manager';
+import { GitHubManager } from '../github-manager';
 import { Octokit } from '@octokit/rest';
 import { SettingsManager } from '../settings-manager';
 import { OpenAIManager } from '../openai-manager';
@@ -16,6 +16,11 @@ import type { DatabaseManager } from '../database';
 
 const mockOctokit = {
   rest: {
+    repos: {
+      get: () => ({
+        data: { default_branch: 'main' },
+      }),
+    },
     pulls: {
       create: jest.fn(),
       update: jest.fn(),
@@ -29,8 +34,8 @@ const mockOctokit = {
   },
 };
 
-describe('PRManager', () => {
-  let prManager: PRManager;
+describe('GitHubManager', () => {
+  let githubManager: GitHubManager;
   let mockDb: jest.Mocked<DatabaseManager>;
   let mockSettingsManager: jest.Mocked<SettingsManager>;
   let mockOpenAIManager: jest.Mocked<OpenAIManager>;
@@ -62,7 +67,7 @@ describe('PRManager', () => {
 
     (withRetry as jest.Mock).mockImplementation(async (fn) => fn());
 
-    prManager = new PRManager('test-token', mockDb, mockOpenAIManager);
+    githubManager = new GitHubManager('test-token', mockDb, mockOpenAIManager);
   });
 
   describe('createPRFromTask', () => {
@@ -81,10 +86,11 @@ describe('PRManager', () => {
         },
       });
 
-      const result = await prManager.createPRFromTask(
+      const result = await githubManager.createPRFromTask(
         'feature-branch',
         'Task description',
-        456
+        456,
+        '/test/repo'
       );
 
       expect(mockOpenAIManager.generatePRTitle).toHaveBeenCalledWith(
@@ -125,11 +131,12 @@ describe('PRManager', () => {
         },
       });
 
-      const result = await prManager.createPR(
+      const result = await githubManager.createPR(
         'test-branch',
         'Test Title',
         'Test Description',
-        789
+        789,
+        '/test/repo'
       );
 
       expect(mockOctokit.rest.pulls.list).toHaveBeenCalledWith({
@@ -165,11 +172,12 @@ describe('PRManager', () => {
       };
       mockOctokit.rest.pulls.list.mockResolvedValue({ data: [existingPR] });
 
-      const result = await prManager.createPR(
+      const result = await githubManager.createPR(
         'existing-branch',
         'Test Title',
         'Test Description',
-        789
+        789,
+        '/test/repo'
       );
 
       expect(mockOctokit.rest.pulls.create).not.toHaveBeenCalled();
@@ -194,11 +202,12 @@ describe('PRManager', () => {
         },
       });
 
-      await prManager.createPR(
+      await githubManager.createPR(
         'new-branch',
         'New Title',
         'New Description',
-        111
+        111,
+        '/test/repo'
       );
 
       expect(mockDb.addTaskLog).toHaveBeenCalledWith({
@@ -214,56 +223,20 @@ describe('PRManager', () => {
     });
   });
 
-  describe('updatePR', () => {
-    beforeEach(async () => {
-      // Initialize the PRManager by calling ensureInitialized
-      await prManager.createPR('init-branch', 'init', 'init', 1);
-      jest.clearAllMocks();
-    });
-
-    it('updates PR title and description when both provided', async () => {
-      await prManager.updatePR(
-        123,
-        'Updated Title',
-        'Updated Description',
-        456
-      );
-
-      expect(mockOctokit.rest.pulls.update).toHaveBeenCalledWith({
-        owner: 'testowner',
-        repo: 'testrepo',
-        pull_number: 123,
-        title: 'Updated Title',
-        body: 'Updated Description',
-      });
-    });
-
-    it('updates only title when description not provided', async () => {
-      await prManager.updatePR(123, 'Only Title', undefined, 456);
-
-      expect(mockOctokit.rest.pulls.update).toHaveBeenCalledWith({
-        owner: 'testowner',
-        repo: 'testrepo',
-        pull_number: 123,
-        title: 'Only Title',
-      });
-    });
-
-    it('does not call update when no parameters provided', async () => {
-      await prManager.updatePR(123, undefined, undefined, 456);
-
-      expect(mockOctokit.rest.pulls.update).not.toHaveBeenCalled();
-    });
-  });
-
   describe('findPRByBranch', () => {
     beforeEach(async () => {
-      // Initialize the PRManager
+      // Initialize the GitHubManager
       mockOctokit.rest.pulls.list.mockResolvedValue({ data: [] });
       mockOctokit.rest.pulls.create.mockResolvedValue({
         data: { number: 1, html_url: 'url' },
       });
-      await prManager.createPR('init-branch', 'init', 'init', 1);
+      await githubManager.createPR(
+        'init-branch',
+        'init',
+        'init',
+        1,
+        '/test/repo'
+      );
       jest.clearAllMocks();
     });
 
@@ -274,7 +247,7 @@ describe('PRManager', () => {
       ];
       mockOctokit.rest.pulls.list.mockResolvedValue({ data: prs });
 
-      const result = await prManager.findPRByBranch('test-branch');
+      const result = await githubManager.findPRByBranch('test-branch');
 
       expect(mockOctokit.rest.pulls.list).toHaveBeenCalledWith({
         owner: 'testowner',
@@ -288,7 +261,7 @@ describe('PRManager', () => {
     it('returns null when no PRs exist for branch', async () => {
       mockOctokit.rest.pulls.list.mockResolvedValue({ data: [] });
 
-      const result = await prManager.findPRByBranch('nonexistent-branch');
+      const result = await githubManager.findPRByBranch('nonexistent-branch');
 
       expect(result).toBeNull();
     });
@@ -296,7 +269,7 @@ describe('PRManager', () => {
     it('returns null when API call fails', async () => {
       mockOctokit.rest.pulls.list.mockRejectedValue(new Error('API Error'));
 
-      const result = await prManager.findPRByBranch('error-branch');
+      const result = await githubManager.findPRByBranch('error-branch');
 
       expect(result).toBeNull();
     });
@@ -325,10 +298,11 @@ describe('PRManager', () => {
         data: reviewComments,
       });
 
-      const result = await prManager.pollForComments(
+      const result = await githubManager.pollForComments(
         123,
         '2023-01-01T12:00:00Z',
-        'targetuser'
+        'targetuser',
+        '/test/repo'
       );
 
       expect(result).toHaveLength(1);
@@ -352,7 +326,12 @@ describe('PRManager', () => {
         data: reviewComments,
       });
 
-      const result = await prManager.pollForComments(123, null, 'targetuser');
+      const result = await githubManager.pollForComments(
+        123,
+        null,
+        'targetuser',
+        '/test/repo'
+      );
 
       expect(result).toHaveLength(2);
     });
@@ -362,7 +341,12 @@ describe('PRManager', () => {
         new Error('API Error')
       );
 
-      const result = await prManager.pollForComments(123, null, 'targetuser');
+      const result = await githubManager.pollForComments(
+        123,
+        null,
+        'targetuser',
+        '/test/repo'
+      );
 
       expect(result).toEqual([]);
     });
@@ -379,7 +363,12 @@ describe('PRManager', () => {
         data: reviewComments,
       });
 
-      const result = await prManager.pollForComments(123, null, 'targetuser');
+      const result = await githubManager.pollForComments(
+        123,
+        null,
+        'targetuser',
+        '/test/repo'
+      );
 
       expect(result).toHaveLength(1);
       expect(result[0].body).toBe('Case test');
@@ -388,12 +377,18 @@ describe('PRManager', () => {
 
   describe('getPRReviewComments', () => {
     beforeEach(async () => {
-      // Initialize the PRManager
+      // Initialize the GitHubManager
       mockOctokit.rest.pulls.list.mockResolvedValue({ data: [] });
       mockOctokit.rest.pulls.create.mockResolvedValue({
         data: { number: 1, html_url: 'url' },
       });
-      await prManager.createPR('init-branch', 'init', 'init', 1);
+      await githubManager.createPR(
+        'init-branch',
+        'init',
+        'init',
+        1,
+        '/test/repo'
+      );
       jest.clearAllMocks();
     });
 
@@ -403,7 +398,7 @@ describe('PRManager', () => {
         data: comments,
       });
 
-      const result = await prManager.getPRReviewComments(123);
+      const result = await githubManager.getPRReviewComments(123, '/test/repo');
 
       expect(mockOctokit.rest.pulls.listReviewComments).toHaveBeenCalledWith({
         owner: 'testowner',
@@ -414,54 +409,20 @@ describe('PRManager', () => {
     });
   });
 
-  describe('addComment', () => {
-    beforeEach(async () => {
-      // Initialize the PRManager
-      mockOctokit.rest.pulls.list.mockResolvedValue({ data: [] });
-      mockOctokit.rest.pulls.create.mockResolvedValue({
-        data: { number: 1, html_url: 'url' },
-      });
-      await prManager.createPR('init-branch', 'init', 'init', 1);
-      jest.clearAllMocks();
-    });
-
-    it('adds comment to PR and logs event when taskId provided', async () => {
-      await prManager.addComment(123, 'Test comment', 789);
-
-      expect(mockOctokit.rest.issues.createComment).toHaveBeenCalledWith({
-        owner: 'testowner',
-        repo: 'testrepo',
-        issue_number: 123,
-        body: 'Test comment',
-      });
-      expect(mockDb.addTaskLog).toHaveBeenCalledWith({
-        task_id: 789,
-        level: 'info',
-        message: 'Comment added to PR #123',
-      });
-    });
-
-    it('adds comment without logging when taskId not provided', async () => {
-      await prManager.addComment(123, 'Test comment');
-
-      expect(mockOctokit.rest.issues.createComment).toHaveBeenCalledWith({
-        owner: 'testowner',
-        repo: 'testrepo',
-        issue_number: 123,
-        body: 'Test comment',
-      });
-      expect(mockDb.addTaskLog).not.toHaveBeenCalled();
-    });
-  });
-
   describe('getPRStatus', () => {
     beforeEach(async () => {
-      // Initialize the PRManager
+      // Initialize the GitHubManager
       mockOctokit.rest.pulls.list.mockResolvedValue({ data: [] });
       mockOctokit.rest.pulls.create.mockResolvedValue({
         data: { number: 1, html_url: 'url' },
       });
-      await prManager.createPR('init-branch', 'init', 'init', 1);
+      await githubManager.createPR(
+        'init-branch',
+        'init',
+        'init',
+        1,
+        '/test/repo'
+      );
       jest.clearAllMocks();
     });
 
@@ -473,7 +434,7 @@ describe('PRManager', () => {
       };
       mockOctokit.rest.pulls.get.mockResolvedValue({ data: prData });
 
-      const result = await prManager.getPRStatus(123);
+      const result = await githubManager.getPRStatus(123, '/test/repo');
 
       expect(mockOctokit.rest.pulls.get).toHaveBeenCalledWith({
         owner: 'testowner',
@@ -495,7 +456,13 @@ describe('PRManager', () => {
       );
 
       await expect(
-        prManager.createPR('test-branch', 'title', 'desc', 123)
+        githubManager.createPR(
+          'test-branch',
+          'title',
+          'desc',
+          123,
+          '/test/repo'
+        )
       ).rejects.toThrow(
         'Failed to get repository information: Error: Not a git repo'
       );
@@ -508,11 +475,21 @@ describe('PRManager', () => {
 
       // First call should fail
       await expect(
-        prManager.createPR('test-branch', 'title', 'desc', 123)
+        githubManager.createPR(
+          'test-branch',
+          'title',
+          'desc',
+          123,
+          '/test/repo'
+        )
       ).rejects.toThrow('Failed to get repository information');
 
       // Reset the manager for second test
-      prManager = new PRManager('test-token', mockDb, mockOpenAIManager);
+      githubManager = new GitHubManager(
+        'test-token',
+        mockDb,
+        mockOpenAIManager
+      );
       mockOctokit.rest.pulls.list.mockResolvedValue({ data: [] });
       mockOctokit.rest.pulls.create.mockResolvedValue({
         data: { number: 123, html_url: 'url' },
@@ -520,7 +497,13 @@ describe('PRManager', () => {
 
       // Second call should succeed
       await expect(
-        prManager.createPR('test-branch', 'title', 'desc', 123)
+        githubManager.createPR(
+          'test-branch',
+          'title',
+          'desc',
+          123,
+          '/test/repo'
+        )
       ).resolves.toBeDefined();
     });
   });
@@ -532,7 +515,13 @@ describe('PRManager', () => {
         data: { number: 123, html_url: 'url' },
       });
 
-      await prManager.createPR('test-branch', 'title', 'desc', 123);
+      await githubManager.createPR(
+        'test-branch',
+        'title',
+        'desc',
+        123,
+        '/test/repo'
+      );
 
       expect(withRetry).toHaveBeenCalledWith(
         expect.any(Function),
@@ -541,34 +530,14 @@ describe('PRManager', () => {
       );
     });
 
-    it('uses withRetry for updatePR operations', async () => {
-      await prManager.updatePR(123, 'title', 'desc', 456);
-
-      expect(withRetry).toHaveBeenCalledWith(
-        expect.any(Function),
-        'Update PR',
-        3
-      );
-    });
-
     it('uses withRetry for getPRReviewComments operations', async () => {
       mockOctokit.rest.pulls.listReviewComments.mockResolvedValue({ data: [] });
 
-      await prManager.getPRReviewComments(123);
+      await githubManager.getPRReviewComments(123, '/test/repo');
 
       expect(withRetry).toHaveBeenCalledWith(
         expect.any(Function),
         'Get PR review comments',
-        2
-      );
-    });
-
-    it('uses withRetry for addComment operations', async () => {
-      await prManager.addComment(123, 'comment', 456);
-
-      expect(withRetry).toHaveBeenCalledWith(
-        expect.any(Function),
-        'Add PR comment',
         2
       );
     });
@@ -578,7 +547,7 @@ describe('PRManager', () => {
         data: { state: 'open', mergeable: true, merged: false },
       });
 
-      await prManager.getPRStatus(123);
+      await githubManager.getPRStatus(123, '/test/repo');
 
       expect(withRetry).toHaveBeenCalledWith(
         expect.any(Function),

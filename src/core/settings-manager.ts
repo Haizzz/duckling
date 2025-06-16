@@ -7,7 +7,6 @@ export interface SettingsDefaults {
   repositoryUrl: string;
   defaultCodingTool: CodingTool;
   branchPrefix: string;
-  baseBranch: string;
   prTitlePrefix: string;
   commitSuffix: string;
   maxRetries: number;
@@ -22,7 +21,6 @@ export class SettingsManager {
     repositoryUrl: '',
     defaultCodingTool: 'amp',
     branchPrefix: 'duckling-',
-    baseBranch: 'main',
     prTitlePrefix: '[DUCKLING]',
     commitSuffix: ' [quack]',
     maxRetries: 3,

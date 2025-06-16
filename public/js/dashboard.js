@@ -2,6 +2,7 @@
 class Dashboard {
   constructor() {
     this.loadedTasks = [];
+    this.repositories = [];
     this.currentPage = 1;
     this.tasksPerPage = 5;
     this.isLoading = false;
@@ -13,6 +14,7 @@ class Dashboard {
 
   init() {
     this.bindEvents();
+    this.loadRepositories();
     this.loadTasks();
     this.startPolling();
     this.checkRequiredSettings();
@@ -50,38 +52,32 @@ class Dashboard {
         const hasAmpTool = settings.ampApiKey === '***CONFIGURED***';
         const hasOpenAiTool = settings.openaiApiKey === '***CONFIGURED***';
         const hasOpenAiForCommits = settings.openaiApiKey === '***CONFIGURED***'; // Required for both tools
-        
-        const taskInput = document.getElementById('task-input');
-        const submitBtn = document.getElementById('submit-task');
 
         // Determine what's missing
         const missingRequirements = [];
-        
+
         if (!hasGithubToken) missingRequirements.push('GitHub token');
         if (!hasGithubUsername) missingRequirements.push('GitHub username');
         if (!hasOpenAiForCommits) missingRequirements.push('OpenAI API key');
         if (!hasAmpTool && !hasOpenAiTool) missingRequirements.push('at least one coding tool (Amp or OpenAI)');
 
         if (missingRequirements.length > 0) {
-          // Disable task creation
-          taskInput.disabled = true;
+          // Mark settings as missing and update form state
           const missingText = missingRequirements.join(', ');
-          taskInput.placeholder = `Missing configuration: ${missingText}. Visit settings to configure.`;
-          submitBtn.disabled = true;
-          submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
-          
+          this.setTaskFormEnabled(false, `Missing configuration: ${missingText}. Visit settings to configure.`);
+
           // Show a helper message
           this.showConfigurationHelper(missingRequirements);
         } else {
-          // Enable task creation
-          taskInput.disabled = false;
-          taskInput.placeholder = 'What would you like me to work on?';
-          submitBtn.disabled = false;
-          submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-          
+          // Clear missing settings flag and update form state
+          this.setTaskFormEnabled(true);
+
           // Hide helper message if it exists
           this.hideConfigurationHelper();
         }
+
+        // Always update form state to consider both repositories and settings
+        this.updateTaskFormState();
       }
     } catch (error) {
       console.error('Failed to check settings:', error);
@@ -95,27 +91,27 @@ class Dashboard {
       helperEl = document.createElement('div');
       helperEl.id = 'config-helper';
       helperEl.className = 'bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 max-w-2xl mx-auto';
-      
+
       const taskInputContainer = document.querySelector('.max-w-2xl.mx-auto');
       taskInputContainer.parentNode.insertBefore(helperEl, taskInputContainer);
     }
-    
-    const toolsText = missingRequirements.includes('at least one coding tool (Amp or OpenAI)') 
+
+    const toolsText = missingRequirements.includes('at least one coding tool (Amp or OpenAI)')
       ? '<li><strong>Coding Tool:</strong> Configure either Amp (requires Amp token) or OpenAI (requires OpenAI key)</li>'
       : '';
-      
-    const githubText = missingRequirements.includes('GitHub token') 
+
+    const githubText = missingRequirements.includes('GitHub token')
       ? '<li><strong>GitHub Token:</strong> Create a personal access token with repo permissions</li>'
       : '';
-      
-    const usernameText = missingRequirements.includes('GitHub username') 
+
+    const usernameText = missingRequirements.includes('GitHub username')
       ? '<li><strong>GitHub Username:</strong> Your GitHub username for PR comment filtering</li>'
       : '';
-      
-    const openaiText = missingRequirements.includes('OpenAI API key') 
+
+    const openaiText = missingRequirements.includes('OpenAI API key')
       ? '<li><strong>OpenAI API Key:</strong> Required for commit messages and task summaries</li>'
       : '';
-    
+
     helperEl.innerHTML = `
       <div class="flex items-start">
         <div class="flex-shrink-0">
@@ -139,10 +135,10 @@ class Dashboard {
         </div>
       </div>
     `;
-    
+
     helperEl.classList.remove('hidden');
   }
-  
+
   hideConfigurationHelper() {
     const helperEl = document.getElementById('config-helper');
     if (helperEl) {
@@ -152,13 +148,20 @@ class Dashboard {
 
   async createTask() {
     const taskInput = document.getElementById('task-input');
+    const repositorySelect = document.getElementById('repository-select');
     const submitBtn = document.getElementById('submit-task');
 
     // Don't proceed if inputs are disabled
     if (taskInput.disabled || submitBtn.disabled) return;
 
     const description = taskInput.value.trim();
+    const repositoryPath = repositorySelect.value;
+
     if (!description) return;
+    if (!repositoryPath) {
+      Utils.showToast('Please select a repository', 'error');
+      return;
+    }
 
     // Store original icon and show spinner
     const originalIcon = submitBtn.innerHTML;
@@ -174,7 +177,7 @@ class Dashboard {
       const response = await fetch('/api/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ description })
+        body: JSON.stringify({ description, repositoryPath })
       });
 
       if (response.ok) {
@@ -283,6 +286,12 @@ class Dashboard {
       `<span class="text-sm text-gray-600 font-mono">${this.escapeHtml(task.branch_name)}</span>` :
       '<span class="text-gray-400 text-sm">No branch yet</span>';
 
+    // Get repository info
+    const repository = this.repositories.find(repo => repo.path === task.repository_path);
+    const repositoryInfo = repository ?
+      `<span class="text-sm text-gray-600">${repository.name}</span>` :
+      `<span class="text-sm text-gray-500 font-mono">${this.escapeHtml(task.repository_path || 'Unknown')}</span>`;
+
     // Generate a summary from the description (first 80 chars)
     const summary = task.summary || task.description.substring(0, 80) + (task.description.length > 80 ? '...' : '');
 
@@ -302,8 +311,12 @@ class Dashboard {
         </div>
         
         
-        <!-- Branch Name -->
-        <div class="mb-3">
+        <!-- Repository and Branch -->
+        <div class="mb-3 space-y-2">
+          <div class="flex items-center space-x-2">
+            <span class="text-sm font-medium text-gray-600">Repository:</span>
+            ${repositoryInfo}
+          </div>
           <div class="flex items-center space-x-2">
             <span class="text-sm font-medium text-gray-600">Branch:</span>
             ${branchName}
@@ -364,18 +377,18 @@ class Dashboard {
       const response = await fetch('/api/settings/general');
       const result = await response.json();
       let pollInterval = 10; // Default fallback
-      
+
       if (response.ok && result.success) {
         const pollSetting = result.data.find(s => s.key === 'pollInterval');
         if (pollSetting) {
           pollInterval = parseInt(pollSetting.value);
         }
       }
-      
+
       // Use 6x the poll interval for backup polling (less frequent)
       const backupPollMs = pollInterval * 6 * 1000;
       console.log(`Starting backup polling with ${backupPollMs / 1000}s interval`);
-      
+
       setInterval(() => {
         if (!this.isLoading && !this.hasRecentSSEUpdate) {
           // Refresh current tasks without changing page  
@@ -408,10 +421,10 @@ class Dashboard {
       console.log('Update already in progress, skipping...');
       return;
     }
-    
+
     this.isUpdating = true;
     this.hasRecentSSEUpdate = true; // Prevent polling redundancy
-    
+
     try {
       const { taskId, status, metadata } = data;
 
@@ -449,7 +462,7 @@ class Dashboard {
     const task = this.loadedTasks[taskIndex];
     // Find the specific task card by data-task-id attribute for better targeting
     const taskCard = document.querySelector(`[data-task-id="${task.id}"]`);
-    
+
     if (taskCard) {
       // Create new card HTML
       const newCardHTML = this.renderTaskCard(task);
@@ -457,7 +470,7 @@ class Dashboard {
       const tempDiv = document.createElement('div');
       tempDiv.innerHTML = newCardHTML;
       const newCard = tempDiv.firstElementChild;
-      
+
       if (newCard) {
         // Replace the existing card with the new one
         taskCard.replaceWith(newCard);
@@ -501,6 +514,111 @@ class Dashboard {
 
   escapeHtml(text) {
     return Utils.escapeHtml(text || '');
+  }
+
+  // Helper method to enable/disable task creation form
+  // Checks both repository availability and required settings
+  updateTaskFormState() {
+    const taskInput = document.getElementById('task-input');
+    const submitBtn = document.getElementById('submit-task');
+
+    // Check if we have repositories
+    const hasRepositories = this.repositories.length > 0;
+
+    // Check if we have required settings (simplified check here)
+    // We'll call this from checkRequiredSettings with the actual settings
+    const hasRequiredSettings = !taskInput.hasAttribute('data-missing-settings');
+
+    if (!hasRepositories) {
+      // No repositories takes priority
+      taskInput.disabled = true;
+      taskInput.placeholder = 'Add repositories in settings before creating tasks';
+      submitBtn.disabled = true;
+      submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+    } else if (!hasRequiredSettings) {
+      // Has repositories but missing settings
+      taskInput.disabled = true;
+      // Placeholder will be set by checkRequiredSettings
+      submitBtn.disabled = true;
+      submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+    } else {
+      // All good - enable form
+      taskInput.disabled = false;
+      taskInput.placeholder = 'What would you like me to work on?';
+      submitBtn.disabled = false;
+      submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+    }
+  }
+
+  // Legacy helper for backward compatibility
+  setTaskFormEnabled(enabled, placeholderText = null) {
+    const taskInput = document.getElementById('task-input');
+    const submitBtn = document.getElementById('submit-task');
+
+    if (enabled) {
+      taskInput.disabled = false;
+      taskInput.placeholder = placeholderText || 'What would you like me to work on?';
+      submitBtn.disabled = false;
+      submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+      taskInput.removeAttribute('data-missing-settings');
+    } else {
+      taskInput.disabled = true;
+      taskInput.placeholder = placeholderText || 'Task creation disabled';
+      submitBtn.disabled = true;
+      submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+      if (placeholderText && placeholderText.includes('Missing configuration')) {
+        taskInput.setAttribute('data-missing-settings', 'true');
+      }
+    }
+  }
+
+  async loadRepositories() {
+    try {
+      const response = await fetch('/api/repositories');
+      const result = await response.json();
+
+      if (response.ok) {
+        this.repositories = result.data;
+        this.updateRepositoryUI();
+      } else {
+        console.error('Failed to load repositories:', result.error);
+        this.updateRepositoryUI(); // Show no repos warning
+      }
+    } catch (error) {
+      console.error('Failed to load repositories:', error);
+      this.updateRepositoryUI(); // Show no repos warning
+    }
+  }
+
+  updateRepositoryUI() {
+    const repositoryPill = document.getElementById('repository-pill');
+    const repositorySelect = document.getElementById('repository-select');
+    const noReposWarning = document.getElementById('no-repos-task-warning');
+    const submitBtn = document.getElementById('submit-task');
+
+    if (this.repositories.length === 0) {
+      // No repositories - show warning, hide pill
+      repositoryPill.classList.add('hidden');
+      noReposWarning.classList.remove('hidden');
+    } else {
+      // Has repositories - show pill, hide warning
+      repositoryPill.classList.remove('hidden');
+      noReposWarning.classList.add('hidden');
+
+      // Populate repository dropdown with name only when closed, name + path when open
+      repositorySelect.innerHTML = this.repositories.map(repo => `
+        <option value="${repo.path}">${repo.name} (${repo.path})</option>
+      `).join('');
+
+      // Set first repository as default (always have a selection)
+      if (this.repositories.length > 0) {
+        repositorySelect.value = this.repositories[0].path;
+        submitBtn.disabled = false;
+      }
+    }
+
+    // Update form state based on both repositories and settings
+    this.updateTaskFormState();
   }
 }
 

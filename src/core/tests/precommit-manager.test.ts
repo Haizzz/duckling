@@ -54,7 +54,7 @@ describe('PrecommitManager', () => {
           exitCode: 0,
         });
 
-      const result = await precommitManager.runChecks(123);
+      const result = await precommitManager.runChecks(123, '/test/repo');
 
       expect(result.passed).toBe(true);
       expect(result.errors).toHaveLength(0);
@@ -62,12 +62,14 @@ describe('PrecommitManager', () => {
         'npm run lint',
         expect.objectContaining({
           taskId: '123',
+          cwd: '/test/repo',
         })
       );
       expect(execSpy).toHaveBeenCalledWith(
         'npm test',
         expect.objectContaining({
           taskId: '123',
+          cwd: '/test/repo',
         })
       );
     });
@@ -99,7 +101,7 @@ describe('PrecommitManager', () => {
         .mockRejectedValueOnce(new Error('Format failed: wrong indentation'))
         .mockRejectedValueOnce(new Error('Format failed: wrong indentation'));
 
-      const result = await precommitManager.runChecks(123);
+      const result = await precommitManager.runChecks(123, '/test/repo');
 
       expect(result.passed).toBe(false);
       expect(result.errors).toHaveLength(2);
@@ -136,10 +138,22 @@ describe('PrecommitManager', () => {
           exitCode: 0,
         });
 
-      const result = await precommitManager.runChecks(123);
+      const result = await precommitManager.runChecks(123, '/test/repo');
 
-      expect(execSpy).toHaveBeenCalledWith('npm run lint', expect.any(Object));
-      expect(execSpy).toHaveBeenCalledWith('npm test', expect.any(Object));
+      expect(execSpy).toHaveBeenCalledWith(
+        'npm run lint',
+        expect.objectContaining({
+          taskId: '123',
+          cwd: '/test/repo',
+        })
+      );
+      expect(execSpy).toHaveBeenCalledWith(
+        'npm test',
+        expect.objectContaining({
+          taskId: '123',
+          cwd: '/test/repo',
+        })
+      );
       expect(result.errors).toHaveLength(1);
     });
 
@@ -161,7 +175,7 @@ describe('PrecommitManager', () => {
         exitCode: 0,
       });
 
-      await precommitManager.runChecks(123);
+      await precommitManager.runChecks(123, '/test/repo');
 
       expect(mockDb.addTaskLog).toHaveBeenCalledWith({
         task_id: 123,

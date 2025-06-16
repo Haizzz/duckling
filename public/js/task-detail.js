@@ -7,8 +7,10 @@ class TaskDetail {
     this.taskUpdateHandler = null;
     this.lastLogId = 0; // Track last loaded log ID for incremental loading
     this.logs = []; // Cache logs to avoid full re-render
+    this.repositories = []; // Repository data for display
 
     if (this.taskId) {
+      this.loadRepositories();
       this.loadTaskDetail();
       this.startLogRefresh();
       this.startEventStream();
@@ -63,6 +65,9 @@ class TaskDetail {
     const summary = task.summary || task.description.substring(0, 80) + (task.description.length > 80 ? '...' : '');
     const canCancel = task.status !== 'completed' && task.status !== 'cancelled' && task.status !== 'failed';
 
+    // Update page title with task summary
+    document.title = `Duckling - ${summary}`;
+
     container.innerHTML = `
       <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
         <!-- Header -->
@@ -101,6 +106,13 @@ class TaskDetail {
                 <span class="text-gray-600">Task ID:</span>
                 <span class="font-mono text-sm">${task.id}</span>
               </div>
+              ${this.getRepositoryInfo(task)}
+              ${task.coding_tool ? `
+                <div class="flex justify-between">
+                  <span class="text-gray-600">Coding Tool:</span>
+                  <span class="capitalize">${task.coding_tool}</span>
+                </div>
+              ` : ''}
               ${task.current_stage ? `
                 <div class="flex justify-between">
                   <span class="text-gray-600">Stage:</span>
@@ -110,7 +122,7 @@ class TaskDetail {
               ${task.branch_name ? `
                 <div class="flex justify-between">
                   <span class="text-gray-600">Branch:</span>
-                  ${this.getBranchLink(task.branch_name)}
+                  ${this.escapeHtml(task.branchName)}
                 </div>
               ` : ''}
               ${task.pr_url ? `
@@ -269,16 +281,16 @@ class TaskDetail {
     this.taskUpdateHandler = (event) => {
       const taskUpdate = event.detail;
       console.log('Task detail received SSE update:', taskUpdate);
-      
+
       if (taskUpdate.taskId == this.taskId) { // Note: == for type coercion
         console.log('Update is for current task, processing...');
-        
+
         // Use the full task data from metadata if available, otherwise fall back to current task
         if (taskUpdate.metadata && taskUpdate.metadata.task) {
           console.log('Using full task data from metadata:', taskUpdate.metadata.task);
           this.currentTask = taskUpdate.metadata.task;
           this.renderTaskDetail(taskUpdate.metadata.task);
-          
+
           // Show visual indication of update
           this.showUpdateIndicator();
         } else {
@@ -306,29 +318,6 @@ class TaskDetail {
     if (this.taskUpdateHandler) {
       window.removeEventListener('duckling-task-update', this.taskUpdateHandler);
       this.taskUpdateHandler = null;
-    }
-  }
-
-  getBranchLink(branchName) {
-    return `<a href="javascript:void(0)" onclick="TaskDetailInstance.openBranchUrl('${this.escapeHtml(branchName)}')" class="font-mono text-sm text-blue-600 hover:text-blue-800 underline">${this.escapeHtml(branchName)}</a>`;
-  }
-
-  async openBranchUrl(branchName) {
-    try {
-      // Get repo info from server
-      const response = await fetch('/api/repo-info');
-      if (response.ok) {
-        const result = await response.json();
-        const repoUrl = `https://github.com/${result.owner}/${result.name}/tree/${encodeURIComponent(branchName)}`;
-        window.open(repoUrl, '_blank');
-      } else {
-        // Fallback - just copy branch name to clipboard or show error
-        navigator.clipboard.writeText(branchName);
-        alert('Copied branch name to clipboard');
-      }
-    } catch (error) {
-      navigator.clipboard.writeText(branchName);
-      alert('Copied branch name to clipboard');
     }
   }
 
@@ -395,7 +384,7 @@ class TaskDetail {
     if (lastUpdated) {
       lastUpdated.textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
       lastUpdated.style.color = '#10b981'; // Green color
-      
+
       // Reset color after 2 seconds
       setTimeout(() => {
         lastUpdated.style.color = '#6b7280';
@@ -405,6 +394,37 @@ class TaskDetail {
 
   escapeHtml(text) {
     return Utils.escapeHtml(text || '');
+  }
+
+  async loadRepositories() {
+    try {
+      const response = await fetch('/api/repositories');
+      const result = await response.json();
+
+      if (response.ok) {
+        this.repositories = result.data;
+      } else {
+        console.error('Failed to load repositories:', result.error);
+      }
+    } catch (error) {
+      console.error('Failed to load repositories:', error);
+    }
+  }
+
+  getRepositoryInfo(task) {
+    if (!task.repository_path) return '';
+
+    const repository = this.repositories.find(repo => repo.path === task.repository_path);
+    const repositoryDisplay = repository ?
+      `${repository.name} <span class="text-gray-500">(${repository.owner})</span>` :
+      `<span class="font-mono text-sm">${this.escapeHtml(task.repository_path)}</span>`;
+
+    return `
+      <div class="flex justify-between">
+        <span class="text-gray-600">Repository:</span>
+        <span>${repositoryDisplay}</span>
+      </div>
+    `;
   }
 }
 

@@ -60,9 +60,7 @@ export class OpenAIManager {
     taskDescription: string,
     taskId?: number
   ): Promise<string> {
-    // Get branch prefix to calculate available space
-    const branchPrefix = this.settings.get('branchPrefix');
-    const maxBranchNameLength = 30 - branchPrefix.length; // Reserve space for prefix
+    const maxBranchNameLength = 50;
 
     if (taskId) {
       this.db.addTaskLog({

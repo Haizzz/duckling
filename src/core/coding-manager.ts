@@ -4,6 +4,11 @@ import { logger } from '../utils/logger';
 import { DatabaseManager } from './database';
 import { execCommand, execCommandWithInput } from '../utils/exec';
 
+interface CodingContext {
+  taskId: number;
+  repositoryPath: string;
+}
+
 export class CodingManager {
   private db: DatabaseManager;
 
@@ -14,7 +19,7 @@ export class CodingManager {
   async generateCode(
     tool: CodingTool,
     prompt: string,
-    context: { files?: string[]; taskId: number }
+    context: CodingContext
   ): Promise<string> {
     return await withRetry(
       async () => {
@@ -32,8 +37,11 @@ export class CodingManager {
     );
   }
 
-  private async callAmp(prompt: string, context: any): Promise<string> {
-    const { taskId } = context;
+  private async callAmp(
+    prompt: string,
+    context: CodingContext
+  ): Promise<string> {
+    const { taskId, repositoryPath } = context;
 
     try {
       // Get API key from settings
@@ -43,12 +51,16 @@ export class CodingManager {
       }
 
       // Check if amp is available
-      await execCommand('which', ['amp'], { taskId });
+      await execCommand('which', ['amp'], {
+        taskId: taskId.toString(),
+        cwd: repositoryPath,
+      });
 
       // Call amp with the prompt via stdin
       const result = await execCommandWithInput('amp', prompt, [], {
-        taskId,
-        timeout: 300000, // 5 minutes timeout
+        taskId: taskId.toString(),
+        cwd: repositoryPath,
+        timeout: 30 * 60 * 1000, // 30 minutes timeout
         env: {
           ...process.env,
           AMP_API_KEY: apiKeySetting.value,
@@ -70,8 +82,11 @@ export class CodingManager {
     }
   }
 
-  private async callCodex(prompt: string, context: any): Promise<string> {
-    const { taskId } = context;
+  private async callCodex(
+    prompt: string,
+    context: CodingContext
+  ): Promise<string> {
+    const { taskId, repositoryPath } = context;
 
     try {
       // Get API key from settings
@@ -81,16 +96,30 @@ export class CodingManager {
       }
 
       // Check if codex is available
-      await execCommand('which', ['codex'], { taskId });
-
-      const result = await execCommand('codex', ['-q', prompt], {
-        taskId,
-        timeout: 300000,
-        env: {
-          ...process.env,
-          OPENAI_API_KEY: apiKeySetting.value,
-        },
+      await execCommand('which', ['codex'], {
+        taskId: taskId.toString(),
+        cwd: repositoryPath,
       });
+
+      const result = await execCommand(
+        'codex',
+        [
+          '--disable-response-storage',
+          '--auto-edit',
+          '--quiet',
+          '--full-stdout',
+          prompt,
+        ],
+        {
+          taskId: taskId.toString(),
+          cwd: repositoryPath,
+          timeout: 30 * 60 * 1000, // 30 minutes timeout
+          env: {
+            ...process.env,
+            OPENAI_API_KEY: apiKeySetting.value,
+          },
+        }
+      );
 
       if (result.exitCode !== 0) {
         throw new Error(
@@ -113,7 +142,7 @@ export class CodingManager {
     tool: CodingTool,
     originalPrompt: string,
     errorMessages: string[],
-    context: { files?: string[]; taskId: number }
+    context: CodingContext
   ): Promise<string> {
     logger.info(
       'Requesting fixes for precommit errors',

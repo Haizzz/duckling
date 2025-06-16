@@ -12,7 +12,7 @@ import { SettingsManager } from '../settings-manager';
 import { GitManager } from '../git-manager';
 import { CodingManager } from '../coding-manager';
 import { PrecommitManager } from '../precommit-manager';
-import { PRManager } from '../pr-manager';
+import { GitHubManager } from '../github-manager';
 import { OpenAIManager } from '../openai-manager';
 import { taskExecutor } from '../task-executor';
 import { CreateTaskRequest, Task, TaskStatus } from '../../types';
@@ -37,7 +37,7 @@ describe('CoreEngine', () => {
   let mockGitManager: jest.Mocked<GitManager>;
   let mockCodingManager: jest.Mocked<CodingManager>;
   let mockPrecommitManager: jest.Mocked<PrecommitManager>;
-  let mockPRManager: jest.Mocked<PRManager>;
+  let mockGitHubManager: jest.Mocked<GitHubManager>;
   let mockOpenAIManager: jest.Mocked<OpenAIManager>;
   let mockTaskExecutor: jest.Mocked<typeof taskExecutor>;
 
@@ -52,7 +52,7 @@ describe('CoreEngine', () => {
     mockGitManager = createMockInstance(GitManager);
     mockCodingManager = createMockInstance(CodingManager);
     mockPrecommitManager = createMockInstance(PrecommitManager);
-    mockPRManager = createMockInstance(PRManager);
+    mockGitHubManager = createMockInstance(GitHubManager);
     mockOpenAIManager = createMockInstance(OpenAIManager);
 
     // Mock task executor
@@ -65,11 +65,11 @@ describe('CoreEngine', () => {
     (GitManager as any).mockImplementation(() => mockGitManager);
     (CodingManager as any).mockImplementation(() => mockCodingManager);
     (PrecommitManager as any).mockImplementation(() => mockPrecommitManager);
-    (PRManager as any).mockImplementation(() => mockPRManager);
+    (GitHubManager as any).mockImplementation(() => mockGitHubManager);
     (OpenAIManager as any).mockImplementation(() => mockOpenAIManager);
     (taskExecutor as any) = mockTaskExecutor;
 
-    engine = new CoreEngine(mockDb, '/test/repo');
+    engine = new CoreEngine(mockDb);
   });
 
   afterEach(() => {
@@ -109,6 +109,7 @@ describe('CoreEngine', () => {
       title: 'Test Task',
       description: 'Test description',
       codingTool: 'amp',
+      repositoryPath: '/test/repo',
     };
 
     it('creates task with generated summary and returns task ID', async () => {
@@ -178,6 +179,7 @@ describe('CoreEngine', () => {
       description: 'Test description',
       status: 'pending',
       coding_tool: 'amp',
+      repository_path: '/test/repo',
       created_at: '2023-01-01T00:00:00Z',
       updated_at: '2023-01-01T00:00:00Z',
     };
@@ -228,6 +230,7 @@ describe('CoreEngine', () => {
       description: 'Test description',
       status: 'failed',
       coding_tool: 'amp',
+      repository_path: '/test/repo',
       created_at: '2023-01-01T00:00:00Z',
       updated_at: '2023-01-01T00:00:00Z',
     };
@@ -288,6 +291,7 @@ describe('CoreEngine', () => {
       description: 'Test description',
       status: 'pending',
       coding_tool: 'amp',
+      repository_path: '/test/repo',
       created_at: '2023-01-01T00:00:00Z',
       updated_at: '2023-01-01T00:00:00Z',
     };
@@ -333,7 +337,7 @@ describe('CoreEngine', () => {
         errors: [],
       });
       mockSettings.get.mockReturnValue('github-token');
-      mockPRManager.createPRFromTask.mockResolvedValue({
+      mockGitHubManager.createPRFromTask.mockResolvedValue({
         number: 1,
         url: 'https://github.com/test/pr/1',
       });
@@ -362,7 +366,7 @@ describe('CoreEngine', () => {
         'Test description',
         123
       );
-      expect(mockPRManager.createPRFromTask).toHaveBeenCalled();
+      expect(mockGitHubManager.createPRFromTask).toHaveBeenCalled();
     });
 
     it('handles precommit check failures with retry mechanism', async () => {
@@ -377,7 +381,7 @@ describe('CoreEngine', () => {
         .mockResolvedValueOnce({ passed: true, errors: [] });
       mockCodingManager.requestFixes.mockResolvedValue('Fixed code');
       mockSettings.get.mockReturnValue('github-token');
-      mockPRManager.createPRFromTask.mockResolvedValue({
+      mockGitHubManager.createPRFromTask.mockResolvedValue({
         number: 1,
         url: 'https://github.com/test/pr/1',
       });
@@ -437,6 +441,7 @@ describe('CoreEngine', () => {
       description: 'Test description',
       status: 'awaiting-review',
       coding_tool: 'amp',
+      repository_path: '/test/repo',
       branch_name: 'duckling-feature-branch',
       pr_number: 1,
       created_at: '2023-01-01T00:00:00Z',
@@ -465,11 +470,11 @@ describe('CoreEngine', () => {
       mockGitManager.getLastCommitTimestamp.mockResolvedValue(
         '2023-01-01T12:00:00Z'
       );
-      mockPRManager.pollForComments.mockResolvedValue([
+      mockGitHubManager.pollForComments.mockResolvedValue([
         { id: '1', body: 'Please fix the formatting' },
         { id: '2', body: 'Add more tests' },
       ]);
-      mockPRManager.getPRStatus.mockResolvedValue({
+      mockGitHubManager.getPRStatus.mockResolvedValue({
         merged: false,
         state: 'open',
         mergeable: true,
@@ -481,12 +486,12 @@ describe('CoreEngine', () => {
       });
 
       // Initialize PR manager first
-      (engine as any).getPRManager();
+      (engine as any).getGitHubManager();
 
       // Directly call the review processing method instead of relying on timers
       await (engine as any).processReviews();
 
-      expect(mockPRManager.pollForComments).toHaveBeenCalledWith(
+      expect(mockGitHubManager.pollForComments).toHaveBeenCalledWith(
         1,
         '2023-01-01T12:00:00Z',
         'github-username'
@@ -514,15 +519,15 @@ describe('CoreEngine', () => {
       mockGitManager.getLastCommitTimestamp.mockResolvedValue(
         '2023-01-01T12:00:00Z'
       );
-      mockPRManager.pollForComments.mockResolvedValue([]);
-      mockPRManager.getPRStatus.mockResolvedValue({
+      mockGitHubManager.pollForComments.mockResolvedValue([]);
+      mockGitHubManager.getPRStatus.mockResolvedValue({
         merged: true,
         state: 'closed',
         mergeable: null,
       });
 
       // Initialize PR manager first
-      (engine as any).getPRManager();
+      (engine as any).getGitHubManager();
 
       // Directly call the review processing method instead of relying on timers
       await (engine as any).processReviews();
@@ -550,15 +555,15 @@ describe('CoreEngine', () => {
       mockGitManager.getLastCommitTimestamp.mockResolvedValue(
         '2023-01-01T12:00:00Z'
       );
-      mockPRManager.pollForComments.mockResolvedValue([]);
-      mockPRManager.getPRStatus.mockResolvedValue({
+      mockGitHubManager.pollForComments.mockResolvedValue([]);
+      mockGitHubManager.getPRStatus.mockResolvedValue({
         merged: false,
         state: 'closed',
         mergeable: null,
       });
 
       // Initialize PR manager first
-      (engine as any).getPRManager();
+      (engine as any).getGitHubManager();
 
       // Directly call the review processing method instead of relying on timers
       await (engine as any).processReviews();
@@ -592,21 +597,21 @@ describe('CoreEngine', () => {
     it('initializes PR manager with GitHub token', () => {
       mockSettings.get.mockReturnValue('github-token');
 
-      const prManager = (engine as any).getPRManager();
+      const prManager = (engine as any).getGitHubManager();
 
       expect(mockSettings.get).toHaveBeenCalledWith('githubToken');
-      expect(PRManager).toHaveBeenCalledWith(
+      expect(GitHubManager).toHaveBeenCalledWith(
         'github-token',
         mockDb,
         mockOpenAIManager
       );
-      expect(prManager).toBe(mockPRManager);
+      expect(prManager).toBe(mockGitHubManager);
     });
 
     it('throws error when GitHub token not configured', () => {
       mockSettings.get.mockReturnValue('');
 
-      expect(() => (engine as any).getPRManager()).toThrow(
+      expect(() => (engine as any).getGitHubManager()).toThrow(
         'GitHub token not configured'
       );
     });
@@ -614,11 +619,11 @@ describe('CoreEngine', () => {
     it('reuses existing PR manager instance', () => {
       mockSettings.get.mockReturnValue('github-token');
 
-      const prManager1 = (engine as any).getPRManager();
-      const prManager2 = (engine as any).getPRManager();
+      const prManager1 = (engine as any).getGitHubManager();
+      const prManager2 = (engine as any).getGitHubManager();
 
       expect(prManager1).toBe(prManager2);
-      expect(PRManager).toHaveBeenCalledTimes(1);
+      expect(GitHubManager).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -655,6 +660,7 @@ describe('CoreEngine', () => {
         description: 'Test description',
         status: 'pending',
         coding_tool: 'amp',
+        repository_path: '/test/repo',
         created_at: '2023-01-01T00:00:00Z',
         updated_at: '2023-01-01T00:00:00Z',
       };
