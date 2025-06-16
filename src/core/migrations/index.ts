@@ -12,7 +12,6 @@ export function runMultiRepositoryMigration(
   db: Database,
   currentWorkingDirectory: string
 ): void {
-  return
   console.log('Running database migrations...');
 
   // Get current columns in tasks table

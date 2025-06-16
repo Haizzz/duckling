@@ -94,7 +94,6 @@ export class DatabaseManager {
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
       CREATE INDEX IF NOT EXISTS idx_tasks_created_at ON tasks(created_at);
-      CREATE INDEX IF NOT EXISTS idx_tasks_repository_path ON tasks(repository_path);
       CREATE INDEX IF NOT EXISTS idx_task_logs_task_id ON task_logs(task_id);
       CREATE INDEX IF NOT EXISTS idx_repositories_path ON repositories(path);
     `);
