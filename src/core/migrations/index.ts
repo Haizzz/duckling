@@ -30,8 +30,12 @@ export function runMultiRepositoryMigration(
 
   for (const column of columnsToAdd) {
     if (!columnNames.includes(column.name)) {
-      db.exec(`ALTER TABLE tasks ADD COLUMN ${column.definition}`);
+      const sql = `ALTER TABLE tasks ADD COLUMN ${column.definition}`;
+      console.log(`Executing SQL: ${sql}`);
+      db.exec(sql);
       console.log(`Added ${column.name} column to tasks table`);
+    } else {
+      console.log(`Column ${column.name} already exists, skipping`);
     }
   }
 
