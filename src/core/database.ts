@@ -1,11 +1,12 @@
 import Database from 'better-sqlite3';
 import fs from 'fs';
-import { Task, TaskLog, Setting, PrecommitCheck } from '../types';
+import { Task, TaskLog, Setting, PrecommitCheck, Repository } from '../types';
 import {
   DUCKLING_DIR,
   DATABASE_PATH,
   DEFAULT_SETTINGS,
 } from '../utils/constants';
+import { runMultiRepositoryMigration } from './migrations';
 
 export class DatabaseManager {
   private db: Database.Database;
@@ -24,9 +25,21 @@ export class DatabaseManager {
     this.db.pragma('journal_mode = WAL');
 
     this.initTables();
+    this.runMigrations();
   }
 
   private initTables(): void {
+    // Repositories table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS repositories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        path TEXT NOT NULL UNIQUE,
+        name TEXT NOT NULL,
+        owner TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     // Tasks table
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS tasks (
@@ -35,6 +48,7 @@ export class DatabaseManager {
         description TEXT NOT NULL,
         status TEXT NOT NULL,
         coding_tool TEXT NOT NULL,
+        repository_path TEXT NOT NULL DEFAULT '',
         branch_name TEXT,
         pr_number INTEGER,
         pr_url TEXT,
@@ -43,19 +57,6 @@ export class DatabaseManager {
         completed_at DATETIME
       )
     `);
-
-    // Add new columns if they don't exist (for existing databases)
-    try {
-      this.db.exec(`ALTER TABLE tasks ADD COLUMN summary TEXT`);
-    } catch (e) {
-      // Column already exists, ignore
-    }
-
-    try {
-      this.db.exec(`ALTER TABLE tasks ADD COLUMN current_stage TEXT`);
-    } catch (e) {
-      // Column already exists, ignore
-    }
 
     // Task logs table
     this.db.exec(`
@@ -93,7 +94,9 @@ export class DatabaseManager {
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
       CREATE INDEX IF NOT EXISTS idx_tasks_created_at ON tasks(created_at);
+      CREATE INDEX IF NOT EXISTS idx_tasks_repository_path ON tasks(repository_path);
       CREATE INDEX IF NOT EXISTS idx_task_logs_task_id ON task_logs(task_id);
+      CREATE INDEX IF NOT EXISTS idx_repositories_path ON repositories(path);
     `);
 
     // Initialize default settings if not exists
@@ -107,7 +110,6 @@ export class DatabaseManager {
       { key: 'prTitlePrefix', value: DEFAULT_SETTINGS.prTitlePrefix },
       { key: 'commitSuffix', value: DEFAULT_SETTINGS.commitSuffix },
       { key: 'maxRetries', value: DEFAULT_SETTINGS.maxRetries.toString() },
-      { key: 'baseBranch', value: DEFAULT_SETTINGS.baseBranch },
     ];
 
     const insertSetting = this.db.prepare(`
@@ -125,8 +127,8 @@ export class DatabaseManager {
   // Task operations
   createTask(task: Omit<Task, 'id' | 'created_at' | 'updated_at'>): number {
     const stmt = this.db.prepare(`
-      INSERT INTO tasks (title, description, summary, status, coding_tool, current_stage, branch_name, pr_number, pr_url, completed_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO tasks (title, description, summary, status, coding_tool, repository_path, current_stage, branch_name, pr_number, pr_url, completed_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const result = stmt.run(
@@ -135,6 +137,7 @@ export class DatabaseManager {
       task.summary || null,
       task.status,
       task.coding_tool,
+      task.repository_path,
       task.current_stage || null,
       task.branch_name || null,
       task.pr_number || null,
@@ -322,6 +325,38 @@ export class DatabaseManager {
     `);
 
     return stmt.all() as PrecommitCheck[];
+  }
+
+  // Repository operations
+  addRepository(repo: Omit<Repository, 'id' | 'created_at'>): number {
+    const stmt = this.db.prepare(`
+      INSERT INTO repositories (path, name, owner)
+      VALUES (?, ?, ?)
+    `);
+
+    const result = stmt.run(repo.path, repo.name, repo.owner);
+    return result.lastInsertRowid as number;
+  }
+
+  getRepository(path: string): Repository | null {
+    const stmt = this.db.prepare('SELECT * FROM repositories WHERE path = ?');
+    return stmt.get(path) as Repository | null;
+  }
+
+  getRepositories(): Repository[] {
+    const stmt = this.db.prepare(
+      'SELECT * FROM repositories ORDER BY created_at ASC'
+    );
+    return stmt.all() as Repository[];
+  }
+
+  deleteRepository(id: number): void {
+    const stmt = this.db.prepare('DELETE FROM repositories WHERE id = ?');
+    stmt.run(id);
+  }
+
+  private runMigrations(): void {
+    runMultiRepositoryMigration(this.db, process.cwd());
   }
 
   close(): void {

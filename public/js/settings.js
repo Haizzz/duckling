@@ -2,12 +2,14 @@
 class Settings {
   constructor() {
     this.precommitChecks = [];
+    this.repositories = [];
     this.init();
   }
 
   init() {
     this.bindEvents();
     this.loadSettings();
+    this.loadRepositories();
   }
 
   bindEvents() {
@@ -26,6 +28,19 @@ class Settings {
       if (e.key === 'Enter') {
         e.preventDefault();
         this.addPrecommitCheck();
+      }
+    });
+
+    // Add repository button
+    document.getElementById('add-repo-btn').addEventListener('click', () => {
+      this.addRepository();
+    });
+
+    // Enter key in repository input
+    document.getElementById('repo-path').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        this.addRepository();
       }
     });
   }
@@ -298,6 +313,120 @@ class Settings {
 
   showError(message) {
     Utils.showToast(message, 'error');
+  }
+
+  showSuccess(message) {
+    Utils.showToast(message, 'success');
+  }
+
+  async loadRepositories() {
+    try {
+      const response = await fetch('/api/repositories');
+      const result = await response.json();
+
+      if (response.ok) {
+        this.repositories = result.data;
+        this.renderRepositories();
+      } else {
+        this.showError('Failed to load repositories');
+      }
+    } catch (error) {
+      this.showError('Failed to load repositories: ' + error.message);
+    }
+  }
+
+  renderRepositories() {
+    const container = document.getElementById('repository-list');
+    const warningEl = document.getElementById('no-repos-warning');
+
+    if (this.repositories.length === 0) {
+      warningEl.classList.remove('hidden');
+      container.innerHTML = '';
+      return;
+    }
+
+    warningEl.classList.add('hidden');
+    container.innerHTML = this.repositories.map(repo => `
+      <div class="flex items-center justify-between p-3 bg-gray-50 rounded-md">
+        <div class="flex-1">
+          <div class="flex items-center space-x-2">
+            <span class="font-medium text-gray-900">${repo.name}</span>
+            <span class="text-sm text-gray-500">(${repo.owner})</span>
+          </div>
+          <div class="text-sm text-gray-600 mt-1">${repo.path}</div>
+          
+        </div>
+        <button 
+          onclick="settings.removeRepository(${repo.id})"
+          class="text-red-600 hover:text-red-800 font-medium text-sm"
+        >
+          Remove
+        </button>
+      </div>
+    `).join('');
+  }
+
+  async addRepository() {
+    const pathInput = document.getElementById('repo-path');
+    const path = pathInput.value.trim();
+
+    if (!path) {
+      this.showError('Please enter a repository path');
+      return;
+    }
+
+    const addBtn = document.getElementById('add-repo-btn');
+    const originalText = addBtn.textContent;
+    addBtn.textContent = 'Adding...';
+    addBtn.disabled = true;
+
+    try {
+      const response = await fetch('/api/repositories', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ path }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        this.showSuccess('Repository added successfully');
+        pathInput.value = '';
+        this.loadRepositories(); // Reload the list
+      } else {
+        this.showError(result.error || 'Failed to add repository');
+      }
+    } catch (error) {
+      this.showError('Failed to add repository: ' + error.message);
+    } finally {
+      addBtn.textContent = originalText;
+      addBtn.disabled = false;
+    }
+  }
+
+  async removeRepository(repoId) {
+    if (!confirm('Are you sure you want to remove this repository? Existing tasks will not be deleted.')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/repositories/${repoId}`, {
+        method: 'DELETE',
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        this.showSuccess('Repository removed successfully');
+        this.loadRepositories(); // Reload the list
+      } else {
+        this.showError(result.error || 'Failed to remove repository');
+      }
+    } catch (error) {
+      this.showError('Failed to remove repository: ' + error.message);
+    }
   }
 }
 

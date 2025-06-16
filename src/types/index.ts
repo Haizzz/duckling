@@ -5,6 +5,7 @@ export interface Task {
   summary?: string;
   status: TaskStatus;
   coding_tool: CodingTool;
+  repository_path: string;
   current_stage?: string;
   branch_name?: string;
   pr_number?: number;
@@ -48,6 +49,14 @@ export interface PrecommitCheck {
   created_at: string;
 }
 
+export interface Repository {
+  id: number;
+  path: string;
+  name: string;
+  owner: string;
+  created_at: string;
+}
+
 export interface DucklingSettings {
   // API Keys
   github_token: string;
@@ -60,10 +69,8 @@ export interface DucklingSettings {
   pr_prefix: string;
   commit_suffix: string;
   max_retries: number;
-  base_branch: string;
 
   // GitHub settings
-  github_repo_url: string;
   github_username: string;
   poll_interval_seconds: number;
 }
@@ -86,6 +93,7 @@ export interface CreateTaskRequest {
   title: string;
   description: string;
   codingTool: CodingTool;
+  repositoryPath: string;
   branchPrefix?: string;
   prPrefix?: string;
 }

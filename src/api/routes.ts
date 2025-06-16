@@ -1,8 +1,12 @@
 import { Router, Request, Response } from 'express';
+import fs from 'fs';
+import pathLib from 'path';
+import { execSync } from 'child_process';
 import { DatabaseManager } from '../core/database';
 import { SettingsManager } from '../core/settings-manager';
 import { CoreEngine } from '../core/engine';
 import { ApiResponse, CreateTaskRequest } from '../types';
+import { validateAndGetRepoInfo } from '../utils/git-utils';
 
 export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
   const router = Router();
@@ -58,13 +62,29 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
 
   router.post('/tasks', async (req: Request, res: Response) => {
     try {
-      const { description } = req.body;
+      const { description, repositoryPath } = req.body;
 
       // Validate required fields
       if (!description) {
         return res.status(400).json({
           success: false,
           error: 'Missing required field: description',
+        });
+      }
+
+      if (!repositoryPath) {
+        return res.status(400).json({
+          success: false,
+          error: 'Missing required field: repositoryPath',
+        });
+      }
+
+      // Validate repository exists
+      const repository = db.getRepository(repositoryPath);
+      if (!repository) {
+        return res.status(400).json({
+          success: false,
+          error: 'Repository not found. Please add the repository first.',
         });
       }
 
@@ -78,6 +98,7 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
           description.substring(0, 50) + (description.length > 50 ? '...' : ''),
         description,
         codingTool,
+        repositoryPath,
       };
 
       const taskId = await engine.createTask(taskRequest);
@@ -241,7 +262,6 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
   // Repo info endpoint
   router.get('/repo-info', async (req: Request, res: Response) => {
     try {
-      const { validateAndGetRepoInfo } = await import('../utils/git-utils');
       const repoInfo = await validateAndGetRepoInfo(process.cwd());
 
       const response: ApiResponse = {
@@ -454,6 +474,141 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
       engine.removeListener('task-update', handleTaskUpdate);
       clearInterval(heartbeat);
     });
+  });
+
+  // Repository endpoints
+  router.get('/repositories', async (req: Request, res: Response) => {
+    try {
+      const repositories = db.getRepositories();
+      const response: ApiResponse = {
+        success: true,
+        data: repositories,
+      };
+      res.json(response);
+    } catch (error) {
+      const response: ApiResponse = {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+      res.status(500).json(response);
+    }
+  });
+
+  router.post('/repositories', async (req: Request, res: Response) => {
+    try {
+      const { path } = req.body;
+
+      if (!path) {
+        const response: ApiResponse = {
+          success: false,
+          error: 'Repository path is required',
+        };
+        return res.status(400).json(response);
+      }
+
+      // Validate repository exists and get details
+      if (!fs.existsSync(path) || !fs.lstatSync(path).isDirectory()) {
+        const response: ApiResponse = {
+          success: false,
+          error: 'Path does not exist or is not a directory',
+        };
+        return res.status(400).json(response);
+      }
+
+      const gitDir = pathLib.join(path, '.git');
+      if (!fs.existsSync(gitDir)) {
+        const response: ApiResponse = {
+          success: false,
+          error: 'Path is not a Git repository',
+        };
+        return res.status(400).json(response);
+      }
+
+      // Check if repository already exists
+      const existingRepo = db.getRepository(path);
+      if (existingRepo) {
+        const response: ApiResponse = {
+          success: false,
+          error: 'Repository already exists',
+        };
+        return res.status(400).json(response);
+      }
+
+      // Get repository details from Git
+      try {
+        const remoteUrl = execSync('git remote get-url origin', {
+          cwd: path,
+          encoding: 'utf8',
+        }).trim();
+
+        // Extract owner/name from remote URL
+        const urlMatch = remoteUrl.match(
+          /github\.com[:/](.+?)\/(.+?)(?:\.git)?$/
+        );
+        if (!urlMatch) {
+          const response: ApiResponse = {
+            success: false,
+            error: 'Could not parse GitHub repository URL',
+          };
+          return res.status(400).json(response);
+        }
+
+        const [, owner, name] = urlMatch;
+
+        db.addRepository({
+          path,
+          name,
+          owner,
+        });
+
+        const newRepo = db.getRepository(path);
+        const response: ApiResponse = {
+          success: true,
+          data: newRepo,
+        };
+        res.json(response);
+      } catch (gitError) {
+        const response: ApiResponse = {
+          success: false,
+          error: 'Failed to get repository details from Git',
+        };
+        res.status(400).json(response);
+      }
+    } catch (error) {
+      const response: ApiResponse = {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+      res.status(500).json(response);
+    }
+  });
+
+  router.delete('/repositories/:id', async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+
+      if (isNaN(id)) {
+        const response: ApiResponse = {
+          success: false,
+          error: 'Invalid repository ID',
+        };
+        return res.status(400).json(response);
+      }
+
+      db.deleteRepository(id);
+
+      const response: ApiResponse = {
+        success: true,
+        data: { message: 'Repository removed successfully' },
+      };
+      res.json(response);
+    } catch (error) {
+      const response: ApiResponse = {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+      res.status(500).json(response);
+    }
   });
 
   return router;

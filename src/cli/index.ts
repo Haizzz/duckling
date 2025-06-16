@@ -3,7 +3,7 @@
 import { Command } from 'commander';
 import { DatabaseManager } from '../core/database';
 import { CoreEngine } from '../core/engine';
-import { CreateTaskRequest } from '../types';
+import { CodingTool, CreateTaskRequest } from '../types';
 import { startDuckling } from '../index';
 import * as readline from 'readline';
 
@@ -114,7 +114,8 @@ taskCmd
       const taskRequest: CreateTaskRequest = {
         title: title.trim(),
         description: description.trim(),
-        codingTool: codingTool as any,
+        codingTool: codingTool as CodingTool,
+        repositoryPath: process.cwd(), // Use current directory for CLI
       };
 
       const taskId = await engine.createTask(taskRequest);

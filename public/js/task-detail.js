@@ -7,8 +7,10 @@ class TaskDetail {
     this.taskUpdateHandler = null;
     this.lastLogId = 0; // Track last loaded log ID for incremental loading
     this.logs = []; // Cache logs to avoid full re-render
+    this.repositories = []; // Repository data for display
 
     if (this.taskId) {
+      this.loadRepositories();
       this.loadTaskDetail();
       this.startLogRefresh();
       this.startEventStream();
@@ -101,6 +103,13 @@ class TaskDetail {
                 <span class="text-gray-600">Task ID:</span>
                 <span class="font-mono text-sm">${task.id}</span>
               </div>
+              ${this.getRepositoryInfo(task)}
+              ${task.coding_tool ? `
+                <div class="flex justify-between">
+                  <span class="text-gray-600">Coding Tool:</span>
+                  <span class="capitalize">${task.coding_tool}</span>
+                </div>
+              ` : ''}
               ${task.current_stage ? `
                 <div class="flex justify-between">
                   <span class="text-gray-600">Stage:</span>
@@ -405,6 +414,37 @@ class TaskDetail {
 
   escapeHtml(text) {
     return Utils.escapeHtml(text || '');
+  }
+
+  async loadRepositories() {
+    try {
+      const response = await fetch('/api/repositories');
+      const result = await response.json();
+
+      if (response.ok) {
+        this.repositories = result.data;
+      } else {
+        console.error('Failed to load repositories:', result.error);
+      }
+    } catch (error) {
+      console.error('Failed to load repositories:', error);
+    }
+  }
+
+  getRepositoryInfo(task) {
+    if (!task.repository_path) return '';
+    
+    const repository = this.repositories.find(repo => repo.path === task.repository_path);
+    const repositoryDisplay = repository ? 
+      `${repository.name} <span class="text-gray-500">(${repository.owner})</span>` :
+      `<span class="font-mono text-sm">${this.escapeHtml(task.repository_path)}</span>`;
+    
+    return `
+      <div class="flex justify-between">
+        <span class="text-gray-600">Repository:</span>
+        <span>${repositoryDisplay}</span>
+      </div>
+    `;
   }
 }
 

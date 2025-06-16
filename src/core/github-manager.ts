@@ -1,3 +1,12 @@
+/**
+ * GitHub Manager - Handles all GitHub API interactions
+ *
+ * This manager provides GitHub-specific functionality including:
+ * - Getting repository default branches
+ * - Creating and managing pull requests
+ * - Handling PR comments and reviews
+ */
+
 import { Octokit } from '@octokit/rest';
 import { withRetry } from '../utils/retry';
 import { DatabaseManager } from './database';
@@ -6,7 +15,7 @@ import { OpenAIManager } from './openai-manager';
 import { validateAndGetRepoInfo } from '../utils/git-utils';
 import { logger } from '../utils/logger';
 
-export class PRManager {
+export class GitHubManager {
   private octokit: Octokit;
   private db: DatabaseManager;
   private settings: SettingsManager;
@@ -28,11 +37,11 @@ export class PRManager {
     this.openaiManager = openaiManager;
   }
 
-  private async ensureInitialized() {
+  private async ensureInitialized(repositoryPath: string) {
     if (this.initialized) return;
 
     try {
-      const repoInfo = await validateAndGetRepoInfo(process.cwd());
+      const repoInfo = await validateAndGetRepoInfo(repositoryPath);
       this.repoOwner = repoInfo.owner;
       this.repoName = repoInfo.name;
       this.initialized = true;
@@ -41,12 +50,37 @@ export class PRManager {
     }
   }
 
+  /**
+   * Get the default branch for a repository using GitHub API
+   */
+  async getDefaultBranch(repositoryPath: string): Promise<string> {
+    await this.ensureInitialized(repositoryPath);
+
+    return await withRetry(async () => {
+      try {
+        const response = await this.octokit.rest.repos.get({
+          owner: this.repoOwner,
+          repo: this.repoName,
+        });
+
+        return response.data.default_branch;
+      } catch (error) {
+        logger.warn(
+          'Could not get default branch from GitHub API, falling back to "main"',
+          String(error)
+        );
+        return 'main';
+      }
+    }, 'Get default branch from GitHub');
+  }
+
   async createPRFromTask(
     branchName: string,
     taskDescription: string,
-    taskId: number
+    taskId: number,
+    repositoryPath: string
   ): Promise<{ number: number; url: string }> {
-    await this.ensureInitialized();
+    await this.ensureInitialized(repositoryPath);
 
     this.db.addTaskLog({
       task_id: taskId,
@@ -67,16 +101,23 @@ export class PRManager {
       message: `📋 Generated PR title: "${title}"`,
     });
 
-    return this.createPR(branchName, title, description, taskId);
+    return this.createPR(
+      branchName,
+      title,
+      description,
+      taskId,
+      repositoryPath
+    );
   }
 
   async createPR(
     branchName: string,
     title: string,
     description: string,
-    taskId: number
+    taskId: number,
+    repositoryPath: string
   ): Promise<{ number: number; url: string }> {
-    await this.ensureInitialized();
+    await this.ensureInitialized(repositoryPath);
 
     return await withRetry(
       async () => {
@@ -100,70 +141,43 @@ export class PRManager {
           };
         }
 
-        // Get base branch from settings
-        const baseBranch = this.settings.get('baseBranch');
+        // Get the default branch from the repository (avoid recursion by calling internal method)
+        const repoResponse = await this.octokit.rest.repos.get({
+          owner: this.repoOwner,
+          repo: this.repoName,
+        });
+        const defaultBranch = repoResponse.data.default_branch;
 
         this.db.addTaskLog({
           task_id: taskId,
           level: 'info',
-          message: `🚀 Creating new PR from ${branchName} to ${baseBranch}...`,
+          message: `🚀 Creating new PR from ${branchName} to ${defaultBranch}...`,
         });
 
         // Create new PR
-        const response = await this.octokit.rest.pulls.create({
+        const createResponse = await this.octokit.rest.pulls.create({
           owner: this.repoOwner,
           repo: this.repoName,
           title,
           body: description,
           head: branchName,
-          base: baseBranch,
+          base: defaultBranch,
         });
 
         this.db.addTaskLog({
           task_id: taskId,
           level: 'info',
-          message: `✅ PR created successfully: #${response.data.number} - ${response.data.html_url}`,
+          message: `✅ PR created successfully: #${createResponse.data.number} - ${createResponse.data.html_url}`,
         });
 
-        this.logPREvent(taskId, `PR created: #${response.data.number}`);
+        this.logPREvent(taskId, `PR created: #${createResponse.data.number}`);
 
         return {
-          number: response.data.number,
-          url: response.data.html_url,
+          number: createResponse.data.number,
+          url: createResponse.data.html_url,
         };
       },
       'Create PR',
-      3
-    );
-  }
-
-  async updatePR(
-    prNumber: number,
-    title?: string,
-    description?: string,
-    taskId?: number
-  ): Promise<void> {
-    return await withRetry(
-      async () => {
-        const updateData: any = {};
-
-        if (title) updateData.title = title;
-        if (description) updateData.body = description;
-
-        if (Object.keys(updateData).length === 0) return;
-
-        await this.octokit.rest.pulls.update({
-          owner: this.repoOwner,
-          repo: this.repoName,
-          pull_number: prNumber,
-          ...updateData,
-        });
-
-        if (taskId) {
-          this.logPREvent(taskId, `PR updated: #${prNumber}`);
-        }
-      },
-      'Update PR',
       3
     );
   }
@@ -186,36 +200,46 @@ export class PRManager {
   async pollForComments(
     prNumber: number,
     lastCommitTimestamp: string | null,
-    targetUsername: string
+    targetUsername: string,
+    repositoryPath: string
   ): Promise<any[]> {
     try {
       // Only get PR review comments (not regular PR comments)
-      const reviewComments = await this.getPRReviewComments(prNumber);
+      const reviewComments = await this.getPRReviewComments(
+        prNumber,
+        repositoryPath
+      );
 
       // Filter comments from the target user and newer than last commit timestamp
       const newComments = reviewComments.filter((comment) => {
         logger.info(
+          `comment author ${comment.user.login}, target ${targetUsername}, ` +
           `comment time ${new Date(comment.created_at)}, commit time ${lastCommitTimestamp ? new Date(lastCommitTimestamp) : 'null'}`
         );
+
         const isFromTargetUser =
           comment.user.login.toLowerCase() === targetUsername.toLowerCase();
-        const isNewer =
-          !lastCommitTimestamp ||
-          new Date(comment.created_at) > new Date(lastCommitTimestamp);
-        return isFromTargetUser && isNewer;
+        const isNewerThanCommit = lastCommitTimestamp
+          ? new Date(comment.created_at) > new Date(lastCommitTimestamp)
+          : true;
+
+        return isFromTargetUser && isNewerThanCommit;
       });
 
       return newComments;
     } catch (error) {
-      console.error('Error polling for PR review comments:', error);
+      logger.error('Failed to fetch PR comments:', String(error));
       return [];
     }
   }
 
-  async getPRReviewComments(prNumber: number): Promise<any[]> {
+  async getPRReviewComments(
+    prNumber: number,
+    repositoryPath: string
+  ): Promise<any[]> {
     return await withRetry(
       async () => {
-        await this.ensureInitialized();
+        await this.ensureInitialized(repositoryPath);
 
         const params = {
           owner: this.repoOwner,
@@ -232,35 +256,15 @@ export class PRManager {
     );
   }
 
-  async addComment(
+  async getPRStatus(
     prNumber: number,
-    comment: string,
-    taskId?: number
-  ): Promise<void> {
-    return await withRetry(
-      async () => {
-        await this.octokit.rest.issues.createComment({
-          owner: this.repoOwner,
-          repo: this.repoName,
-          issue_number: prNumber,
-          body: comment,
-        });
-
-        if (taskId) {
-          this.logPREvent(taskId, `Comment added to PR #${prNumber}`);
-        }
-      },
-      'Add PR comment',
-      2
-    );
-  }
-
-  async getPRStatus(prNumber: number): Promise<{
+    repositoryPath: string
+  ): Promise<{
     state: string;
     mergeable: boolean | null;
     merged: boolean;
   }> {
-    await this.ensureInitialized();
+    await this.ensureInitialized(repositoryPath);
 
     return await withRetry(
       async () => {
@@ -280,9 +284,6 @@ export class PRManager {
       2
     );
   }
-
-  // Note: PR merge and close functionality removed per requirements
-  // The system can only create PRs and push new commits
 
   private logPREvent(taskId: number, message: string): void {
     this.db.addTaskLog({

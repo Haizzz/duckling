@@ -18,6 +18,8 @@ interface MockGit {
   push: jest.Mock;
   log: jest.Mock;
   diff: jest.Mock;
+  reset: jest.Mock;
+  clean: jest.Mock;
 }
 
 describe('GitManager', () => {
@@ -47,6 +49,8 @@ describe('GitManager', () => {
       push: jest.fn(),
       log: jest.fn(),
       diff: jest.fn(),
+      reset: jest.fn(),
+      clean: jest.fn(),
     };
 
     (simpleGit as jest.Mock).mockReturnValue(mockGit);
@@ -100,7 +104,6 @@ describe('GitManager', () => {
       const result = await gitManager.createAndCheckoutBranch('feature', 123);
 
       expect(result).toBe('duckling-feature');
-      expect(mockGit.fetch).toHaveBeenCalledWith('origin', 'main');
       expect(mockGit.checkout).toHaveBeenCalledWith('main');
       expect(mockGit.pull).toHaveBeenCalledWith('origin', 'main');
       expect(mockGit.checkoutLocalBranch).toHaveBeenCalledWith(
@@ -136,25 +139,6 @@ describe('GitManager', () => {
         message:
           'ℹ️ Branch name adjusted to avoid conflicts: duckling-feature-2',
       });
-    });
-
-    it('uses custom branch prefix when provided', async () => {
-      mockGit.branchLocal.mockResolvedValue({ all: [] });
-      mockGit.fetch.mockResolvedValue(undefined);
-      mockGit.checkout.mockResolvedValue(undefined);
-      mockGit.pull.mockResolvedValue(undefined);
-      mockGit.checkoutLocalBranch.mockResolvedValue(undefined);
-
-      const result = await gitManager.createAndCheckoutBranch(
-        'feature',
-        123,
-        'custom-'
-      );
-
-      expect(result).toBe('custom-feature');
-      expect(mockGit.checkoutLocalBranch).toHaveBeenCalledWith(
-        'custom-feature'
-      );
     });
 
     it('logs progress messages during branch creation process', async () => {

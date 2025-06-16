@@ -2,6 +2,7 @@
 class Dashboard {
   constructor() {
     this.loadedTasks = [];
+    this.repositories = [];
     this.currentPage = 1;
     this.tasksPerPage = 5;
     this.isLoading = false;
@@ -13,6 +14,7 @@ class Dashboard {
 
   init() {
     this.bindEvents();
+    this.loadRepositories();
     this.loadTasks();
     this.startPolling();
     this.checkRequiredSettings();
@@ -152,13 +154,20 @@ class Dashboard {
 
   async createTask() {
     const taskInput = document.getElementById('task-input');
+    const repositorySelect = document.getElementById('repository-select');
     const submitBtn = document.getElementById('submit-task');
 
     // Don't proceed if inputs are disabled
     if (taskInput.disabled || submitBtn.disabled) return;
 
     const description = taskInput.value.trim();
+    const repositoryPath = repositorySelect.value;
+    
     if (!description) return;
+    if (!repositoryPath) {
+      Utils.showToast('Please select a repository', 'error');
+      return;
+    }
 
     // Store original icon and show spinner
     const originalIcon = submitBtn.innerHTML;
@@ -174,7 +183,7 @@ class Dashboard {
       const response = await fetch('/api/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ description })
+        body: JSON.stringify({ description, repositoryPath })
       });
 
       if (response.ok) {
@@ -283,6 +292,12 @@ class Dashboard {
       `<span class="text-sm text-gray-600 font-mono">${this.escapeHtml(task.branch_name)}</span>` :
       '<span class="text-gray-400 text-sm">No branch yet</span>';
 
+    // Get repository info
+    const repository = this.repositories.find(repo => repo.path === task.repository_path);
+    const repositoryInfo = repository ? 
+      `<span class="text-sm text-gray-600">${repository.name}</span>` :
+      `<span class="text-sm text-gray-500 font-mono">${this.escapeHtml(task.repository_path || 'Unknown')}</span>`;
+
     // Generate a summary from the description (first 80 chars)
     const summary = task.summary || task.description.substring(0, 80) + (task.description.length > 80 ? '...' : '');
 
@@ -302,8 +317,12 @@ class Dashboard {
         </div>
         
         
-        <!-- Branch Name -->
-        <div class="mb-3">
+        <!-- Repository and Branch -->
+        <div class="mb-3 space-y-2">
+          <div class="flex items-center space-x-2">
+            <span class="text-sm font-medium text-gray-600">Repository:</span>
+            ${repositoryInfo}
+          </div>
           <div class="flex items-center space-x-2">
             <span class="text-sm font-medium text-gray-600">Branch:</span>
             ${branchName}
@@ -501,6 +520,61 @@ class Dashboard {
 
   escapeHtml(text) {
     return Utils.escapeHtml(text || '');
+  }
+
+  async loadRepositories() {
+    try {
+      const response = await fetch('/api/repositories');
+      const result = await response.json();
+
+      if (response.ok) {
+        this.repositories = result.data;
+        this.updateRepositoryUI();
+      } else {
+        console.error('Failed to load repositories:', result.error);
+        this.updateRepositoryUI(); // Show no repos warning
+      }
+    } catch (error) {
+      console.error('Failed to load repositories:', error);
+      this.updateRepositoryUI(); // Show no repos warning
+    }
+  }
+
+  updateRepositoryUI() {
+    const repositorySelection = document.getElementById('repository-selection');
+    const repositorySelect = document.getElementById('repository-select');
+    const noReposWarning = document.getElementById('no-repos-task-warning');
+    const submitBtn = document.getElementById('submit-task');
+
+    if (this.repositories.length === 0) {
+      // No repositories - show warning, hide selection, disable submit
+      repositorySelection.classList.add('hidden');
+      noReposWarning.classList.remove('hidden');
+      submitBtn.disabled = true;
+    } else {
+      // Has repositories - show selection, hide warning, enable submit
+      repositorySelection.classList.remove('hidden');
+      noReposWarning.classList.add('hidden');
+      
+      // Populate repository dropdown
+      repositorySelect.innerHTML = `
+        <option value="">Select a repository...</option>
+        ${this.repositories.map(repo => `
+          <option value="${repo.path}">${repo.name} (${repo.path})</option>
+        `).join('')}
+      `;
+
+      // Enable submit button when repository is selected
+      repositorySelect.addEventListener('change', () => {
+        submitBtn.disabled = !repositorySelect.value;
+      });
+
+      // Set first repository as default if only one
+      if (this.repositories.length === 1) {
+        repositorySelect.value = this.repositories[0].path;
+        submitBtn.disabled = false;
+      }
+    }
   }
 }
 

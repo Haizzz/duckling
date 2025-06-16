@@ -12,7 +12,8 @@ export class PrecommitManager {
   }
 
   async runChecks(
-    taskId: number
+    taskId: number,
+    repositoryPath: string
   ): Promise<{ passed: boolean; errors: string[] }> {
     const checks = this.db.getEnabledPrecommitChecks();
     const errors: string[] = [];
@@ -21,7 +22,7 @@ export class PrecommitManager {
 
     for (const check of checks) {
       try {
-        await this.runSingleCheck(check, taskId);
+        await this.runSingleCheck(check, taskId, repositoryPath);
         this.logCheckResult(taskId, check.name, true, null);
       } catch (error: any) {
         const errorMessage = `${check.name}: ${error.message}`;
@@ -44,7 +45,8 @@ export class PrecommitManager {
 
   private async runSingleCheck(
     check: PrecommitCheck,
-    taskId: number
+    taskId: number,
+    repositoryPath: string
   ): Promise<void> {
     logger.info(`Running precommit check: ${check.name}`, taskId.toString());
 
@@ -53,7 +55,7 @@ export class PrecommitManager {
         const result = await execShellCommand(check.command, {
           taskId: taskId.toString(),
           timeout: 300000, // 5 minutes timeout
-          cwd: process.cwd(),
+          cwd: repositoryPath,
         });
 
         if (result.exitCode !== 0) {

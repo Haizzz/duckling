@@ -84,6 +84,7 @@ describe('DatabaseManager', () => {
         description: 'Test Description',
         status: 'pending',
         coding_tool: 'amp',
+        repository_path: '/test/repo',
         summary: 'Test Summary',
         current_stage: 'planning',
         branch_name: 'test-branch',
@@ -120,6 +121,7 @@ describe('DatabaseManager', () => {
         description: 'Test Description',
         status: 'pending',
         coding_tool: 'amp',
+        repository_path: '/test/repo',
       };
 
       mockStmt.run.mockReturnValue({ lastInsertRowid: 2 });
@@ -193,6 +195,7 @@ describe('DatabaseManager', () => {
         description: 'Test Description',
         status: 'pending',
         coding_tool: 'amp',
+        repository_path: '/test/repo',
         created_at: '2023-01-01T00:00:00Z',
         updated_at: '2023-01-01T00:00:00Z',
       };
@@ -225,6 +228,7 @@ describe('DatabaseManager', () => {
         description: 'Description 1',
         status: 'pending',
         coding_tool: 'amp',
+        repository_path: '/test/repo',
         created_at: '2023-01-01T00:00:00Z',
         updated_at: '2023-01-01T00:00:00Z',
       },
@@ -234,6 +238,7 @@ describe('DatabaseManager', () => {
         description: 'Description 2',
         status: 'completed',
         coding_tool: 'openai',
+        repository_path: '/test/repo',
         created_at: '2023-01-02T00:00:00Z',
         updated_at: '2023-01-02T00:00:00Z',
       },
@@ -641,6 +646,7 @@ describe('DatabaseManager', () => {
           description: 'Test',
           status: 'pending',
           coding_tool: 'amp',
+          repository_path: '/test/repo',
         })
       ).toThrow('Statement preparation failed');
     });
@@ -662,6 +668,7 @@ describe('DatabaseManager', () => {
           description: 'Test',
           status: 'pending',
           coding_tool: 'amp',
+          repository_path: '/test/repo',
         })
       ).toThrow('Statement execution failed');
     });

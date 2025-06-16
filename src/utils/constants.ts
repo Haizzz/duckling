@@ -20,7 +20,6 @@ export const DEFAULT_SETTINGS = {
   prTitlePrefix: '[DUCKLING]',
   commitSuffix: ' [quack]',
   maxRetries: 3,
-  baseBranch: 'main',
 } as const;
 
 // Git settings
