@@ -44,7 +44,7 @@ export function runMultiRepositoryMigration(
         .all();
       if (tasksWithoutRepo.length > 0) {
         db.prepare(
-          'UPDATE tasks SET repository_path = ? WHERE repository_path = ""'
+          "UPDATE tasks SET repository_path = ? WHERE repository_path = ''"
         ).run(currentWorkingDirectory);
 
         console.log(

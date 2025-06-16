@@ -77,7 +77,6 @@ class Settings {
 
     // Task configuration
     document.getElementById('branch-prefix').value = settings.branchPrefix || 'duckling-';
-    document.getElementById('base-branch').value = settings.baseBranch || 'main';
     document.getElementById('pr-title-prefix').value = settings.prTitlePrefix || '[DUCKLING]';
     document.getElementById('commit-suffix').value = settings.commitSuffix || ' [quack]';
     document.getElementById('max-retries').value = settings.maxRetries || 3;
@@ -114,9 +113,11 @@ class Settings {
         this.showSuccess();
       } else {
         const error = await response.json();
-        this.showError(error.message || 'Failed to save settings');
+        console.error('Server error saving settings:', error);
+        this.showError(error.message || error.error || 'Failed to save settings');
       }
     } catch (error) {
+      console.error('Error saving settings:', error);
       this.showError('Failed to save settings: ' + error.message);
     }
   }
@@ -349,12 +350,8 @@ class Settings {
     container.innerHTML = this.repositories.map(repo => `
       <div class="flex items-center justify-between p-3 bg-gray-50 rounded-md">
         <div class="flex-1">
-          <div class="flex items-center space-x-2">
-            <span class="font-medium text-gray-900">${repo.name}</span>
-            <span class="text-sm text-gray-500">(${repo.owner})</span>
-          </div>
+          <div class="font-medium text-gray-900">${repo.name}</div>
           <div class="text-sm text-gray-600 mt-1">${repo.path}</div>
-          
         </div>
         <button 
           onclick="settings.removeRepository(${repo.id})"

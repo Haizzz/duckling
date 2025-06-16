@@ -65,6 +65,9 @@ class TaskDetail {
     const summary = task.summary || task.description.substring(0, 80) + (task.description.length > 80 ? '...' : '');
     const canCancel = task.status !== 'completed' && task.status !== 'cancelled' && task.status !== 'failed';
 
+    // Update page title with task summary
+    document.title = `Duckling - ${summary}`;
+
     container.innerHTML = `
       <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
         <!-- Header -->
