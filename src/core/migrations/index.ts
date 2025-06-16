@@ -12,6 +12,7 @@ export function runMultiRepositoryMigration(
   db: Database,
   currentWorkingDirectory: string
 ): void {
+  return
   console.log('Running database migrations...');
 
   // Get current columns in tasks table
@@ -31,7 +32,6 @@ export function runMultiRepositoryMigration(
   for (const column of columnsToAdd) {
     if (!columnNames.includes(column.name)) {
       const sql = `ALTER TABLE tasks ADD COLUMN ${column.definition}`;
-      fs.writeFileSync('query.sql', sql);
       db.exec(sql);
       console.log(`Added ${column.name} column to tasks table`);
     } else {
