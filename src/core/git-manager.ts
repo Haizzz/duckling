@@ -77,7 +77,9 @@ export class GitManager {
         message: `🔄 Switching to ${baseBranch} and pulling latest...`,
       });
 
-      // Switch to base branch and pull latest
+      // Discard any local changes and untracked files, then switch to base branch
+      await this.git.reset(['--hard']);
+      await this.git.clean('f', ['-d']);
       await this.git.checkout(baseBranch);
       await this.git.pull('origin', baseBranch);
 
@@ -222,6 +224,10 @@ export class GitManager {
           `Fetching and switching to branch: ${branchName}`,
           taskId.toString()
         );
+
+      // Discard all local changes and untracked files to ensure clean state
+      await this.git.reset(['--hard']);
+      await this.git.clean('f', ['-d']);
 
       // Fetch the specific branch to ensure we have latest changes
       await this.git.fetch('origin', branchName);
