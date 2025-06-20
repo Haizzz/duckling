@@ -226,7 +226,22 @@ export class CoreEngine extends EventEmitter {
         // If there are new comments, concatenate them and address all at once
         if (result.comments.length > 0) {
           const concatenatedComments = result.comments
-            .map((c) => c.body)
+            .map((c) => {
+              let comment = '';
+              if (c.path) comment += `File: ${c.path}\n`;
+              if (c.diff_hunk) comment += `Diff: ${c.diff_hunk}\n`;
+              if (c.line !== undefined) comment += `Line: ${c.line}\n`;
+              if (c.original_line !== undefined) comment += `Original Line: ${c.original_line}\n`;
+              if (c.start_line !== undefined) comment += `Start Line: ${c.start_line}\n`;
+              if (c.original_start_line !== undefined) comment += `Original Start Line: ${c.original_start_line}\n`;
+              if (c.side) comment += `Side: ${c.side}\n`;
+              if (c.start_side) comment += `Start Side: ${c.start_side}\n`;
+              if (c.position !== undefined) comment += `Position: ${c.position}\n`;
+              if (c.original_position !== undefined) comment += `Original Position: ${c.original_position}\n`;
+              if (c.subject_type) comment += `Subject Type: ${c.subject_type}\n`;
+              comment += `Body: ${c.body}`;
+              return comment;
+            })
             .join('\n\n---\n\n');
 
           this.db.addTaskLog({
@@ -507,7 +522,21 @@ export class CoreEngine extends EventEmitter {
     taskId: number,
     prNumber: number
   ): Promise<{
-    comments: Array<{ id: string; body: string }>;
+    comments: Array<{
+      id: string;
+      body: string;
+      path?: string;
+      diff_hunk?: string;
+      line?: number;
+      original_line?: number;
+      start_line?: number;
+      original_start_line?: number;
+      side?: string;
+      start_side?: string;
+      position?: number;
+      original_position?: number;
+      subject_type?: string;
+    }>;
     statusUpdate?: 'completed' | 'cancelled';
   }> {
     logger.info(`Collecting PR comments for task: ${taskId} ${prNumber}`);
