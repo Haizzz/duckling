@@ -220,9 +220,10 @@ class Dashboard {
           this.loadedTasks.push(...result.data.tasks);
         }
 
-        this.hasMore = result.data.tasks.length === this.tasksPerPage;
+        // Use pagination info to determine if there are more tasks
+        const pagination = result.data.pagination;
+        this.hasMore = pagination ? this.currentPage < pagination.totalPages : result.data.tasks.length === this.tasksPerPage;
         this.renderTasks();
-        this.updateLoadMoreButton();
       } else {
         throw new Error(result.error || 'Failed to load tasks');
       }
@@ -234,6 +235,7 @@ class Dashboard {
       if (loadingEl) {
         loadingEl.classList.add('hidden');
       }
+      this.updateLoadMoreButton();
     }
   }
 
