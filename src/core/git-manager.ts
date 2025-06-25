@@ -24,7 +24,7 @@ export class GitManager {
     this.settings = new SettingsManager(db);
     this.openaiManager = openaiManager || new OpenAIManager(db);
     this.repoPath = repoPath;
-    
+
     // Validate git repository before initializing SimpleGit
     this.validateGitRepo();
     this.git = simpleGit(repoPath);
@@ -39,7 +39,9 @@ export class GitManager {
     // Check if directory is a git repository
     const gitDir = path.join(this.repoPath, '.git');
     if (!fs.existsSync(gitDir)) {
-      throw new Error(`Not a git repository: ${this.repoPath}. Please ensure the server is started from within a git repository.`);
+      throw new Error(
+        `Not a git repository: ${this.repoPath}. Please ensure the server is started from within a git repository.`
+      );
     }
   }
 

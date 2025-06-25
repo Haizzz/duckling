@@ -205,18 +205,15 @@ export class GitHubManager {
   ): Promise<string[]> {
     try {
       // Get PR reviews (not individual review comments)
-      const reviews = await this.getPRReviews(
-        prNumber,
-        repositoryPath
-      );
+      const reviews = await this.getPRReviews(prNumber, repositoryPath);
 
       // Filter reviews from the target user and newer than last commit timestamp
       // Only consider actual reviews with state (APPROVED, CHANGES_REQUESTED, COMMENTED)
       const newReviews = reviews.filter((review) => {
         logger.info(
           `review author ${review.user.login}, target ${targetUsername}, ` +
-          `review time ${new Date(review.submitted_at)}, commit time ${lastCommitTimestamp ? new Date(lastCommitTimestamp) : 'null'}, ` +
-          `review state ${review.state}`
+            `review time ${new Date(review.submitted_at)}, commit time ${lastCommitTimestamp ? new Date(lastCommitTimestamp) : 'null'}, ` +
+            `review state ${review.state}`
         );
 
         const isFromTargetUser =
@@ -233,8 +230,8 @@ export class GitHubManager {
       // For each review, combine review body and line comments into a formatted string
       const formattedReviews = [];
       // Get all review IDs from new reviews to check if replies are within this set
-      const newReviewIds = new Set(newReviews.map(r => r.id));
-      
+      const newReviewIds = new Set(newReviews.map((r) => r.id));
+
       for (const review of newReviews) {
         let reviewString = `Review by ${review.user.login} (${review.state}):\n`;
         let reviewComments = [];
@@ -253,7 +250,7 @@ export class GitHubManager {
           );
 
           // Filter out comments that are replies to comments NOT in our current review set
-          const originalComments = reviewComments.filter(comment => {
+          const originalComments = reviewComments.filter((comment) => {
             if (!comment.in_reply_to_id) return true; // Not a reply, include it
             // Check if the reply is to a comment in one of our new reviews
             return newReviewIds.has(comment.in_reply_to_id);
@@ -263,13 +260,18 @@ export class GitHubManager {
             reviewString += `Line Comments:\n`;
             for (const comment of originalComments) {
               if (comment.path) reviewString += `File: ${comment.path}\n`;
-              if (comment.line !== undefined) reviewString += `Line: ${comment.line}\n`;
-              if (comment.diff_hunk) reviewString += `Context: ${comment.diff_hunk}\n`;
+              if (comment.line !== undefined)
+                reviewString += `Line: ${comment.line}\n`;
+              if (comment.diff_hunk)
+                reviewString += `Context: ${comment.diff_hunk}\n`;
               reviewString += `Comment: ${comment.body}\n\n`;
             }
           }
         } catch (error) {
-          logger.error(`Failed to get comments for review ${review.id}:`, String(error));
+          logger.error(
+            `Failed to get comments for review ${review.id}:`,
+            String(error)
+          );
         }
 
         // Include all reviews from the target user (body or line comments)
@@ -288,10 +290,7 @@ export class GitHubManager {
     }
   }
 
-  async getPRReviews(
-    prNumber: number,
-    repositoryPath: string
-  ): Promise<any[]> {
+  async getPRReviews(prNumber: number, repositoryPath: string): Promise<any[]> {
     return await withRetry(
       async () => {
         await this.ensureInitialized(repositoryPath);
@@ -326,7 +325,8 @@ export class GitHubManager {
           review_id: reviewId,
         };
 
-        const response = await this.octokit.rest.pulls.listCommentsForReview(params);
+        const response =
+          await this.octokit.rest.pulls.listCommentsForReview(params);
         return response.data;
       },
       'Get comments for review',
