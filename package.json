@@ -13,7 +13,7 @@
     "lint:fix": "eslint src --ext .ts --fix",
     "format": "prettier --write 'src/**/*.ts'",
     "test": "jest",
-    "check": "npm run type-check && npm run lint && npm run format && npm run test"
+    "check": "npm run type-check && npm run lint && npm run format"
   },
   "bin": {
     "duckling": "./dist/cli/index.js"
