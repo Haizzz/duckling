@@ -1,22 +1,11 @@
 import { DatabaseManager } from './core/database';
 import { CoreEngine } from './core/engine';
 import { APIServer } from './api/server';
-import { validateAndGetRepoInfo, getGitHubUrl } from './utils/git-utils';
 
 export async function startDuckling(port: number = 5050): Promise<void> {
   console.log('🚀 Starting Duckling...');
 
   const db = new DatabaseManager();
-
-  // Validate git repository (but don't store URL as it's not needed)
-  try {
-    const repoInfo = await validateAndGetRepoInfo(process.cwd());
-    const githubUrl = getGitHubUrl(repoInfo);
-    console.log(`📁 Repository: ${githubUrl}`);
-  } catch (error: any) {
-    console.warn(`⚠️  Could not determine repository URL: ${error.message}`);
-  }
-
   const engine = new CoreEngine(db);
   const server = new APIServer(db, engine);
 

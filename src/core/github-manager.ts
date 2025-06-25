@@ -202,35 +202,136 @@ export class GitHubManager {
     lastCommitTimestamp: string | null,
     targetUsername: string,
     repositoryPath: string
-  ): Promise<any[]> {
+  ): Promise<string[]> {
     try {
-      // Only get PR review comments (not regular PR comments)
-      const reviewComments = await this.getPRReviewComments(
+      // Get PR reviews (not individual review comments)
+      const reviews = await this.getPRReviews(
         prNumber,
         repositoryPath
       );
 
-      // Filter comments from the target user and newer than last commit timestamp
-      const newComments = reviewComments.filter((comment) => {
+      // Filter reviews from the target user and newer than last commit timestamp
+      // Only consider actual reviews with state (APPROVED, CHANGES_REQUESTED, COMMENTED)
+      const newReviews = reviews.filter((review) => {
         logger.info(
-          `comment author ${comment.user.login}, target ${targetUsername}, ` +
-            `comment time ${new Date(comment.created_at)}, commit time ${lastCommitTimestamp ? new Date(lastCommitTimestamp) : 'null'}`
+          `review author ${review.user.login}, target ${targetUsername}, ` +
+          `review time ${new Date(review.submitted_at)}, commit time ${lastCommitTimestamp ? new Date(lastCommitTimestamp) : 'null'}, ` +
+          `review state ${review.state}`
         );
 
         const isFromTargetUser =
-          comment.user.login.toLowerCase() === targetUsername.toLowerCase();
+          review.user.login.toLowerCase() === targetUsername.toLowerCase();
         const isNewerThanCommit = lastCommitTimestamp
-          ? new Date(comment.created_at) > new Date(lastCommitTimestamp)
+          ? new Date(review.submitted_at) > new Date(lastCommitTimestamp)
           : true;
+        // Only consider submitted reviews (not PENDING state)
+        const isSubmittedReview = review.state && review.state !== 'PENDING';
 
-        return isFromTargetUser && isNewerThanCommit;
+        return isFromTargetUser && isNewerThanCommit && isSubmittedReview;
       });
 
-      return newComments;
+      // For each review, combine review body and line comments into a formatted string
+      const formattedReviews = [];
+      // Get all review IDs from new reviews to check if replies are within this set
+      const newReviewIds = new Set(newReviews.map(r => r.id));
+      
+      for (const review of newReviews) {
+        let reviewString = `Review by ${review.user.login} (${review.state}):\n`;
+        let reviewComments = [];
+
+        // Add review body if it exists
+        if (review.body && review.body.trim()) {
+          reviewString += `Overall Comment: ${review.body}\n\n`;
+        }
+
+        // Get individual line comments for this review
+        try {
+          reviewComments = await this.getCommentsForReview(
+            prNumber,
+            review.id,
+            repositoryPath
+          );
+
+          // Filter out comments that are replies to comments NOT in our current review set
+          const originalComments = reviewComments.filter(comment => {
+            if (!comment.in_reply_to_id) return true; // Not a reply, include it
+            // Check if the reply is to a comment in one of our new reviews
+            return newReviewIds.has(comment.in_reply_to_id);
+          });
+
+          if (originalComments.length > 0) {
+            reviewString += `Line Comments:\n`;
+            for (const comment of originalComments) {
+              if (comment.path) reviewString += `File: ${comment.path}\n`;
+              if (comment.line !== undefined) reviewString += `Line: ${comment.line}\n`;
+              if (comment.diff_hunk) reviewString += `Context: ${comment.diff_hunk}\n`;
+              reviewString += `Comment: ${comment.body}\n\n`;
+            }
+          }
+        } catch (error) {
+          logger.error(`Failed to get comments for review ${review.id}:`, String(error));
+        }
+
+        // Include all reviews from the target user (body or line comments)
+        const hasBody = review.body && review.body.trim();
+        const hasComments = reviewComments.length > 0;
+
+        if (hasBody || hasComments) {
+          formattedReviews.push(reviewString.trim());
+        }
+      }
+
+      return formattedReviews;
     } catch (error) {
-      logger.error('Failed to fetch PR comments:', String(error));
+      logger.error('Failed to fetch PR reviews:', String(error));
       return [];
     }
+  }
+
+  async getPRReviews(
+    prNumber: number,
+    repositoryPath: string
+  ): Promise<any[]> {
+    return await withRetry(
+      async () => {
+        await this.ensureInitialized(repositoryPath);
+
+        const params = {
+          owner: this.repoOwner,
+          repo: this.repoName,
+          pull_number: prNumber,
+        };
+
+        const response = await this.octokit.rest.pulls.listReviews(params);
+        return response.data;
+      },
+      'Get PR reviews',
+      2
+    );
+  }
+
+  async getCommentsForReview(
+    prNumber: number,
+    reviewId: number,
+    repositoryPath: string
+  ): Promise<any[]> {
+    return await withRetry(
+      async () => {
+        await this.ensureInitialized(repositoryPath);
+
+        const params = {
+          owner: this.repoOwner,
+          repo: this.repoName,
+          pull_number: prNumber,
+          review_id: reviewId,
+        };
+
+        const response = await this.octokit.rest.pulls.listCommentsForReview(params);
+        return response.data;
+      },
+      'Get comments for review',
+      2
+    );
   }
 
   async getPRReviewComments(

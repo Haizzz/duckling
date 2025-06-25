@@ -471,8 +471,8 @@ describe('CoreEngine', () => {
         '2023-01-01T12:00:00Z'
       );
       mockGitHubManager.pollForComments.mockResolvedValue([
-        { id: '1', body: 'Please fix the formatting' },
-        { id: '2', body: 'Add more tests' },
+        'Review by user1 (CHANGES_REQUESTED):\nOverall Comment: Please fix the formatting',
+        'Review by user1 (COMMENTED):\nLine Comments:\nFile: src/test.js\nLine: 10\nComment: Add more tests',
       ]);
       mockGitHubManager.getPRStatus.mockResolvedValue({
         merged: false,
