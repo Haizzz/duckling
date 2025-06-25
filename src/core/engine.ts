@@ -32,7 +32,12 @@ export class CoreEngine extends EventEmitter {
   }
 
   private getGitManager(repositoryPath: string): GitManager {
-    return new GitManager(this.db, repositoryPath, this.openaiManager);
+    try {
+      return new GitManager(this.db, repositoryPath, this.openaiManager);
+    } catch (error: any) {
+      logger.error(`Failed to initialize GitManager: ${error.message}`);
+      throw new Error(`Git repository validation failed: ${error.message}`);
+    }
   }
 
   private getGitHubManager(): GitHubManager {

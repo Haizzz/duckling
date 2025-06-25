@@ -5,6 +5,8 @@ import { DatabaseManager } from './database';
 import { SettingsManager } from './settings-manager';
 import { OpenAIManager } from './openai-manager';
 import { GitHubManager } from './github-manager';
+import * as path from 'path';
+import * as fs from 'fs';
 
 export class GitManager {
   private git: SimpleGit;
@@ -18,11 +20,27 @@ export class GitManager {
     repoPath: string,
     openaiManager?: OpenAIManager
   ) {
-    this.git = simpleGit(repoPath);
     this.db = db;
     this.settings = new SettingsManager(db);
     this.openaiManager = openaiManager || new OpenAIManager(db);
     this.repoPath = repoPath;
+    
+    // Validate git repository before initializing SimpleGit
+    this.validateGitRepo();
+    this.git = simpleGit(repoPath);
+  }
+
+  private validateGitRepo(): void {
+    // Check if directory exists
+    if (!fs.existsSync(this.repoPath)) {
+      throw new Error(`Repository path does not exist: ${this.repoPath}`);
+    }
+
+    // Check if directory is a git repository
+    const gitDir = path.join(this.repoPath, '.git');
+    if (!fs.existsSync(gitDir)) {
+      throw new Error(`Not a git repository: ${this.repoPath}. Please ensure the server is started from within a git repository.`);
+    }
   }
 
   async getLastCommitTimestamp(branchName: string): Promise<string> {
