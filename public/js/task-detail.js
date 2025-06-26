@@ -23,6 +23,14 @@ class TaskDetail {
       this.stopLogRefresh();
       this.stopEventStream();
     });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (event) => {
+      const target = event.target;
+      if (!target.closest('#task-actions-menu') && !target.closest('#task-actions-dropdown')) {
+        this.hideTaskDropdown();
+      }
+    });
   }
 
   getTaskIdFromUrl() {
@@ -64,6 +72,7 @@ class TaskDetail {
 
     const summary = task.summary || task.description.substring(0, 80) + (task.description.length > 80 ? '...' : '');
     const canCancel = task.status !== 'completed' && task.status !== 'cancelled' && task.status !== 'failed';
+    const canComplete = task.status !== 'completed' && task.status !== 'cancelled' && task.status !== 'failed';
 
     // Update page title with task summary
     document.title = `Duckling - ${summary}`;
@@ -78,13 +87,48 @@ class TaskDetail {
               ${statusBadge}
             </div>
           </div>
-          ${canCancel ? `
-            <button 
-              onclick="TaskDetailInstance.cancelTask()"
-              class="px-4 py-2 border border-red-300 text-red-600 rounded hover:bg-red-600 hover:text-white hover:border-red-600 transition-all duration-200 focus:outline-none"
-            >
-              Cancel Task
-            </button>
+          ${(canCancel || canComplete) ? `
+            <div class="relative inline-block text-left">
+              <button 
+                onclick="TaskDetailInstance.toggleTaskDropdown()"
+                class="px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition-all duration-200 focus:outline-none inline-flex items-center"
+                id="task-actions-menu"
+              >
+                Actions
+                <svg class="ml-2 h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                </svg>
+              </button>
+              <div 
+                id="task-actions-dropdown" 
+                class="hidden absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-md shadow-lg z-10"
+              >
+                <div class="py-1">
+                  ${canComplete ? `
+                    <button 
+                      onclick="TaskDetailInstance.completeTask()"
+                      class="block w-full text-left px-4 py-2 text-sm text-green-700 hover:bg-green-50 hover:text-green-800"
+                    >
+                      <svg class="inline-block w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                      </svg>
+                      Mark as Complete
+                    </button>
+                  ` : ''}
+                  ${canCancel ? `
+                    <button 
+                      onclick="TaskDetailInstance.cancelTask()"
+                      class="block w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50 hover:text-red-800"
+                    >
+                      <svg class="inline-block w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                      </svg>
+                      Cancel Task
+                    </button>
+                  ` : ''}
+                </div>
+              </div>
+            </div>
           ` : ''}
         </div>
 
@@ -342,8 +386,9 @@ class TaskDetail {
       });
 
       if (response.ok) {
-        // Reload the page to show updated status
-        window.location.reload();
+        this.hideTaskDropdown();
+        // Don't reload immediately - let real-time updates handle it
+        // The SSE will send a task-update event for the cancelled task
       } else {
         const result = await response.json();
         throw new Error(result.error || 'Failed to cancel task');
@@ -351,6 +396,46 @@ class TaskDetail {
     } catch (error) {
       console.error('Error cancelling task:', error);
       alert('Failed to cancel task. Please try again.');
+    }
+  }
+
+  async completeTask() {
+    if (!confirm('Are you sure you want to mark this task as complete?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/tasks/${this.taskId}/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (response.ok) {
+        this.hideTaskDropdown();
+        // Don't reload immediately - let real-time updates handle it
+        // The SSE will send a task-update event for the completed task
+      } else {
+        const result = await response.json();
+        throw new Error(result.error || 'Failed to complete task');
+      }
+    } catch (error) {
+      console.error('Error completing task:', error);
+      alert('Failed to complete task. Please try again.');
+    }
+  }
+
+  toggleTaskDropdown() {
+    const dropdown = document.getElementById('task-actions-dropdown');
+    
+    if (dropdown) {
+      dropdown.classList.toggle('hidden');
+    }
+  }
+
+  hideTaskDropdown() {
+    const dropdown = document.getElementById('task-actions-dropdown');
+    if (dropdown) {
+      dropdown.classList.add('hidden');
     }
   }
 

@@ -35,6 +35,16 @@ class Dashboard {
         this.loadMoreTasks();
       });
     }
+
+    // Close dropdowns when clicking outside
+    document.addEventListener('click', (event) => {
+      const target = event.target;
+      if (!target.closest('[id^="task-menu-"]') && !target.closest('[id^="task-dropdown-"]')) {
+        document.querySelectorAll('[id^="task-dropdown-"]').forEach(dropdown => {
+          dropdown.classList.add('hidden');
+        });
+      }
+    });
   }
 
 
@@ -298,6 +308,7 @@ class Dashboard {
     const summary = task.summary || task.description.substring(0, 80) + (task.description.length > 80 ? '...' : '');
 
     const canCancel = task.status !== 'completed' && task.status !== 'cancelled' && task.status !== 'failed';
+    const canComplete = task.status !== 'completed' && task.status !== 'cancelled' && task.status !== 'failed';
 
     return `
       <div class="task-card bg-white border border-gray-200 rounded-lg p-6 hover:shadow-sm transition-shadow" data-task-id="${task.id}">
@@ -333,19 +344,48 @@ class Dashboard {
           </div>
         </div>
         
-        <!-- Created / Updated / Cancel -->
+        <!-- Created / Updated / Actions -->
         <div class="flex justify-between items-center pt-3 border-t border-gray-100">
           <div class="flex space-x-4 text-sm text-gray-500">
             <span>Created ${createdDate}</span>
             <span>Updated ${updatedDate}</span>
           </div>
-          ${canCancel ? `
-            <button 
-              onclick="window.Dashboard.cancelTask('${task.id}')"
-              class="text-sm text-red-600 hover:text-red-800 hover:underline focus:outline-none"
-            >
-              Cancel Task
-            </button>
+          ${(canCancel || canComplete) ? `
+            <div class="relative inline-block text-left">
+              <button 
+                onclick="window.Dashboard.toggleTaskDropdown('${task.id}')"
+                class="text-sm text-gray-600 hover:text-gray-800 focus:outline-none inline-flex items-center"
+                id="task-menu-${task.id}"
+              >
+                Actions
+                <svg class="ml-1 h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                </svg>
+              </button>
+              <div 
+                id="task-dropdown-${task.id}" 
+                class="hidden absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-10"
+              >
+                <div class="py-1">
+                  ${canComplete ? `
+                    <button 
+                      onclick="window.Dashboard.completeTask('${task.id}')"
+                      class="block w-full text-left px-4 py-2 text-sm text-green-700 hover:bg-green-50 hover:text-green-800"
+                    >
+                      Mark as Complete
+                    </button>
+                  ` : ''}
+                  ${canCancel ? `
+                    <button 
+                      onclick="window.Dashboard.cancelTask('${task.id}')"
+                      class="block w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50 hover:text-red-800"
+                    >
+                      Cancel Task
+                    </button>
+                  ` : ''}
+                </div>
+              </div>
+            </div>
           ` : ''}
         </div>
       </div>
@@ -502,6 +542,7 @@ class Dashboard {
       if (response.ok) {
         // Don't refresh immediately - let real-time updates handle it
         // The SSE will send a task-update event for the cancelled task
+        this.hideTaskDropdown(taskId);
       } else {
         const result = await response.json();
         throw new Error(result.error || 'Failed to cancel task');
@@ -509,6 +550,54 @@ class Dashboard {
     } catch (error) {
       console.error('Error cancelling task:', error);
       this.showError('Failed to cancel task. Please try again.');
+    }
+  }
+
+  async completeTask(taskId) {
+    if (!confirm('Are you sure you want to mark this task as complete?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/tasks/${taskId}/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (response.ok) {
+        // Don't refresh immediately - let real-time updates handle it
+        // The SSE will send a task-update event for the completed task
+        this.hideTaskDropdown(taskId);
+      } else {
+        const result = await response.json();
+        throw new Error(result.error || 'Failed to complete task');
+      }
+    } catch (error) {
+      console.error('Error completing task:', error);
+      this.showError('Failed to complete task. Please try again.');
+    }
+  }
+
+  toggleTaskDropdown(taskId) {
+    const dropdown = document.getElementById(`task-dropdown-${taskId}`);
+    
+    // Hide all other dropdowns first
+    document.querySelectorAll('[id^="task-dropdown-"]').forEach(el => {
+      if (el.id !== `task-dropdown-${taskId}`) {
+        el.classList.add('hidden');
+      }
+    });
+
+    // Toggle current dropdown
+    if (dropdown) {
+      dropdown.classList.toggle('hidden');
+    }
+  }
+
+  hideTaskDropdown(taskId) {
+    const dropdown = document.getElementById(`task-dropdown-${taskId}`);
+    if (dropdown) {
+      dropdown.classList.add('hidden');
     }
   }
 

@@ -195,6 +195,45 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
     }
   });
 
+  router.post('/tasks/:id/complete', async (req: Request, res: Response) => {
+    try {
+      const task = db.getTask(parseInt(req.params.id));
+
+      if (!task) {
+        return res.status(404).json({
+          success: false,
+          error: 'Task not found',
+        });
+      }
+
+      // Update task status to completed
+      db.updateTask(parseInt(req.params.id), {
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+      });
+
+      // Emit task update event for real-time updates
+      const updatedTask = db.getTask(parseInt(req.params.id));
+      engine.emit('task-update', {
+        taskId: parseInt(req.params.id),
+        status: 'completed',
+        metadata: { task: updatedTask },
+      });
+
+      const response: ApiResponse = {
+        success: true,
+        data: { message: 'Task marked as completed successfully' },
+      };
+
+      res.json(response);
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  });
+
   router.get('/tasks/:id/commits', async (req: Request, res: Response) => {
     try {
       // For now, return empty array as commits aren't tracked yet
