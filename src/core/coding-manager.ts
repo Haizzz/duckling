@@ -1,8 +1,8 @@
 import { withRetry } from '../utils/retry';
 import { CodingTool } from '../types';
-import { logger } from '../utils/logger';
 import { DatabaseManager } from './database';
 import { execCommand, execCommandWithInput } from '../utils/exec';
+import { createCodingPrompt } from './prompts';
 
 interface CodingContext {
   taskId: number;
@@ -21,13 +21,15 @@ export class CodingManager {
     prompt: string,
     context: CodingContext
   ): Promise<string> {
+    const enhancedPrompt = createCodingPrompt(prompt);
+
     return await withRetry(
       async () => {
         switch (tool) {
           case 'amp':
-            return await this.callAmp(prompt, context);
+            return await this.callAmp(enhancedPrompt, context);
           case 'openai':
-            return await this.callCodex(prompt, context);
+            return await this.callCodex(enhancedPrompt, context);
           default:
             throw new Error(`Unsupported coding tool: ${tool}`);
         }
@@ -136,28 +138,5 @@ export class CodingManager {
       }
       throw error;
     }
-  }
-
-  async requestFixes(
-    tool: CodingTool,
-    originalPrompt: string,
-    errorMessages: string[],
-    context: CodingContext
-  ): Promise<string> {
-    logger.info(
-      'Requesting fixes for precommit errors',
-      context.taskId.toString()
-    );
-
-    const fixPrompt = `
-Original request: ${originalPrompt}
-
-The following errors occurred during precommit checks:
-${errorMessages.map((error) => `- ${error}`).join('\n')}
-
-Please fix these issues and provide the corrected implementation. Focus only on fixing the specific errors mentioned above.
-`;
-
-    return await this.generateCode(tool, fixPrompt, context);
   }
 }

@@ -3,6 +3,13 @@ import { logger } from '../utils/logger';
 import { DatabaseManager } from './database';
 import { SettingsManager } from './settings-manager';
 import { withRetry } from '../utils/retry';
+import {
+  createPRDescriptionPrompt,
+  createBranchNamePrompt,
+  createPRTitlePrompt,
+  createTaskSummaryPrompt,
+  createCommitMessagePrompt,
+} from './prompts';
 
 export class OpenAIManager {
   private db: DatabaseManager;
@@ -92,16 +99,10 @@ export class OpenAIManager {
     }
 
     try {
-      const prompt = `Generate a short, descriptive Git branch name (kebab-case, max ${maxBranchNameLength} chars) for this task: "${taskDescription}". 
-Rules:
-- Use only lowercase letters, numbers, and hyphens
-- Start with a letter
-- Be descriptive but concise
-- No special characters or spaces
-- Maximum ${maxBranchNameLength} characters (prefix will be added separately)
-- Examples: "fix-login-bug", "add-user-auth", "update-navbar-styles"
-
-Branch name:`;
+      const prompt = createBranchNamePrompt(
+        taskDescription,
+        maxBranchNameLength
+      );
 
       const result = await this.callOpenAI(prompt);
 
@@ -152,15 +153,7 @@ Branch name:`;
     }
 
     try {
-      const prompt = `Generate a clear, professional pull request title for this task: "${taskDescription}".
-Rules:
-- Maximum 80 characters total (including prefix)
-- Use imperative mood (e.g., "Add", "Fix", "Update")
-- Be specific and descriptive
-- No prefix needed (will be added automatically)
-- Examples: "Fix authentication bug in login flow", "Add user profile settings page"
-
-PR title:`;
+      const prompt = createPRTitlePrompt(taskDescription);
 
       const result = await this.callOpenAI(prompt);
 
@@ -192,15 +185,7 @@ PR title:`;
     }
 
     try {
-      const prompt = `Generate a professional pull request description for this task: "${taskDescription}".
-Include:
-- Brief summary of changes
-- Why this change was needed
-- Any relevant details for reviewers
-
-Keep it concise but informative. Use plain text, no markdown formatting.
-
-PR description:`;
+      const prompt = createPRDescriptionPrompt(taskDescription);
 
       const result = await this.callOpenAI(prompt);
 
@@ -229,14 +214,7 @@ PR description:`;
     }
 
     try {
-      const prompt = `Generate a concise summary for this development task: "${taskDescription}".
-Rules:
-- Maximum 80 characters
-- Capture the main action and purpose
-- Use active voice and be specific
-- Examples: "Fix user authentication bug in login flow", "Add responsive design to homepage"
-
-Summary:`;
+      const prompt = createTaskSummaryPrompt(taskDescription);
 
       const result = await this.callOpenAI(prompt);
 
@@ -287,20 +265,7 @@ Summary:`;
     }
 
     try {
-      const changesText =
-        changes.length > 0
-          ? `\nFiles changed: ${changes.slice(0, 5).join(', ')}`
-          : '';
-
-      const prompt = `Generate a concise git commit message for this task: "${taskDescription}".${changesText}
-Rules:
-- Maximum 50 characters
-- Use imperative mood (e.g., "Fix", "Add", "Update")
-- No period at the end
-- Be specific but concise
-- Examples: "Fix login validation error", "Add user profile component"
-
-Commit message:`;
+      const prompt = createCommitMessagePrompt(taskDescription, changes);
 
       const result = await this.callOpenAI(prompt);
 
