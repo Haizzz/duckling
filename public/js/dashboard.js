@@ -4,7 +4,7 @@ class Dashboard {
     this.loadedTasks = [];
     this.repositories = [];
     this.currentPage = 1;
-    this.tasksPerPage = 5;
+    this.tasksPerPage = 10;
     this.isLoading = false;
     this.hasMore = true;
     this.hasRecentSSEUpdate = false;
@@ -276,7 +276,44 @@ class Dashboard {
       return;
     }
 
-    const tasksHTML = this.loadedTasks.map(task => this.renderTaskCard(task)).join('');
+    // Separate active and completed tasks
+    const activeTasks = this.loadedTasks.filter(task => 
+      ['pending', 'in-progress', 'awaiting-review'].includes(task.status)
+    ).sort((a, b) => {
+      const summaryA = (a.summary || a.description || '').toLowerCase();
+      const summaryB = (b.summary || b.description || '').toLowerCase();
+      return summaryA.localeCompare(summaryB);
+    });
+
+    const completedTasks = this.loadedTasks.filter(task => 
+      !['pending', 'in-progress', 'awaiting-review'].includes(task.status)
+    ).sort((a, b) => {
+      const summaryA = (a.summary || a.description || '').toLowerCase();
+      const summaryB = (b.summary || b.description || '').toLowerCase();
+      return summaryA.localeCompare(summaryB);
+    });
+
+    // Build HTML with divider if both sections exist
+    let tasksHTML = '';
+    
+    if (activeTasks.length > 0) {
+      tasksHTML += activeTasks.map(task => this.renderTaskCard(task)).join('');
+    }
+    
+    if (activeTasks.length > 0 && completedTasks.length > 0) {
+      tasksHTML += `
+        <div class="flex items-center py-4">
+          <div class="flex-1 border-t border-gray-300"></div>
+          <div class="px-4 text-sm text-gray-500 font-medium">Completed</div>
+          <div class="flex-1 border-t border-gray-300"></div>
+        </div>
+      `;
+    }
+    
+    if (completedTasks.length > 0) {
+      tasksHTML += completedTasks.map(task => this.renderTaskCard(task)).join('');
+    }
+
     container.innerHTML = `<div class="space-y-4">${tasksHTML}</div>`;
 
     if (loadingEl) {
@@ -310,8 +347,12 @@ class Dashboard {
     const canCancel = task.status !== 'completed' && task.status !== 'cancelled' && task.status !== 'failed';
     const canComplete = task.status !== 'completed' && task.status !== 'cancelled' && task.status !== 'failed';
 
+    // Add pulsing border if task is in progress or awaiting review
+    const isWorking = task.status === 'in-progress' || task.status === 'awaiting-review';
+    const borderClass = isWorking ? 'task-working' : '';
+
     return `
-      <div class="task-card bg-white border border-gray-200 rounded-lg p-6 hover:shadow-sm transition-shadow" data-task-id="${task.id}">
+      <div class="task-card bg-white border border-gray-200 rounded-lg p-6 hover:shadow-sm transition-shadow ${borderClass}" data-task-id="${task.id}">
         <!-- Summary | Status -->
         <div class="flex justify-between items-start mb-4">
           <a href="task-detail.html?id=${task.id}" class="text-lg font-medium text-gray-900 flex-1 mr-4 hover:text-blue-600 hover:underline">${this.escapeHtml(summary)}</a>
@@ -501,27 +542,9 @@ class Dashboard {
 
   // Update a specific task card without full re-render
   updateTaskCard(taskIndex) {
-    const task = this.loadedTasks[taskIndex];
-    // Find the specific task card by data-task-id attribute for better targeting
-    const taskCard = document.querySelector(`[data-task-id="${task.id}"]`);
-
-    if (taskCard) {
-      // Create new card HTML
-      const newCardHTML = this.renderTaskCard(task);
-      // Create temporary container to parse the HTML
-      const tempDiv = document.createElement('div');
-      tempDiv.innerHTML = newCardHTML;
-      const newCard = tempDiv.firstElementChild;
-
-      if (newCard) {
-        // Replace the existing card with the new one
-        taskCard.replaceWith(newCard);
-      }
-    } else {
-      // If we can't find the specific card, fall back to full re-render
-      console.warn(`Task card not found for task ${task.id}, doing full re-render`);
-      this.renderTasks();
-    }
+    // Since we need to maintain sort order, just do a full re-render
+    // when tasks change status to ensure proper ordering
+    this.renderTasks();
   }
 
   showError(message) {

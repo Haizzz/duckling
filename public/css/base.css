@@ -70,3 +70,25 @@
 .hidden { 
   display: none !important; 
 }
+
+/* Pulsing yellow border for active tasks */
+.task-working {
+  @apply border-yellow-400;
+  animation: pulse-yellow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-yellow {
+  0%, 100% {
+    border-color: #fbbf24;
+    box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.3);
+  }
+  50% {
+    border-color: #f59e0b;
+    box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.1);
+  }
+}
+
+/* Status box styling */
+.status-box {
+  @apply bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6;
+}
