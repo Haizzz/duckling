@@ -7,6 +7,7 @@ import { OpenAIManager } from './openai-manager';
 import { GitHubCLIProvider } from './github-cli-provider';
 import * as path from 'path';
 import * as fs from 'fs';
+import { execCommand } from '../utils/exec';
 
 export class GitManager {
   private git: SimpleGit;
@@ -67,7 +68,7 @@ export class GitManager {
   async createAndCheckoutBranch(
     generatedBranchName: string,
     taskId: number
-  ): Promise<string> {
+  ): Promise<{ branchName: string; worktreePath: string }> {
     return await withRetry(async () => {
       const branchPrefix = this.settings.get('branchPrefix');
       const githubManager = new GitHubCLIProvider(
@@ -78,7 +79,7 @@ export class GitManager {
       const defaultBranch = await githubManager.getDefaultBranch(this.repoPath);
 
       logger.info(
-        `Updating to latest ${defaultBranch} and creating new branch`,
+        `Updating to latest ${defaultBranch} and creating new worktree`,
         taskId.toString()
       );
 
@@ -124,20 +125,27 @@ export class GitManager {
         });
       }
 
+      // Create worktree path
+      const worktreePath = path.join(
+        this.repoPath,
+        '..',
+        `${branchName}-worktree`
+      );
+
       this.db.addTaskLog({
         task_id: taskId,
         level: 'info',
-        message: `🌱 Creating and checking out new branch: ${branchName}`,
+        message: `🌱 Creating worktree for branch: ${branchName}`,
       });
 
-      // Create and checkout the new branch
-      await this.git.checkoutLocalBranch(branchName);
+      // Create worktree
+      await this.createWorktree(branchName, worktreePath, taskId);
 
       logger.info(
-        `Created and switched to branch: ${branchName}`,
+        `Created worktree for branch: ${branchName} at ${worktreePath}`,
         taskId.toString()
       );
-      return branchName;
+      return { branchName, worktreePath };
     }, 'Create and checkout branch');
   }
 
@@ -150,16 +158,115 @@ export class GitManager {
     }
   }
 
-  async commitChanges(taskDescription: string, taskId: number): Promise<void> {
-    return await withRetry(async () => {
+  async createWorktree(
+    branchName: string,
+    worktreePath: string,
+    taskId: number
+  ): Promise<void> {
+    try {
+      // Remove existing worktree path if it exists
+      if (fs.existsSync(worktreePath)) {
+        await fs.promises.rm(worktreePath, { recursive: true, force: true });
+      }
+
+      // Create the worktree
+      await execCommand(
+        'git',
+        ['worktree', 'add', worktreePath, '-b', branchName],
+        {
+          cwd: this.repoPath,
+          taskId: taskId.toString(),
+        }
+      );
+
       this.db.addTaskLog({
         task_id: taskId,
         level: 'info',
-        message: '📁 Adding all changes to staging area...',
+        message: `✅ Worktree created at: ${worktreePath}`,
+      });
+    } catch (error: any) {
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'error',
+        message: `❌ Failed to create worktree: ${error.message}`,
+      });
+      throw error;
+    }
+  }
+
+  async removeWorktree(worktreePath: string, taskId: number): Promise<void> {
+    try {
+      if (!fs.existsSync(worktreePath)) {
+        this.db.addTaskLog({
+          task_id: taskId,
+          level: 'info',
+          message: `⚠️ Worktree path does not exist: ${worktreePath}`,
+        });
+        return;
+      }
+
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'info',
+        message: `🗑️ Removing worktree: ${worktreePath}`,
+      });
+
+      // Remove the worktree
+      await execCommand(
+        'git',
+        ['worktree', 'remove', worktreePath, '--force'],
+        {
+          cwd: this.repoPath,
+          taskId: taskId.toString(),
+        }
+      );
+
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'info',
+        message: `✅ Worktree removed: ${worktreePath}`,
+      });
+    } catch (error: any) {
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'error',
+        message: `❌ Failed to remove worktree: ${error.message}`,
+      });
+      // Try to remove the directory manually as a fallback
+      try {
+        await fs.promises.rm(worktreePath, { recursive: true, force: true });
+        this.db.addTaskLog({
+          task_id: taskId,
+          level: 'info',
+          message: `✅ Worktree directory removed manually: ${worktreePath}`,
+        });
+      } catch (fallbackError) {
+        logger.error(
+          `Failed to remove worktree directory: ${fallbackError}`,
+          taskId.toString()
+        );
+      }
+    }
+  }
+
+  async commitChanges(
+    taskDescription: string,
+    taskId: number,
+    worktreePath?: string
+  ): Promise<void> {
+    return await withRetry(async () => {
+      // Use worktree path if provided, otherwise use main repo path
+      const workingDir = worktreePath || this.repoPath;
+      const workingGit = simpleGit(workingDir);
+
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'info',
+        message: `📁 Adding all changes to staging area in ${workingDir}...`,
       });
 
       // Add all changes
-      await this.git.add('.');
+      await workingGit.add('.');
 
       this.db.addTaskLog({
         task_id: taskId,
@@ -168,7 +275,7 @@ export class GitManager {
       });
 
       // Check if there are changes to commit
-      const status = await this.git.status();
+      const status = await workingGit.status();
       if (status.files.length === 0) {
         this.db.addTaskLog({
           task_id: taskId,
@@ -211,21 +318,29 @@ export class GitManager {
       });
 
       // Commit changes
-      await this.git.commit(finalMessage);
+      await workingGit.commit(finalMessage);
 
       logger.info(`Committed changes: ${finalMessage}`, taskId.toString());
     }, 'Commit changes');
   }
 
-  async pushBranch(branchName: string, taskId: number): Promise<void> {
+  async pushBranch(
+    branchName: string,
+    taskId: number,
+    worktreePath?: string
+  ): Promise<void> {
     return await withRetry(async () => {
+      // Use worktree path if provided, otherwise use main repo path
+      const workingDir = worktreePath || this.repoPath;
+      const workingGit = simpleGit(workingDir);
+
       this.db.addTaskLog({
         task_id: taskId,
         level: 'info',
-        message: `🚀 Pushing branch '${branchName}' to origin...`,
+        message: `🚀 Pushing branch '${branchName}' to origin from ${workingDir}...`,
       });
 
-      await this.git.push('origin', branchName);
+      await workingGit.push('origin', branchName);
       logger.info(`Pushed branch: ${branchName}`, taskId.toString());
     }, 'Push branch');
   }

@@ -125,6 +125,9 @@ export class CoreEngine extends EventEmitter {
       message: 'Task cancelled by user',
     });
 
+    // Clean up worktree
+    await this.cleanupWorktree(taskId, task.worktree_path);
+
     this.emitTaskUpdate(taskId, 'cancelled');
   }
 
@@ -196,7 +199,10 @@ export class CoreEngine extends EventEmitter {
 
       try {
         const gitManager = this.getGitManager(task.repository_path);
-        await gitManager.switchToBranch(task.branch_name, task.id);
+        // Don't switch branches if we have a worktree - we'll work in the worktree
+        if (!task.worktree_path) {
+          await gitManager.switchToBranch(task.branch_name, task.id);
+        }
         const result = await this.collectPRComments(task.id, task.pr_number);
 
         // Handle status updates first (completed/cancelled)
@@ -208,12 +214,16 @@ export class CoreEngine extends EventEmitter {
               completed_at: new Date().toISOString(),
             });
             this.emitTaskUpdate(task.id, 'completed');
+            // Clean up worktree
+            await this.cleanupWorktree(task.id, task.worktree_path);
           } else if (result.statusUpdate === 'cancelled') {
             this.db.updateTask(task.id, {
               status: 'cancelled',
               current_stage: 'cancelled',
             });
             this.emitTaskUpdate(task.id, 'cancelled');
+            // Clean up worktree
+            await this.cleanupWorktree(task.id, task.worktree_path);
           }
           continue; // Skip comment processing if task is completed/cancelled
         }
@@ -274,7 +284,7 @@ export class CoreEngine extends EventEmitter {
           });
           this.emitTaskUpdate(taskId, 'in-progress');
 
-          // Step 1: Create branch
+          // Step 1: Create branch and worktree
           const generatedBranchName = await withTaskLogMessages(
             {
               taskId,
@@ -297,27 +307,30 @@ export class CoreEngine extends EventEmitter {
             }
           );
 
-          const branchName = await withTaskLogMessages(
+          const { branchName, worktreePath } = await withTaskLogMessages(
             {
               taskId,
-              startMessage: '🔄 Creating and checking out branch...',
-              completeMessage: `✅ Branch created and checked out`,
-              failureMessage: '❌ Failed to create branch',
+              startMessage: '🔄 Creating worktree and branch...',
+              completeMessage: `✅ Worktree and branch created`,
+              failureMessage: '❌ Failed to create worktree and branch',
             },
             async () => {
-              const name = await gitManager.createAndCheckoutBranch(
+              const result = await gitManager.createAndCheckoutBranch(
                 generatedBranchName,
                 taskId
               );
-              this.db.updateTask(taskId, { branch_name: name });
+              this.db.updateTask(taskId, {
+                branch_name: result.branchName,
+                worktree_path: result.worktreePath,
+              });
               this.db.addTaskLog({
                 task_id: taskId,
                 level: 'info',
-                message: `✅ Branch created and checked out: ${name}`,
+                message: `✅ Worktree created at: ${result.worktreePath}`,
               });
-              // Emit update to notify UI of branch name
+              // Emit update to notify UI of branch name and worktree path
               this.emitTaskUpdate(taskId, 'in-progress');
-              return name;
+              return result;
             }
           );
 
@@ -336,7 +349,7 @@ export class CoreEngine extends EventEmitter {
               await this.codingManager.generateCode(
                 task.coding_tool,
                 task.description,
-                { taskId, repositoryPath: task.repository_path }
+                { taskId, repositoryPath: task.repository_path, worktreePath }
               );
             }
           );
@@ -355,7 +368,7 @@ export class CoreEngine extends EventEmitter {
               failureMessage: '❌ Precommit checks failed',
             },
             async () => {
-              await this.runPrecommitChecks(taskId);
+              await this.runPrecommitChecks(taskId, worktreePath);
             }
           );
 
@@ -371,7 +384,11 @@ export class CoreEngine extends EventEmitter {
               failureMessage: '❌ Failed to commit changes',
             },
             async () => {
-              await gitManager.commitChanges(task.description, taskId);
+              await gitManager.commitChanges(
+                task.description,
+                taskId,
+                worktreePath
+              );
             }
           );
 
@@ -383,7 +400,7 @@ export class CoreEngine extends EventEmitter {
               failureMessage: '❌ Failed to push branch',
             },
             async () => {
-              await gitManager.pushBranch(branchName, taskId);
+              await gitManager.pushBranch(branchName, taskId, worktreePath);
             }
           );
 
@@ -425,6 +442,9 @@ export class CoreEngine extends EventEmitter {
             level: 'error',
             message: `💥 Task failed: ${error.message}`,
           });
+          // Clean up worktree on failure - get latest task state
+          const failedTask = this.db.getTask(taskId);
+          await this.cleanupWorktree(taskId, failedTask?.worktree_path);
           this.emitTaskUpdate(taskId, 'failed');
           throw error;
         }
@@ -432,7 +452,10 @@ export class CoreEngine extends EventEmitter {
     });
   }
 
-  private async runPrecommitChecks(taskId: number): Promise<void> {
+  private async runPrecommitChecks(
+    taskId: number,
+    worktreePath?: string
+  ): Promise<void> {
     const task = this.db.getTask(taskId);
     if (!task) throw new Error('Task not found');
 
@@ -442,7 +465,11 @@ export class CoreEngine extends EventEmitter {
       message: '🧪 Running initial precommit checks...',
     });
 
-    await this.precommitManager.runChecks(taskId, task.repository_path);
+    await this.precommitManager.runChecks(
+      taskId,
+      task.repository_path,
+      worktreePath
+    );
   }
 
   private async createPR(
@@ -579,7 +606,11 @@ export class CoreEngine extends EventEmitter {
           await this.codingManager.generateCode(
             task.coding_tool,
             `Original task: ${task.description}\n\nPR review comments to address:\n\n${concatenatedComments}\n\nPlease address all the feedback above in one go.`,
-            { taskId, repositoryPath: task.repository_path }
+            {
+              taskId,
+              repositoryPath: task.repository_path,
+              worktreePath: task.worktree_path,
+            }
           );
 
           this.db.addTaskLog({
@@ -589,7 +620,7 @@ export class CoreEngine extends EventEmitter {
           });
 
           // Apply changes and run checks
-          await this.runPrecommitChecks(taskId);
+          await this.runPrecommitChecks(taskId, task.worktree_path);
 
           this.db.addTaskLog({
             task_id: taskId,
@@ -599,9 +630,17 @@ export class CoreEngine extends EventEmitter {
 
           // Commit and push changes
           const gitManager = this.getGitManager(task.repository_path);
-          await gitManager.commitChanges(`Address PR feedback`, taskId);
+          await gitManager.commitChanges(
+            `Address PR feedback`,
+            taskId,
+            task.worktree_path
+          );
           if (task.branch_name) {
-            await gitManager.pushBranch(task.branch_name, taskId);
+            await gitManager.pushBranch(
+              task.branch_name,
+              taskId,
+              task.worktree_path
+            );
           }
 
           this.db.addTaskLog({
@@ -619,6 +658,34 @@ export class CoreEngine extends EventEmitter {
         }
       },
     });
+  }
+
+  private async cleanupWorktree(
+    taskId: number,
+    worktreePath?: string
+  ): Promise<void> {
+    if (!worktreePath) {
+      return; // No worktree to clean up
+    }
+
+    const task = this.db.getTask(taskId);
+    if (!task) {
+      return;
+    }
+
+    try {
+      const gitManager = this.getGitManager(task.repository_path);
+      await gitManager.removeWorktree(worktreePath, taskId);
+
+      // Clear the worktree path from the database
+      this.db.updateTask(taskId, { worktree_path: undefined });
+    } catch (error: any) {
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'error',
+        message: `❌ Error cleaning up worktree: ${error.message}`,
+      });
+    }
   }
 
   private emitTaskUpdate(

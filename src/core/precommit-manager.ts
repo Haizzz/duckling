@@ -12,16 +12,21 @@ export class PrecommitManager {
 
   async runChecks(
     taskId: number,
-    repositoryPath: string
+    repositoryPath: string,
+    worktreePath?: string
   ): Promise<{ passed: boolean; errors: string[] }> {
+    const workingDir = worktreePath || repositoryPath;
     const checks = this.db.getEnabledPrecommitChecks();
     const errors: string[] = [];
 
-    logger.info(`Running ${checks.length} precommit checks`, taskId.toString());
+    logger.info(
+      `Running ${checks.length} precommit checks in ${workingDir}`,
+      taskId.toString()
+    );
 
     for (const check of checks) {
       try {
-        await this.runSingleCheck(check, taskId, repositoryPath);
+        await this.runSingleCheck(check, taskId, workingDir);
         this.logCheckResult(taskId, check.name, true, null);
       } catch (error: any) {
         const errorMessage = `${check.name}: ${error.message}`;
@@ -45,14 +50,14 @@ export class PrecommitManager {
   private async runSingleCheck(
     check: PrecommitCheck,
     taskId: number,
-    repositoryPath: string
+    workingDir: string
   ): Promise<void> {
     logger.info(`Running precommit check: ${check.name}`, taskId.toString());
 
     const result = await execShellCommand(check.command, {
       taskId: taskId.toString(),
       timeout: 300000, // 5 minutes timeout
-      cwd: repositoryPath,
+      cwd: workingDir,
     });
 
     if (result.exitCode !== 0) {

@@ -50,6 +50,7 @@ export class DatabaseManager {
         coding_tool TEXT NOT NULL,
         repository_path TEXT NOT NULL DEFAULT '',
         branch_name TEXT,
+        worktree_path TEXT,
         pr_number INTEGER,
         pr_url TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -126,8 +127,8 @@ export class DatabaseManager {
   // Task operations
   createTask(task: Omit<Task, 'id' | 'created_at' | 'updated_at'>): number {
     const stmt = this.db.prepare(`
-      INSERT INTO tasks (title, description, summary, status, coding_tool, repository_path, current_stage, branch_name, pr_number, pr_url, completed_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO tasks (title, description, summary, status, coding_tool, repository_path, current_stage, branch_name, worktree_path, pr_number, pr_url, completed_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const result = stmt.run(
@@ -139,6 +140,7 @@ export class DatabaseManager {
       task.repository_path,
       task.current_stage || null,
       task.branch_name || null,
+      task.worktree_path || null,
       task.pr_number || null,
       task.pr_url || null,
       task.completed_at || null

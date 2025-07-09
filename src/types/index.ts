@@ -8,6 +8,7 @@ export interface Task {
   repository_path: string;
   current_stage?: string;
   branch_name?: string;
+  worktree_path?: string;
   pr_number?: number;
   pr_url?: string;
   created_at: string;

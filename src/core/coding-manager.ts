@@ -7,6 +7,7 @@ import { createCodingPrompt } from './prompts';
 interface CodingContext {
   taskId: number;
   repositoryPath: string;
+  worktreePath?: string;
 }
 
 export class CodingManager {
@@ -43,7 +44,8 @@ export class CodingManager {
     prompt: string,
     context: CodingContext
   ): Promise<string> {
-    const { taskId, repositoryPath } = context;
+    const { taskId, repositoryPath, worktreePath } = context;
+    const workingDir = worktreePath || repositoryPath;
 
     try {
       // Get API key from settings
@@ -55,13 +57,13 @@ export class CodingManager {
       // Check if amp is available
       await execCommand('which', ['amp'], {
         taskId: taskId.toString(),
-        cwd: repositoryPath,
+        cwd: workingDir,
       });
 
       // Call amp with the prompt via stdin
       const result = await execCommandWithInput('amp', prompt, [], {
         taskId: taskId.toString(),
-        cwd: repositoryPath,
+        cwd: workingDir,
         timeout: 30 * 60 * 1000, // 30 minutes timeout
         env: {
           ...process.env,
@@ -88,7 +90,8 @@ export class CodingManager {
     prompt: string,
     context: CodingContext
   ): Promise<string> {
-    const { taskId, repositoryPath } = context;
+    const { taskId, repositoryPath, worktreePath } = context;
+    const workingDir = worktreePath || repositoryPath;
 
     try {
       // Get API key from settings
@@ -100,7 +103,7 @@ export class CodingManager {
       // Check if codex is available
       await execCommand('which', ['codex'], {
         taskId: taskId.toString(),
-        cwd: repositoryPath,
+        cwd: workingDir,
       });
 
       const result = await execCommand(
@@ -114,7 +117,7 @@ export class CodingManager {
         ],
         {
           taskId: taskId.toString(),
-          cwd: repositoryPath,
+          cwd: workingDir,
           timeout: 30 * 60 * 1000, // 30 minutes timeout
           env: {
             ...process.env,
