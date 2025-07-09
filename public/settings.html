@@ -55,25 +55,7 @@
         <!-- Configuration Status -->
         <div id="config-status" class="hidden"></div>
 
-        <!-- GitHub Configuration -->
-        <div class="bg-white shadow rounded-lg">
-          <div class="px-6 py-4 border-b border-gray-200">
-            <h2 class="text-lg font-medium text-gray-900">GitHub Configuration</h2>
-            <p class="text-sm text-gray-500 mt-1">Configure your GitHub integration</p>
-          </div>
-          <div class="px-6 py-4 space-y-4">
-            <div>
-              <label for="github-token" class="block text-sm font-medium text-gray-700">GitHub Personal Access
-                Token</label>
-              <input type="password" id="github-token" name="githubToken"
-                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
-              <p class="text-xs text-gray-500 mt-1">Personal access token with repo permissions to create branches and
-                PRs</p>
-            </div>
 
-
-          </div>
-        </div>
 
         <!-- Repository Management -->
         <div class="bg-white shadow rounded-lg">
@@ -186,6 +168,12 @@
                 class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
               <p class="text-xs text-gray-500 mt-1">Suffix added to all commit messages to identify Duckling-created
                 commits</p>
+            </div>
+            <div>
+              <label for="comment-prefix" class="block text-sm font-medium text-gray-700">Comment Prefix</label>
+              <input type="text" id="comment-prefix" name="commentPrefix" value="duckling"
+                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
+              <p class="text-xs text-gray-500 mt-1">Prefix that comments must start with to be processed by Duckling</p>
             </div>
             <div>
               <label for="max-retries" class="block text-sm font-medium text-gray-700">Max Retries</label>

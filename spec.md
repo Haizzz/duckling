@@ -383,7 +383,7 @@ interface PRManager {
 ```
 
 #### Comment Processing Rules
-- Only process comments from configured GitHub username
+- Only process comments that start with the configured comment prefix
 - Ignore bot comments and automated messages
 - Parse natural language feedback into actionable tasks
 - Track comment processing to avoid duplicates
@@ -504,7 +504,7 @@ interface PerformanceMetrics {
 #### API Keys Category
 ```typescript
 interface APIKeysSettings {
-  githubToken: string;              // Required
+  // GitHub CLI used instead of token
   openaiApiKey?: string;           // Optional
   claudeApiKey?: string;           // Optional
   ampApiKey?: string;              // Optional
@@ -529,13 +529,12 @@ interface GeneralSettings {
 ```typescript
 interface GitHubSettings {
   githubRepoUrl: string;           // Required
-  githubUsername: string;          // Required for comment filtering
   webhookSecret?: string;          // Optional for webhook verification
 }
 ```
 
 ### Configuration Validation Rules
-- **GitHub Token**: Validate permissions and repository access
+- **GitHub CLI**: Validate authentication and repository access
 - **API Keys**: Test connectivity and authentication
 - **Repository URL**: Validate format and accessibility
 - **Numeric Settings**: Range validation and type checking

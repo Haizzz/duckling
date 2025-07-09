@@ -4,7 +4,7 @@ import { logger } from '../utils/logger';
 import { DatabaseManager } from './database';
 import { SettingsManager } from './settings-manager';
 import { OpenAIManager } from './openai-manager';
-import { GitHubManager } from './github-manager';
+import { GitHubCLIProvider } from './github-cli-provider';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -70,11 +70,10 @@ export class GitManager {
   ): Promise<string> {
     return await withRetry(async () => {
       const branchPrefix = this.settings.get('branchPrefix');
-      const githubToken = this.settings.get('githubToken');
-      const githubManager = new GitHubManager(
-        githubToken,
+      const githubManager = new GitHubCLIProvider(
         this.db,
-        this.openaiManager
+        this.openaiManager,
+        this.settings
       );
       const defaultBranch = await githubManager.getDefaultBranch(this.repoPath);
 

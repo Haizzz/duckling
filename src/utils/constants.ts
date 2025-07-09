@@ -19,6 +19,7 @@ export const DEFAULT_SETTINGS = {
   branchPrefix: 'duckling-',
   prTitlePrefix: '[DUCKLING]',
   commitSuffix: ' [quack]',
+  commentPrefix: 'duckling',
   maxRetries: 3,
 } as const;
 

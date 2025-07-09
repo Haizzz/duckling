@@ -58,8 +58,7 @@ export interface Repository {
 }
 
 export interface DucklingSettings {
-  // API Keys
-  github_token: string;
+  // API Keys - GitHub CLI used instead of token
   openai_api_key?: string;
   amp_api_key?: string;
 
@@ -71,7 +70,6 @@ export interface DucklingSettings {
   max_retries: number;
 
   // GitHub settings
-  github_username: string;
   poll_interval_seconds: number;
 }
 

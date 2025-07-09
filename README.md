@@ -38,17 +38,29 @@ All I've ever wanted is Codex web interface, however:
 npx github:haizzz/duckling start
 ```
 
+### Prerequisites
+
+1. **GitHub CLI**: Must be installed and authenticated before starting Duckling
+   ```bash
+   # Install GitHub CLI
+   # macOS: brew install gh
+   # Windows: winget install GitHub.CLI
+   # Linux: See https://github.com/cli/cli#installation
+   
+   # Authenticate
+   gh auth login
+   ```
+
 ### Configuration
 
 1. **API Keys Required:**
-   - **GitHub Token**: https://github.com/settings/personal-access-tokens (requires repo permissions)
    - **Amp Token**: Available from Amp dashboard
    - **OpenAI API Key**: https://platform.openai.com/api-keys
 
 2. **Setup:**
    - Access web interface at http://localhost:5050
    - Navigate to Settings
-   - Add API keys and GitHub username
+   - Add API keys
    - Select coding tool preference
    - Set base branch
 

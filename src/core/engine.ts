@@ -4,8 +4,7 @@ import { SettingsManager } from './settings-manager';
 import { GitManager } from './git-manager';
 import { CodingManager } from './coding-manager';
 import { PrecommitManager } from './precommit-manager';
-import { GitHubProvider } from './github-interface';
-import { DefaultGitHubProviderFactory } from './github-provider-factory';
+import { GitHubCLIProvider } from './github-cli-provider';
 import { OpenAIManager } from './openai-manager';
 import { Task, TaskStatus, TaskUpdateEvent, CreateTaskRequest } from '../types';
 import { taskExecutor } from './task-executor';
@@ -17,7 +16,7 @@ export class CoreEngine extends EventEmitter {
   private settings: SettingsManager;
   private codingManager: CodingManager;
   private precommitManager: PrecommitManager;
-  private githubManager?: GitHubProvider;
+  private githubManager?: GitHubCLIProvider;
   private openaiManager: OpenAIManager;
   private isInitialized = false;
   private processingInterval?: NodeJS.Timeout;
@@ -41,20 +40,20 @@ export class CoreEngine extends EventEmitter {
     }
   }
 
-  private async getGitHubManager(): Promise<GitHubProvider> {
+  private getGitHubManager(): GitHubCLIProvider {
     if (this.githubManager) {
       return this.githubManager;
     }
 
     try {
-      const factory = new DefaultGitHubProviderFactory(
+      this.githubManager = new GitHubCLIProvider(
         this.db,
-        this.openaiManager
+        this.openaiManager,
+        this.settings
       );
-      this.githubManager = await factory.createProvider();
       return this.githubManager;
     } catch (error) {
-      const errorMsg = `Failed to initialize GitHub provider: ${error}`;
+      const errorMsg = `Failed to initialize GitHub CLI provider: ${error}`;
       logger.error(errorMsg);
       console.error(`❌ ${errorMsg}`);
       throw new Error(errorMsg);
@@ -444,7 +443,7 @@ export class CoreEngine extends EventEmitter {
     branchName: string
   ): Promise<void> {
     try {
-      const githubManager = await this.getGitHubManager();
+      const githubManager = this.getGitHubManager();
       const pr = await githubManager.createPRFromTask(
         branchName,
         task.description,
@@ -503,7 +502,7 @@ export class CoreEngine extends EventEmitter {
       return { comments: [] }; // Task completed or cancelled
     }
 
-    const githubManager = await this.getGitHubManager();
+    const githubManager = this.getGitHubManager();
 
     // Get last commit timestamp for the branch
     let lastCommitTimestamp: string | null = null;

@@ -67,10 +67,7 @@ class Settings {
 
   populateForm(settings) {
     // GitHub settings
-    this.setSecureField('github-token', settings.githubToken);
-
-    // Handle GitHub CLI status
-    this.updateGitHubTokenField(settings.githubCLIStatus);
+    // GitHub CLI status is handled in the HTML
 
     // Coding tools
     document.getElementById('default-coding-tool').value = settings.defaultCodingTool || 'amp';
@@ -81,6 +78,7 @@ class Settings {
     document.getElementById('branch-prefix').value = settings.branchPrefix || 'duckling-';
     document.getElementById('pr-title-prefix').value = settings.prTitlePrefix || '[DUCKLING]';
     document.getElementById('commit-suffix').value = settings.commitSuffix || ' [quack]';
+    document.getElementById('comment-prefix').value = settings.commentPrefix || 'duckling';
     document.getElementById('max-retries').value = settings.maxRetries || 3;
 
 
@@ -147,28 +145,7 @@ class Settings {
     }
   }
 
-  updateGitHubTokenField(cliStatus) {
-    const tokenField = document.getElementById('github-token');
-    const tokenLabel = document.querySelector('label[for="github-token"]');
-    const tokenHelp = tokenField.nextElementSibling;
 
-    if (cliStatus && cliStatus.method === 'cli' && cliStatus.authenticated) {
-      // GitHub CLI is available and authenticated
-      tokenField.disabled = true;
-      tokenField.style.opacity = '0.5';
-      tokenField.style.cursor = 'not-allowed';
-      tokenField.placeholder = `Using GitHub CLI (${cliStatus.username || 'authenticated'})`;
-      tokenLabel.style.color = '#6B7280';
-      tokenHelp.innerHTML = `<span style="color: #059669;">✓ GitHub CLI is authenticated and will be used instead of tokens</span>`;
-    } else {
-      // GitHub CLI not available, use token
-      tokenField.disabled = false;
-      tokenField.style.opacity = '1';
-      tokenField.style.cursor = 'text';
-      tokenLabel.style.color = '';
-      tokenHelp.innerHTML = 'Personal access token with repo permissions to create branches and PRs';
-    }
-  }
 
   async loadPrecommitChecks() {
     try {
@@ -266,16 +243,12 @@ class Settings {
   showConfigurationStatus(settings) {
     const statusEl = document.getElementById('config-status');
 
-    // Check configuration completeness
-    const hasGithubToken = settings.githubToken === '***CONFIGURED***';
-    const hasGithubCLI = settings.githubCLIStatus && settings.githubCLIStatus.method === 'cli' && settings.githubCLIStatus.authenticated;
-    const hasGithubAuth = hasGithubToken || hasGithubCLI;
+    // GitHub CLI is guaranteed to be available if server is running
     const hasAmpTool = settings.ampApiKey === '***CONFIGURED***';
     const hasOpenAiTool = settings.openaiApiKey === '***CONFIGURED***';
     const hasOpenAiForCommits = settings.openaiApiKey === '***CONFIGURED***';
 
     const missingRequirements = [];
-    if (!hasGithubAuth) missingRequirements.push('GitHub authentication (token or CLI)');
     if (!hasOpenAiForCommits) missingRequirements.push('OpenAI API key');
     if (!hasAmpTool && !hasOpenAiTool) missingRequirements.push('at least one coding tool (Amp or OpenAI)');
 
@@ -301,14 +274,6 @@ class Settings {
         ? '<li><strong>Coding Tool:</strong> Configure either Amp (requires Amp token) or OpenAI (for code generation)</li>'
         : '';
 
-      const githubText = missingRequirements.includes('GitHub token')
-        ? '<li><strong>GitHub Token:</strong> Required for creating branches and PRs</li>'
-        : '';
-
-      const usernameText = missingRequirements.includes('GitHub username')
-        ? '<li><strong>GitHub Username:</strong> Required for PR comment filtering</li>'
-        : '';
-
       const openaiText = missingRequirements.includes('OpenAI API key')
         ? '<li><strong>OpenAI API Key:</strong> Required for commit messages and task summaries</li>'
         : '';
@@ -326,7 +291,7 @@ class Settings {
             <div class="mt-2 text-sm text-red-700">
               <p class="mb-2">The following settings are required to create tasks:</p>
               <ul class="list-disc list-inside space-y-1">
-                ${githubText}${usernameText}${openaiText}${toolsText}
+                ${openaiText}${toolsText}
               </ul>
             </div>
           </div>

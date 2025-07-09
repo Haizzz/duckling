@@ -2,25 +2,32 @@
  * GitHub CLI Provider - Implements GitHub operations using GitHub CLI
  */
 
-import { GitHubProvider } from './github-interface';
 import { DatabaseManager } from './database';
 import { OpenAIManager } from './openai-manager';
+import { SettingsManager } from './settings-manager';
 import { executeGitHubCLI } from '../utils/github-cli-utils';
 import { validateAndGetRepoInfo } from '../utils/git-utils';
 import { withRetry } from '../utils/retry';
 import { logger } from '../utils/logger';
 import { execCommand } from '../utils/exec';
+import { processAllComments, CommentData } from '../utils/comment-processor';
 
-export class GitHubCLIProvider implements GitHubProvider {
+export class GitHubCLIProvider {
   private db: DatabaseManager;
   private openaiManager: OpenAIManager;
+  private settings: SettingsManager;
   private repoOwner: string = '';
   private repoName: string = '';
   private initialized: boolean = false;
 
-  constructor(db: DatabaseManager, openaiManager: OpenAIManager) {
+  constructor(
+    db: DatabaseManager,
+    openaiManager: OpenAIManager,
+    settings: SettingsManager
+  ) {
     this.db = db;
     this.openaiManager = openaiManager;
+    this.settings = settings;
   }
 
   private async ensureInitialized(repositoryPath: string) {
@@ -33,24 +40,6 @@ export class GitHubCLIProvider implements GitHubProvider {
       this.initialized = true;
     } catch (error) {
       throw new Error(`Failed to get repository information: ${error}`);
-    }
-  }
-
-  private async getCurrentGitHubUsername(
-    repositoryPath: string
-  ): Promise<string> {
-    try {
-      const result = await execCommand('gh', ['api', 'user'], {
-        cwd: repositoryPath,
-      });
-      if (result.exitCode !== 0) {
-        throw new Error(`GitHub CLI command failed: ${result.stderr}`);
-      }
-      const userData = JSON.parse(result.stdout);
-      return userData.login;
-    } catch (error) {
-      logger.warn('Could not get GitHub username from CLI:', String(error));
-      throw new Error('Failed to determine GitHub username');
     }
   }
 
@@ -211,6 +200,9 @@ export class GitHubCLIProvider implements GitHubProvider {
     branchName: string,
     repositoryPath?: string
   ): Promise<any> {
+    if (repositoryPath) {
+      await this.ensureInitialized(repositoryPath);
+    }
     try {
       const result = repositoryPath
         ? await execCommand(
@@ -249,76 +241,42 @@ export class GitHubCLIProvider implements GitHubProvider {
     repositoryPath: string
   ): Promise<string[]> {
     try {
-      // Get current GitHub username
-      const actualTargetUsername =
-        await this.getCurrentGitHubUsername(repositoryPath);
+      const commentPrefix = this.settings.get('commentPrefix');
 
-      // Get PR reviews using GitHub CLI
-      const reviewsResult = await execCommand(
-        'gh',
-        ['pr', 'view', prNumber.toString(), '--json', 'reviews'],
-        { cwd: repositoryPath }
+      // Get all comment types (reviews, review comments, and PR comments)
+      const { reviewComments, prComments } = await this.getAllCommentsSeparated(
+        prNumber,
+        repositoryPath
       );
-      if (reviewsResult.exitCode !== 0) {
-        throw new Error(`GitHub CLI command failed: ${reviewsResult.stderr}`);
-      }
 
-      const data = JSON.parse(reviewsResult.stdout);
-      const reviews = data.reviews || [];
+      // Convert to common format
+      const prCommentData: CommentData[] = prComments.map((comment: any) => ({
+        user: comment.user,
+        body: comment.body,
+        created_at: comment.created_at,
+      }));
 
-      // Filter reviews from the target user and newer than last commit timestamp
-      const newReviews = reviews.filter((review: any) => {
-        logger.info(
-          `review author ${review.author.login}, target ${actualTargetUsername}, ` +
-            `review time ${new Date(review.submittedAt)}, commit time ${lastCommitTimestamp ? new Date(lastCommitTimestamp) : 'null'}, ` +
-            `review state ${review.state}`
-        );
+      const reviewCommentData: CommentData[] = reviewComments.map(
+        (comment: any) => ({
+          user: comment.user,
+          body: comment.body,
+          created_at: comment.created_at,
+          state: comment.state,
+          path: comment.path,
+          line: comment.line,
+          diff_hunk: comment.diff_hunk,
+        })
+      );
 
-        const isFromTargetUser =
-          review.author.login.toLowerCase() ===
-          actualTargetUsername.toLowerCase();
-        const isNewerThanCommit = lastCommitTimestamp
-          ? new Date(review.submittedAt) > new Date(lastCommitTimestamp)
-          : true;
-        const isSubmittedReview = review.state && review.state !== 'PENDING';
-
-        return isFromTargetUser && isNewerThanCommit && isSubmittedReview;
+      return processAllComments(prCommentData, reviewCommentData, {
+        commentPrefix,
+        lastCommitTimestamp,
       });
-
-      // Format reviews for processing
-      const formattedReviews = [];
-      for (const review of newReviews) {
-        let reviewString = `Review by ${review.author.login} (${review.state}):\n`;
-
-        // Add review body if it exists
-        if (review.body && review.body.trim()) {
-          reviewString += `Overall Comment: ${review.body}\n\n`;
-        }
-
-        // Get review comments if available
-        if (review.comments && review.comments.length > 0) {
-          reviewString += `Line Comments:\n`;
-          for (const comment of review.comments) {
-            if (comment.path) reviewString += `File: ${comment.path}\n`;
-            if (comment.line !== undefined)
-              reviewString += `Line: ${comment.line}\n`;
-            if (comment.diffHunk)
-              reviewString += `Context: ${comment.diffHunk}\n`;
-            reviewString += `Comment: ${comment.body}\n\n`;
-          }
-        }
-
-        const hasBody = review.body && review.body.trim();
-        const hasComments = review.comments && review.comments.length > 0;
-
-        if (hasBody || hasComments) {
-          formattedReviews.push(reviewString.trim());
-        }
-      }
-
-      return formattedReviews;
     } catch (error) {
-      logger.error('Failed to fetch PR reviews via GitHub CLI:', String(error));
+      logger.error(
+        'Failed to fetch PR comments via GitHub CLI:',
+        String(error)
+      );
       return [];
     }
   }
@@ -330,75 +288,104 @@ export class GitHubCLIProvider implements GitHubProvider {
 
         const result = await execCommand(
           'gh',
-          ['pr', 'view', prNumber.toString(), '--json', 'reviews'],
+          [
+            'api',
+            `/repos/${this.repoOwner}/${this.repoName}/pulls/${prNumber}/reviews`,
+          ],
           { cwd: repositoryPath }
         );
         if (result.exitCode !== 0) {
           throw new Error(`GitHub CLI command failed: ${result.stderr}`);
         }
 
-        const data = JSON.parse(result.stdout);
-        return data.reviews || [];
+        return JSON.parse(result.stdout);
       },
       'Get PR reviews via GitHub CLI',
       2
     );
   }
 
-  async getCommentsForReview(
+  async getAllCommentsSeparated(
     prNumber: number,
-    reviewId: number,
     repositoryPath: string
-  ): Promise<any[]> {
-    return await withRetry(
-      async () => {
-        await this.ensureInitialized(repositoryPath);
+  ): Promise<{ reviewComments: any[]; prComments: any[] }> {
+    await this.ensureInitialized(repositoryPath);
+    const reviewComments = [];
+    const prComments = [];
 
-        // GitHub CLI doesn't have direct review comment access,
-        // so we'll get all comments and filter by review ID
-        const result = await execCommand(
+    // 1. Get PR reviews (review bodies)
+    const reviews = await this.getPRReviews(prNumber, repositoryPath);
+
+    // Add review body comments and get their associated review comments
+    for (const review of reviews) {
+      // Add the review body comment
+      if (review.body && review.body.trim()) {
+        reviewComments.push({
+          user: { login: review.user.login },
+          body: review.body,
+          created_at: review.submitted_at,
+          state: review.state,
+        });
+      }
+
+      if (review.id) {
+        // 2. Get all review comments (line-by-line comments attached to reviews)
+        const reviewCommentsResult = await execCommand(
           'gh',
-          ['pr', 'view', prNumber.toString(), '--json', 'comments'],
+          [
+            'api',
+            `/repos/${this.repoOwner}/${this.repoName}/pulls/${prNumber}/reviews/${review.id}/comments`,
+          ],
           { cwd: repositoryPath }
         );
-        if (result.exitCode !== 0) {
-          throw new Error(`GitHub CLI command failed: ${result.stderr}`);
+        if (reviewCommentsResult.exitCode === 0) {
+          const reviewLineComments = JSON.parse(reviewCommentsResult.stdout);
+          reviewComments.push(
+            ...reviewLineComments.map((comment: any) => ({
+              user: { login: comment.user.login },
+              body: comment.body,
+              created_at: comment.created_at,
+              path: comment.path,
+              line: comment.line,
+              diff_hunk: comment.diff_hunk,
+            }))
+          );
         }
+      }
+    }
 
-        const data = JSON.parse(result.stdout);
-        const comments = data.comments || [];
-
-        // Filter comments that belong to the specific review
-        return comments.filter((comment: any) => comment.reviewId === reviewId);
-      },
-      'Get comments for review via GitHub CLI',
-      2
+    // 3. Get individual PR comments (not attached to reviews)
+    const prCommentsResult = await execCommand(
+      'gh',
+      [
+        'api',
+        `/repos/${this.repoOwner}/${this.repoName}/issues/${prNumber}/comments`,
+      ],
+      { cwd: repositoryPath }
     );
+    if (prCommentsResult.exitCode === 0) {
+      const prCommentsData = JSON.parse(prCommentsResult.stdout);
+      prComments.push(
+        ...prCommentsData.map((comment: any) => ({
+          user: { login: comment.user.login },
+          body: comment.body,
+          created_at: comment.created_at,
+        }))
+      );
+    }
+
+    return { reviewComments, prComments };
   }
 
-  async getPRReviewComments(
+  async getAllReviewComments(
     prNumber: number,
     repositoryPath: string
   ): Promise<any[]> {
-    return await withRetry(
-      async () => {
-        await this.ensureInitialized(repositoryPath);
-
-        const result = await execCommand(
-          'gh',
-          ['pr', 'view', prNumber.toString(), '--json', 'comments'],
-          { cwd: repositoryPath }
-        );
-        if (result.exitCode !== 0) {
-          throw new Error(`GitHub CLI command failed: ${result.stderr}`);
-        }
-
-        const data = JSON.parse(result.stdout);
-        return data.comments || [];
-      },
-      'Get PR review comments via GitHub CLI',
-      2
+    const { reviewComments, prComments } = await this.getAllCommentsSeparated(
+      prNumber,
+      repositoryPath
     );
+    return [...reviewComments, ...prComments];
   }
 
   async getPRStatus(
@@ -420,7 +407,7 @@ export class GitHubCLIProvider implements GitHubProvider {
             'view',
             prNumber.toString(),
             '--json',
-            'state,mergeable,merged',
+            'state,mergeable,mergedAt',
           ],
           { cwd: repositoryPath }
         );
@@ -431,8 +418,13 @@ export class GitHubCLIProvider implements GitHubProvider {
         const data = JSON.parse(result.stdout);
         return {
           state: data.state || 'UNKNOWN',
-          mergeable: data.mergeable !== undefined ? data.mergeable : null,
-          merged: data.merged || false,
+          mergeable:
+            data.mergeable === 'MERGEABLE'
+              ? true
+              : data.mergeable === 'CONFLICTING'
+                ? false
+                : null,
+          merged: data.mergedAt !== null && data.mergedAt !== undefined,
         };
       },
       'Get PR status via GitHub CLI',

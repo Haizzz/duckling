@@ -1,7 +1,7 @@
 import { DatabaseManager } from './core/database';
 import { CoreEngine } from './core/engine';
 import { APIServer } from './api/server';
-import { getGitHubAuthStatus } from './core/github-provider-factory';
+import { isGitHubCLIAvailable } from './utils/github-cli-utils';
 
 export async function startDuckling(port: number = 5050): Promise<void> {
   console.log('🚀 Starting Duckling...');
@@ -10,20 +10,20 @@ export async function startDuckling(port: number = 5050): Promise<void> {
   const engine = new CoreEngine(db);
   const server = new APIServer(db, engine);
 
-  // Check GitHub authentication status and display it
+  // Check GitHub CLI availability - fail if not available
   try {
-    const authStatus = await getGitHubAuthStatus();
-    if (authStatus.method === 'cli' && authStatus.authenticated) {
-      console.log(
-        `🔑 GitHub authentication: GitHub CLI (${authStatus.username || 'authenticated'})`
-      );
-    } else if (authStatus.method === 'token' && authStatus.authenticated) {
-      console.log('🔑 GitHub authentication: Personal Access Token');
-    } else {
-      console.log('⚠️  GitHub authentication: Not configured');
+    const cliAvailable = await isGitHubCLIAvailable();
+    if (!cliAvailable) {
+      console.error('❌ GitHub CLI is not installed or authenticated');
+      console.error('   Please install and authenticate GitHub CLI:');
+      console.error('   1. Install: https://github.com/cli/cli#installation');
+      console.error('   2. Authenticate: gh auth login');
+      process.exit(1);
     }
+    console.log('🔑 GitHub CLI: Ready');
   } catch (error) {
-    console.log('⚠️  GitHub authentication: Status check failed');
+    console.error('❌ Failed to check GitHub CLI status:', error);
+    process.exit(1);
   }
 
   await server.start(port);

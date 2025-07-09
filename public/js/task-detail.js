@@ -8,6 +8,8 @@ class TaskDetail {
     this.lastLogId = 0; // Track last loaded log ID for incremental loading
     this.logs = []; // Cache logs to avoid full re-render
     this.repositories = []; // Repository data for display
+    this.shouldAutoScroll = true; // Default to auto-scroll enabled
+    this.userScrolledUp = false; // Track if user explicitly scrolled up
 
     if (this.taskId) {
       this.loadRepositories();
@@ -262,6 +264,7 @@ class TaskDetail {
           <p class="text-gray-400 text-sm">No logs yet</p>
         </div>
       `;
+      this.setupScrollListener(container);
       return;
     }
 
@@ -274,6 +277,7 @@ class TaskDetail {
     `).join('');
 
     container.innerHTML = logsHTML;
+    this.setupScrollListener(container);
     this.scrollToBottom(container);
   }
 
@@ -293,13 +297,44 @@ class TaskDetail {
     `).join('');
 
     container.insertAdjacentHTML('beforeend', newLogsHTML);
+    
+    // Ensure scroll listener is set up (in case container was recreated)
+    if (!container._scrollListener) {
+      this.setupScrollListener(container);
+    }
+    
     this.scrollToBottom(container);
   }
 
+  setupScrollListener(container) {
+    // Remove existing listener if any
+    if (container._scrollListener) {
+      container.removeEventListener('scroll', container._scrollListener);
+    }
+
+    // Add scroll listener to detect user scrolling
+    container._scrollListener = () => {
+      const isAtBottom = container.scrollTop >= container.scrollHeight - container.clientHeight - 10;
+      
+      if (!isAtBottom && this.shouldAutoScroll) {
+        // User scrolled up, disable auto-scroll
+        this.shouldAutoScroll = false;
+        this.userScrolledUp = true;
+        console.log('User scrolled up, disabling auto-scroll');
+      } else if (isAtBottom && this.userScrolledUp) {
+        // User scrolled back to bottom, re-enable auto-scroll
+        this.shouldAutoScroll = true;
+        this.userScrolledUp = false;
+        console.log('User scrolled to bottom, enabling auto-scroll');
+      }
+    };
+
+    container.addEventListener('scroll', container._scrollListener);
+  }
+
   scrollToBottom(container) {
-    // Auto-scroll to bottom with smooth behavior, but only if user is near bottom
-    const isNearBottom = container.scrollTop >= container.scrollHeight - container.clientHeight - 100;
-    if (isNearBottom) {
+    // Auto-scroll to bottom only if auto-scroll is enabled
+    if (this.shouldAutoScroll) {
       setTimeout(() => {
         container.scrollTop = container.scrollHeight;
       }, 10);

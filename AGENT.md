@@ -62,11 +62,13 @@ duckling task cancel <taskId>
 
 ## Configuration
 
+### Prerequisites
+- **GitHub CLI**: Must be installed and authenticated before starting Duckling
+
 ### Required Settings
-- **GitHub Token**: Personal access token with repo permissions
 - **Coding Tool API Key**: At least one of Amp, OpenAI, or Claude
 - **Repository URL**: GitHub repository to work with
-- **GitHub Username**: For PR comment filtering
+
 
 ### Optional Settings
 - Branch prefix (default: `duckling-`)
@@ -115,7 +117,7 @@ duckling task cancel <taskId>
 1. **Database locked**: Check if another Duckling instance is running
 2. **Git errors**: Ensure working directory is a git repository
 3. **API failures**: Verify API keys and network connectivity
-4. **Permission errors**: Check GitHub token permissions
+4. **Permission errors**: Check GitHub CLI authentication
 5. **Missing CLI tools**: Ensure coding assistant CLIs are installed
 
 ### Debug Commands

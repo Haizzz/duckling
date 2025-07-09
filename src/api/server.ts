@@ -44,21 +44,7 @@ export class APIServer {
     this.app.use('/api', createRoutes(this.db, this.engine));
 
     // HTML page routes
-    this.app.get('/', async (req, res) => {
-      // Check if basic configuration is present
-      const githubToken = this.db.getSetting('github_token');
-
-      // If no token, check if GitHub CLI is available
-      if (!githubToken) {
-        const { shouldUseGitHubCLI } = await import(
-          '../core/github-provider-factory'
-        );
-        const cliAvailable = await shouldUseGitHubCLI();
-        if (!cliAvailable) {
-          return res.redirect('/settings');
-        }
-      }
-
+    this.app.get('/', (req, res) => {
       res.sendFile(path.join(__dirname, '../../public/index.html'));
     });
 

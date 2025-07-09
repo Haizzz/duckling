@@ -38,8 +38,8 @@ program
       const db = new DatabaseManager();
 
       // Check if already configured
-      const githubToken = db.getSetting('github_token');
-      if (githubToken) {
+      const repositoryUrl = db.getSetting('repositoryUrl');
+      if (repositoryUrl) {
         console.log(
           '✅ Duckling is already configured. Use "duckling start" to run the server.'
         );
@@ -241,8 +241,8 @@ program
       console.log('🔧 Duckling System Status\n');
 
       // Check configuration
-      const githubToken = db.getSetting('github_token');
-      const isConfigured = !!githubToken;
+      const repositoryUrl = db.getSetting('repositoryUrl');
+      const isConfigured = !!repositoryUrl;
 
       console.log(
         `Configuration: ${isConfigured ? '✅ Complete' : '❌ Incomplete'}`
@@ -250,9 +250,7 @@ program
 
       if (isConfigured) {
         // Show configuration details
-        const githubToken = db.getSetting('githubToken');
         const defaultTool = db.getSetting('defaultCodingTool');
-        console.log(`GitHub Token: ${githubToken ? '✅ Set' : '❌ Not set'}`);
         console.log(`Default Tool: ${defaultTool?.value || 'Not set'}`);
 
         // Show task statistics

@@ -2,12 +2,12 @@ import { DatabaseManager } from './database';
 import { CodingTool } from '../types';
 
 export interface SettingsDefaults {
-  githubToken: string;
   repositoryUrl: string;
   defaultCodingTool: CodingTool;
   branchPrefix: string;
   prTitlePrefix: string;
   commitSuffix: string;
+  commentPrefix: string;
   maxRetries: number;
   ampApiKey: string;
   openaiApiKey: string;
@@ -15,12 +15,12 @@ export interface SettingsDefaults {
 
 export class SettingsManager {
   private static readonly DEFAULTS: SettingsDefaults = {
-    githubToken: '',
     repositoryUrl: '',
     defaultCodingTool: 'amp',
     branchPrefix: 'duckling-',
     prTitlePrefix: '[DUCKLING]',
     commitSuffix: ' [quack]',
+    commentPrefix: 'duckling',
     maxRetries: 3,
     ampApiKey: '',
     openaiApiKey: '',

@@ -303,7 +303,7 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
       const settingsObj = settings.getAll();
 
       // For password fields, return a special indicator if value exists
-      const secureFields = ['githubToken', 'ampApiKey', 'openaiApiKey'];
+      const secureFields = ['ampApiKey', 'openaiApiKey'];
       const sanitizedSettings: Record<string, any> = {};
 
       for (const [key, value] of Object.entries(settingsObj)) {
@@ -313,13 +313,6 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
           sanitizedSettings[key] = value;
         }
       }
-
-      // Add GitHub CLI status
-      const { getGitHubAuthStatus } = await import(
-        '../core/github-provider-factory'
-      );
-      const authStatus = await getGitHubAuthStatus();
-      sanitizedSettings.githubCLIStatus = authStatus;
 
       const response: ApiResponse = {
         success: true,

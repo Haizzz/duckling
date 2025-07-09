@@ -56,10 +56,7 @@ class Dashboard {
         const result = await response.json();
         const settings = result.data;
 
-        // Check if required settings are present
-        const hasGithubToken = settings.githubToken === '***CONFIGURED***';
-        const hasGithubCLI = settings.githubCLIStatus && settings.githubCLIStatus.method === 'cli' && settings.githubCLIStatus.authenticated;
-        const hasGithubAuth = hasGithubToken || hasGithubCLI;
+        // GitHub CLI is guaranteed to be available if server is running
         const hasAmpTool = settings.ampApiKey === '***CONFIGURED***';
         const hasOpenAiTool = settings.openaiApiKey === '***CONFIGURED***';
         const hasOpenAiForCommits = settings.openaiApiKey === '***CONFIGURED***'; // Required for both tools
@@ -67,7 +64,6 @@ class Dashboard {
         // Determine what's missing
         const missingRequirements = [];
 
-        if (!hasGithubAuth) missingRequirements.push('GitHub authentication (token or CLI)');
         if (!hasOpenAiForCommits) missingRequirements.push('OpenAI API key');
         if (!hasAmpTool && !hasOpenAiTool) missingRequirements.push('at least one coding tool (Amp or OpenAI)');
 
@@ -110,14 +106,6 @@ class Dashboard {
       ? '<li><strong>Coding Tool:</strong> Configure either Amp (requires Amp token) or OpenAI (requires OpenAI key)</li>'
       : '';
 
-    const githubText = missingRequirements.includes('GitHub token')
-      ? '<li><strong>GitHub Token:</strong> Create a personal access token with repo permissions</li>'
-      : '';
-
-    const usernameText = missingRequirements.includes('GitHub username')
-      ? '<li><strong>GitHub Username:</strong> Your GitHub username for PR comment filtering</li>'
-      : '';
-
     const openaiText = missingRequirements.includes('OpenAI API key')
       ? '<li><strong>OpenAI API Key:</strong> Required for commit messages and task summaries</li>'
       : '';
@@ -134,7 +122,7 @@ class Dashboard {
           <div class="mt-2 text-sm text-yellow-700">
             <p class="mb-2">Before creating tasks, you need to configure:</p>
             <ul class="list-disc list-inside space-y-1">
-              ${githubText}${usernameText}${openaiText}${toolsText}
+              ${openaiText}${toolsText}
             </ul>
             <p class="mt-3">
               <a href="settings.html" class="font-medium underline hover:no-underline">

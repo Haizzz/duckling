@@ -96,7 +96,7 @@ window.API = {
   async checkConfiguration() {
     const settings = await this.getSettings();
     return {
-      configured: !!(settings.github_token && (settings.openai_api_key || settings.amp_api_key))
+      configured: !!(settings.repositoryUrl && (settings.openai_api_key || settings.amp_api_key))
     };
   },
 
