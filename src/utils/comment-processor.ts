@@ -25,8 +25,7 @@ export interface CommentProcessingOptions {
  */
 export function filterComments(
   comments: CommentData[],
-  options: CommentProcessingOptions,
-  commentType: 'pr' | 'review'
+  options: CommentProcessingOptions
 ): CommentData[] {
   const { commentPrefix, lastCommitTimestamp } = options;
   const lastCommitDate = lastCommitTimestamp
@@ -42,20 +41,13 @@ export function filterComments(
       ? commentDate > lastCommitDate
       : true;
 
-    let additionalCheck = true;
-    if (commentType === 'review') {
-      // Only consider submitted reviews (not PENDING state)
-      additionalCheck = Boolean(comment.state && comment.state !== 'PENDING');
-    }
-
     logger.info(
-      `${commentType} comment by ${comment.user.login}, ` +
+      `Comment by ${comment.user.login}, ` +
         `time ${commentDate}, commit time ${lastCommitDate || 'null'}, ` +
-        `starts with '${commentPrefix}': ${startsWithPrefix}` +
-        (commentType === 'review' ? `, state: ${comment.state}` : '')
+        `starts with '${commentPrefix}': ${startsWithPrefix}`
     );
 
-    return startsWithPrefix && isNewerThanCommit && additionalCheck;
+    return startsWithPrefix && isNewerThanCommit;
   });
 }
 
@@ -103,15 +95,11 @@ export function processAllComments(
   const formattedComments: string[] = [];
 
   // Process PR comments
-  const filteredPrComments = filterComments(prComments, options, 'pr');
+  const filteredPrComments = filterComments(prComments, options);
   formattedComments.push(...formatPRComments(filteredPrComments));
 
   // Process all review comments (both body and line comments)
-  const filteredReviewComments = filterComments(
-    allReviewComments,
-    options,
-    'review'
-  );
+  const filteredReviewComments = filterComments(allReviewComments, options);
   formattedComments.push(...formatReviewComments(filteredReviewComments));
 
   return formattedComments;
