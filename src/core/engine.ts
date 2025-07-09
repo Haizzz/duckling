@@ -540,7 +540,7 @@ export class CoreEngine extends EventEmitter {
 
     if (prStatus.merged) {
       statusUpdate = 'completed';
-    } else if (prStatus.state === 'closed') {
+    } else if (prStatus.state === 'CLOSED') {
       statusUpdate = 'cancelled';
     }
 
