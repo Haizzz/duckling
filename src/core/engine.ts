@@ -387,6 +387,14 @@ export class CoreEngine extends EventEmitter {
             }
           );
 
+          // Wait for GitHub to process the push
+          this.db.addTaskLog({
+            task_id: taskId,
+            level: 'info',
+            message: '⏳ Waiting 10 seconds for GitHub to process the push...',
+          });
+          await new Promise(resolve => setTimeout(resolve, 10000));
+
           // Step 5: Create PR
           this.db.updateTask(taskId, { current_stage: 'creating_pr' });
           this.emitTaskUpdate(taskId, 'in-progress');
