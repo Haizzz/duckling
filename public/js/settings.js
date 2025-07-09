@@ -73,6 +73,7 @@ class Settings {
     document.getElementById('default-coding-tool').value = settings.defaultCodingTool || 'amp';
     this.setSecureField('amp-api-key', settings.ampApiKey);
     this.setSecureField('openai-api-key', settings.openaiApiKey);
+    document.getElementById('custom-prompt').value = settings.customPrompt || '';
 
     // Task configuration
     document.getElementById('branch-prefix').value = settings.branchPrefix || 'duckling-';

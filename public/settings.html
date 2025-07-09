@@ -135,6 +135,12 @@
                   task summaries, and code generation (if using OpenAI tool)</p>
               </div>
             </div>
+            <div>
+              <label for="custom-prompt" class="block text-sm font-medium text-gray-700">Custom Prompt</label>
+              <textarea id="custom-prompt" name="customPrompt" rows="8"
+                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400"></textarea>
+              <p class="text-xs text-gray-500 mt-1">Base prompt template passed to coding agents. Include instructions for the coding agent and end with "Make the necessary changes for the following task:" (task description will be appended)</p>
+            </div>
           </div>
         </div>
 

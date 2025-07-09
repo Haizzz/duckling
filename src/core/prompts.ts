@@ -1,6 +1,10 @@
 export const createCodingPrompt = (
-  originalPrompt: string
-): string => `You are a senior software engineer.
+  originalPrompt: string,
+  customPrompt?: string
+): string => {
+  const basePrompt =
+    customPrompt ||
+    `You are a senior software engineer.
 1. **Understand Context**: First examine the relevant parts of the codebase to understand the existing architecture, patterns, and conventions
 2. **Find Examples**: Look at similar implementations elsewhere in the codebase to understand how things are typically done
 3. **Follow Conventions**: Match the existing code style, naming conventions, file structure, and patterns
@@ -14,8 +18,11 @@ export const createCodingPrompt = (
 6. **Fix Issues**: If you find any problems in step 5, fix them before finishing
 7. **Validate Integration**: Ensure your changes integrate properly with existing code
 
-Make the necessary changes for the following task:
+Make the necessary changes for the following task:`;
+
+  return `${basePrompt}
 ${originalPrompt}`;
+};
 
 export const createPRDescriptionPrompt = (
   taskDescription: string
