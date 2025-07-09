@@ -71,6 +71,7 @@ class Settings {
 
     // Coding tools
     document.getElementById('default-coding-tool').value = settings.defaultCodingTool || 'amp';
+    document.getElementById('custom-prompt').value = settings.customPrompt || '';
     this.setSecureField('amp-api-key', settings.ampApiKey);
     this.setSecureField('openai-api-key', settings.openaiApiKey);
 

@@ -3,6 +3,7 @@ import { CodingTool } from '../types';
 import { DatabaseManager } from './database';
 import { execCommand, execCommandWithInput } from '../utils/exec';
 import { createCodingPrompt } from './prompts';
+import { SettingsManager } from './settings-manager';
 
 interface CodingContext {
   taskId: number;
@@ -11,9 +12,11 @@ interface CodingContext {
 
 export class CodingManager {
   private db: DatabaseManager;
+  private settingsManager: SettingsManager;
 
   constructor(db: DatabaseManager) {
     this.db = db;
+    this.settingsManager = new SettingsManager(db);
   }
 
   async generateCode(
@@ -21,7 +24,8 @@ export class CodingManager {
     prompt: string,
     context: CodingContext
   ): Promise<string> {
-    const enhancedPrompt = createCodingPrompt(prompt);
+    const customPrompt = this.settingsManager.get('customPrompt');
+    const enhancedPrompt = createCodingPrompt(prompt, customPrompt);
 
     return await withRetry(
       async () => {

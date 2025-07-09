@@ -393,7 +393,7 @@ export class CoreEngine extends EventEmitter {
             level: 'info',
             message: '⏳ Waiting 10 seconds for GitHub to process the push...',
           });
-          await new Promise(resolve => setTimeout(resolve, 10000));
+          await new Promise((resolve) => setTimeout(resolve, 10000));
 
           // Step 5: Create PR
           this.db.updateTask(taskId, { current_stage: 'creating_pr' });
