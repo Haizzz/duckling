@@ -26,6 +26,7 @@ export function runMultiRepositoryMigration(
       name: 'repository_path',
       definition: "repository_path TEXT NOT NULL DEFAULT ''",
     },
+    { name: 'worktree_path', definition: 'worktree_path TEXT' },
   ];
 
   for (const column of columnsToAdd) {

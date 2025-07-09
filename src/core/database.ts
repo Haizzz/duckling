@@ -126,8 +126,8 @@ export class DatabaseManager {
   // Task operations
   createTask(task: Omit<Task, 'id' | 'created_at' | 'updated_at'>): number {
     const stmt = this.db.prepare(`
-      INSERT INTO tasks (title, description, summary, status, coding_tool, repository_path, current_stage, branch_name, pr_number, pr_url, completed_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO tasks (title, description, summary, status, coding_tool, repository_path, worktree_path, current_stage, branch_name, pr_number, pr_url, completed_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const result = stmt.run(
@@ -137,6 +137,7 @@ export class DatabaseManager {
       task.status,
       task.coding_tool,
       task.repository_path,
+      task.worktree_path || null,
       task.current_stage || null,
       task.branch_name || null,
       task.pr_number || null,

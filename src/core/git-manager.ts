@@ -14,6 +14,7 @@ export class GitManager {
   private settings: SettingsManager;
   private openaiManager: OpenAIManager;
   private repoPath: string;
+  private worktreesPath: string;
 
   constructor(
     db: DatabaseManager,
@@ -24,6 +25,7 @@ export class GitManager {
     this.settings = new SettingsManager(db);
     this.openaiManager = openaiManager || new OpenAIManager(db);
     this.repoPath = repoPath;
+    this.worktreesPath = path.join(repoPath, '.duckling-worktrees');
 
     // Validate git repository before initializing SimpleGit
     this.validateGitRepo();
@@ -315,5 +317,185 @@ export class GitManager {
           taskId.toString()
         );
     }, 'Pull latest changes');
+  }
+
+  async createWorktree(branchName: string, taskId: number): Promise<string> {
+    return await withRetry(async () => {
+      // Ensure worktrees directory exists
+      if (!fs.existsSync(this.worktreesPath)) {
+        fs.mkdirSync(this.worktreesPath, { recursive: true });
+
+        // Add to gitignore if not already there
+        await this.ensureWorktreeInGitignore();
+      }
+
+      const worktreePath = path.join(this.worktreesPath, `task-${taskId}`);
+
+      // Remove existing worktree if it exists
+      if (fs.existsSync(worktreePath)) {
+        await this.removeWorktree(worktreePath, taskId);
+      }
+
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'info',
+        message: `🌳 Creating worktree for branch '${branchName}' at ${worktreePath}`,
+      });
+
+      // Create worktree
+      await this.git.raw(['worktree', 'add', worktreePath, branchName]);
+
+      logger.info(
+        `Created worktree for branch ${branchName} at ${worktreePath}`,
+        taskId.toString()
+      );
+
+      return worktreePath;
+    }, 'Create worktree');
+  }
+
+  private async ensureWorktreeInGitignore(): Promise<void> {
+    const gitignorePath = path.join(this.repoPath, '.gitignore');
+    const worktreeEntry = '.duckling-worktrees/';
+
+    try {
+      let gitignoreContent = '';
+      if (fs.existsSync(gitignorePath)) {
+        gitignoreContent = fs.readFileSync(gitignorePath, 'utf8');
+      }
+
+      if (!gitignoreContent.includes(worktreeEntry)) {
+        const newContent =
+          gitignoreContent +
+          (gitignoreContent.endsWith('\n') ? '' : '\n') +
+          worktreeEntry +
+          '\n';
+        fs.writeFileSync(gitignorePath, newContent);
+        logger.info('Added .duckling-worktrees/ to .gitignore');
+      }
+    } catch (error) {
+      logger.warn(`Could not update .gitignore: ${error}`);
+    }
+  }
+
+  async removeWorktree(worktreePath: string, taskId: number): Promise<void> {
+    return await withRetry(async () => {
+      if (!fs.existsSync(worktreePath)) {
+        return; // Already removed
+      }
+
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'info',
+        message: `🧹 Removing worktree at ${worktreePath}`,
+      });
+
+      // Remove worktree
+      await this.git.raw(['worktree', 'remove', worktreePath, '--force']);
+
+      logger.info(`Removed worktree at ${worktreePath}`, taskId.toString());
+    }, 'Remove worktree');
+  }
+
+  getWorktreeGit(worktreePath: string): SimpleGit {
+    return simpleGit(worktreePath);
+  }
+
+  async commitChangesInWorktree(
+    worktreePath: string,
+    taskDescription: string,
+    taskId: number
+  ): Promise<void> {
+    return await withRetry(async () => {
+      const worktreeGit = this.getWorktreeGit(worktreePath);
+
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'info',
+        message: '📁 Adding all changes to staging area in worktree...',
+      });
+
+      // Add all changes
+      await worktreeGit.add('.');
+
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'info',
+        message: '🔍 Checking for changes to commit in worktree...',
+      });
+
+      // Check if there are changes to commit
+      const status = await worktreeGit.status();
+      if (status.files.length === 0) {
+        this.db.addTaskLog({
+          task_id: taskId,
+          level: 'error',
+          message: '❌ No changes to commit found in worktree',
+        });
+        throw new Error('No changes to commit');
+      }
+
+      // Get list of changed files for context
+      const changedFiles = [
+        ...status.modified,
+        ...status.created,
+        ...status.deleted,
+      ];
+
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'info',
+        message: `📝 Found ${changedFiles.length} changed files in worktree, generating commit message...`,
+      });
+
+      // Generate intelligent commit message
+      const message = await this.openaiManager.generateCommitMessage(
+        taskDescription,
+        changedFiles,
+        taskId
+      );
+
+      // Apply commit suffix from settings
+      const suffix = this.settings.get('commitSuffix');
+      const finalMessage = message.endsWith(suffix)
+        ? message
+        : `${message}${suffix}`;
+
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'info',
+        message: `💾 Committing in worktree with message: "${finalMessage}"`,
+      });
+
+      // Commit changes
+      await worktreeGit.commit(finalMessage);
+
+      logger.info(
+        `Committed changes in worktree: ${finalMessage}`,
+        taskId.toString()
+      );
+    }, 'Commit changes in worktree');
+  }
+
+  async pushBranchFromWorktree(
+    worktreePath: string,
+    branchName: string,
+    taskId: number
+  ): Promise<void> {
+    return await withRetry(async () => {
+      const worktreeGit = this.getWorktreeGit(worktreePath);
+
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'info',
+        message: `🚀 Pushing branch '${branchName}' from worktree to origin...`,
+      });
+
+      await worktreeGit.push('origin', branchName);
+      logger.info(
+        `Pushed branch ${branchName} from worktree`,
+        taskId.toString()
+      );
+    }, 'Push branch from worktree');
   }
 }

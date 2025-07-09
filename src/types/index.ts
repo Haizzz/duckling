@@ -6,6 +6,7 @@ export interface Task {
   status: TaskStatus;
   coding_tool: CodingTool;
   repository_path: string;
+  worktree_path?: string;
   current_stage?: string;
   branch_name?: string;
   pr_number?: number;

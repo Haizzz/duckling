@@ -9,9 +9,9 @@ export interface TaskOperation {
 
 export class TaskExecutor extends EventEmitter {
   private static instance: TaskExecutor;
-  private currentOperation: TaskOperation | null = null;
+  private runningOperations: Map<number, TaskOperation> = new Map();
   private operationQueue: TaskOperation[] = [];
-  private isProcessing = false;
+  private maxConcurrentTasks = 5; // Allow up to 5 concurrent tasks
 
   static getInstance(): TaskExecutor {
     if (!TaskExecutor.instance) {
@@ -40,15 +40,19 @@ export class TaskExecutor extends EventEmitter {
   }
 
   private async processQueue(): Promise<void> {
-    if (this.isProcessing || this.operationQueue.length === 0) {
-      return;
-    }
-
-    this.isProcessing = true;
-
-    while (this.operationQueue.length > 0) {
+    // Start new tasks if we have capacity
+    while (
+      this.operationQueue.length > 0 &&
+      this.runningOperations.size < this.maxConcurrentTasks
+    ) {
       const operation = this.operationQueue.shift()!;
-      this.currentOperation = operation;
+
+      // Check if this task is already running
+      if (this.runningOperations.has(operation.taskId)) {
+        continue; // Skip if task is already running
+      }
+
+      this.runningOperations.set(operation.taskId, operation);
 
       logger.info(
         `Starting task operation: ${operation.operation}`,
@@ -56,29 +60,36 @@ export class TaskExecutor extends EventEmitter {
       );
       this.emit('operation-start', operation);
 
-      try {
-        await operation.execute();
-        logger.info(
-          `Completed task operation: ${operation.operation}`,
-          operation.taskId.toString()
-        );
-        this.emit('operation-complete', operation);
-      } catch (error) {
-        logger.error(
-          `Failed task operation: ${operation.operation} - ${error}`,
-          operation.taskId.toString()
-        );
-        this.emit('operation-error', operation, error);
-      }
-
-      this.currentOperation = null;
+      // Execute the operation in parallel
+      this.executeOperation(operation);
     }
-
-    this.isProcessing = false;
   }
 
-  getCurrentOperation(): TaskOperation | null {
-    return this.currentOperation;
+  private async executeOperation(operation: TaskOperation): Promise<void> {
+    try {
+      await operation.execute();
+      logger.info(
+        `Completed task operation: ${operation.operation}`,
+        operation.taskId.toString()
+      );
+      this.emit('operation-complete', operation);
+    } catch (error) {
+      logger.error(
+        `Failed task operation: ${operation.operation} - ${error}`,
+        operation.taskId.toString()
+      );
+      this.emit('operation-error', operation, error);
+    } finally {
+      // Remove from running operations
+      this.runningOperations.delete(operation.taskId);
+
+      // Process queue again to start any pending tasks
+      this.processQueue();
+    }
+  }
+
+  getCurrentOperations(): TaskOperation[] {
+    return Array.from(this.runningOperations.values());
   }
 
   getQueuedOperations(): TaskOperation[] {
@@ -86,7 +97,7 @@ export class TaskExecutor extends EventEmitter {
   }
 
   isTaskActive(taskId: number): boolean {
-    if (this.currentOperation?.taskId === taskId) {
+    if (this.runningOperations.has(taskId)) {
       return true;
     }
     return this.operationQueue.some((op) => op.taskId === taskId);
@@ -94,6 +105,10 @@ export class TaskExecutor extends EventEmitter {
 
   getQueueLength(): number {
     return this.operationQueue.length;
+  }
+
+  getRunningTaskCount(): number {
+    return this.runningOperations.size;
   }
 }
 
