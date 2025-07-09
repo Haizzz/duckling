@@ -314,6 +314,13 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
         }
       }
 
+      // Add GitHub CLI status
+      const { getGitHubAuthStatus } = await import(
+        '../core/github-provider-factory'
+      );
+      const authStatus = await getGitHubAuthStatus();
+      sanitizedSettings.githubCLIStatus = authStatus;
+
       const response: ApiResponse = {
         success: true,
         data: sanitizedSettings,

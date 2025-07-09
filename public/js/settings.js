@@ -68,7 +68,9 @@ class Settings {
   populateForm(settings) {
     // GitHub settings
     this.setSecureField('github-token', settings.githubToken);
-    document.getElementById('github-username').value = settings.githubUsername || '';
+
+    // Handle GitHub CLI status
+    this.updateGitHubTokenField(settings.githubCLIStatus);
 
     // Coding tools
     document.getElementById('default-coding-tool').value = settings.defaultCodingTool || 'amp';
@@ -142,6 +144,29 @@ class Settings {
       // Field is empty
       field.value = '';
       field.placeholder = 'Enter value...';
+    }
+  }
+
+  updateGitHubTokenField(cliStatus) {
+    const tokenField = document.getElementById('github-token');
+    const tokenLabel = document.querySelector('label[for="github-token"]');
+    const tokenHelp = tokenField.nextElementSibling;
+
+    if (cliStatus && cliStatus.method === 'cli' && cliStatus.authenticated) {
+      // GitHub CLI is available and authenticated
+      tokenField.disabled = true;
+      tokenField.style.opacity = '0.5';
+      tokenField.style.cursor = 'not-allowed';
+      tokenField.placeholder = `Using GitHub CLI (${cliStatus.username || 'authenticated'})`;
+      tokenLabel.style.color = '#6B7280';
+      tokenHelp.innerHTML = `<span style="color: #059669;">✓ GitHub CLI is authenticated and will be used instead of tokens</span>`;
+    } else {
+      // GitHub CLI not available, use token
+      tokenField.disabled = false;
+      tokenField.style.opacity = '1';
+      tokenField.style.cursor = 'text';
+      tokenLabel.style.color = '';
+      tokenHelp.innerHTML = 'Personal access token with repo permissions to create branches and PRs';
     }
   }
 
@@ -243,14 +268,14 @@ class Settings {
 
     // Check configuration completeness
     const hasGithubToken = settings.githubToken === '***CONFIGURED***';
-    const hasGithubUsername = settings.githubUsername;
+    const hasGithubCLI = settings.githubCLIStatus && settings.githubCLIStatus.method === 'cli' && settings.githubCLIStatus.authenticated;
+    const hasGithubAuth = hasGithubToken || hasGithubCLI;
     const hasAmpTool = settings.ampApiKey === '***CONFIGURED***';
     const hasOpenAiTool = settings.openaiApiKey === '***CONFIGURED***';
     const hasOpenAiForCommits = settings.openaiApiKey === '***CONFIGURED***';
 
     const missingRequirements = [];
-    if (!hasGithubToken) missingRequirements.push('GitHub token');
-    if (!hasGithubUsername) missingRequirements.push('GitHub username');
+    if (!hasGithubAuth) missingRequirements.push('GitHub authentication (token or CLI)');
     if (!hasOpenAiForCommits) missingRequirements.push('OpenAI API key');
     if (!hasAmpTool && !hasOpenAiTool) missingRequirements.push('at least one coding tool (Amp or OpenAI)');
 

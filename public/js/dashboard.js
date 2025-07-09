@@ -58,7 +58,8 @@ class Dashboard {
 
         // Check if required settings are present
         const hasGithubToken = settings.githubToken === '***CONFIGURED***';
-        const hasGithubUsername = settings.githubUsername;
+        const hasGithubCLI = settings.githubCLIStatus && settings.githubCLIStatus.method === 'cli' && settings.githubCLIStatus.authenticated;
+        const hasGithubAuth = hasGithubToken || hasGithubCLI;
         const hasAmpTool = settings.ampApiKey === '***CONFIGURED***';
         const hasOpenAiTool = settings.openaiApiKey === '***CONFIGURED***';
         const hasOpenAiForCommits = settings.openaiApiKey === '***CONFIGURED***'; // Required for both tools
@@ -66,8 +67,7 @@ class Dashboard {
         // Determine what's missing
         const missingRequirements = [];
 
-        if (!hasGithubToken) missingRequirements.push('GitHub token');
-        if (!hasGithubUsername) missingRequirements.push('GitHub username');
+        if (!hasGithubAuth) missingRequirements.push('GitHub authentication (token or CLI)');
         if (!hasOpenAiForCommits) missingRequirements.push('OpenAI API key');
         if (!hasAmpTool && !hasOpenAiTool) missingRequirements.push('at least one coding tool (Amp or OpenAI)');
 

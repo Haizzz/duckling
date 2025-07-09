@@ -59,5 +59,47 @@ export function runMultiRepositoryMigration(
     console.warn('Could not migrate existing repository data:', error);
   }
 
+  // Remove category column from settings table if it exists
+  try {
+    const settingsColumns = db.prepare('PRAGMA table_info(settings)').all();
+    const settingsColumnNames = settingsColumns.map((col: any) => col.name);
+
+    if (settingsColumnNames.includes('category')) {
+      console.log('Removing category column from settings table...');
+
+      // SQLite doesn't support DROP COLUMN directly, so we need to recreate the table
+      db.exec(`
+        BEGIN TRANSACTION;
+        
+        -- Create new settings table without category column
+        CREATE TABLE settings_new (
+          key TEXT PRIMARY KEY,
+          value TEXT NOT NULL,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        
+        -- Copy data from old table to new table
+        INSERT INTO settings_new (key, value, updated_at)
+        SELECT key, value, updated_at FROM settings;
+        
+        -- Drop old table and rename new table
+        DROP TABLE settings;
+        ALTER TABLE settings_new RENAME TO settings;
+        
+        COMMIT;
+      `);
+
+      console.log('Successfully removed category column from settings table');
+    } else {
+      console.log('Category column not found in settings table, skipping');
+    }
+  } catch (error) {
+    console.error(
+      'Failed to remove category column from settings table:',
+      error
+    );
+    // Don't fail the entire migration if this fails
+  }
+
   console.log('Database migrations completed');
 }

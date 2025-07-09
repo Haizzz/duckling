@@ -1,11 +1,11 @@
 // API client with retry logic
 window.API = {
   baseURL: '/api',
-  
+
   async request(endpoint, options = {}) {
     const url = `${this.baseURL}${endpoint}`;
     const maxRetries = 3;
-    
+
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         const response = await fetch(url, {
@@ -15,24 +15,24 @@ window.API = {
           },
           ...options
         });
-        
+
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
-        
+
         const data = await response.json();
-        
+
         if (!data.success) {
           throw new Error(data.error || 'Request failed');
         }
-        
+
         return data.data;
       } catch (error) {
         if (attempt === maxRetries) {
           console.error(`API request failed after ${maxRetries} attempts:`, error);
           throw error;
         }
-        
+
         // Wait before retry (exponential backoff)
         await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
       }
@@ -81,9 +81,8 @@ window.API = {
   },
 
   // Settings endpoints
-  async getSettings(category) {
-    const query = category ? `?category=${category}` : '';
-    return this.request(`/settings${query}`);
+  async getSettings() {
+    return this.request(`/settings`);
   },
 
   async updateSettings(settings) {
@@ -109,7 +108,7 @@ window.API = {
   // Server-Sent Events for real-time updates
   createEventSource() {
     const eventSource = new EventSource('/api/events');
-    
+
     eventSource.onerror = () => {
       console.log('EventSource failed, retrying in 5s...');
       setTimeout(() => {
@@ -117,7 +116,7 @@ window.API = {
         this.createEventSource();
       }, 5000);
     };
-    
+
     return eventSource;
   }
 };

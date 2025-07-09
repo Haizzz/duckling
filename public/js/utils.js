@@ -103,6 +103,11 @@ window.Utils = {
     }`;
     toast.textContent = message;
     
+    // Add transition styles
+    toast.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+    toast.style.opacity = '1';
+    toast.style.transform = 'translateX(0)';
+    
     document.body.appendChild(toast);
     
     setTimeout(() => {

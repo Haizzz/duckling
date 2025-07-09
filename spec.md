@@ -214,7 +214,6 @@ CREATE TABLE task_logs (
 CREATE TABLE settings (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL,
-  category TEXT NOT NULL,          -- api_keys, general, precommit, github
   data_type TEXT DEFAULT 'string', -- string, number, boolean, json
   is_secret BOOLEAN DEFAULT 0,     -- for secure handling
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -289,7 +288,6 @@ graph TD
 |----------|--------|---------|--------------|-----------|
 | `/api/settings` | GET | Get all settings | None | SettingsMap |
 | `/api/settings` | PUT | Update multiple settings | SettingsUpdateRequest | StatusResponse |
-| `/api/settings/:category` | GET | Get settings by category | None | SettingsMap |
 
 #### System Management
 | Endpoint | Method | Purpose | Request Body | Response |

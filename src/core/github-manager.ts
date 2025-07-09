@@ -1,5 +1,5 @@
 /**
- * GitHub Manager - Handles all GitHub API interactions
+ * GitHub Manager - Handles all GitHub API interactions using GitHub tokens
  *
  * This manager provides GitHub-specific functionality including:
  * - Getting repository default branches
@@ -14,8 +14,9 @@ import { SettingsManager } from './settings-manager';
 import { OpenAIManager } from './openai-manager';
 import { validateAndGetRepoInfo } from '../utils/git-utils';
 import { logger } from '../utils/logger';
+import { GitHubProvider } from './github-interface';
 
-export class GitHubManager {
+export class GitHubManager implements GitHubProvider {
   private octokit: Octokit;
   private db: DatabaseManager;
   private settings: SettingsManager;
@@ -35,6 +36,16 @@ export class GitHubManager {
     this.db = db;
     this.settings = new SettingsManager(db);
     this.openaiManager = openaiManager;
+  }
+
+  private async getCurrentGitHubUsername(): Promise<string> {
+    try {
+      const response = await this.octokit.rest.users.getAuthenticated();
+      return response.data.login;
+    } catch (error) {
+      logger.warn('Could not get GitHub username from API:', String(error));
+      throw new Error('Failed to determine GitHub username');
+    }
   }
 
   private async ensureInitialized(repositoryPath: string) {
@@ -200,10 +211,12 @@ export class GitHubManager {
   async pollForComments(
     prNumber: number,
     lastCommitTimestamp: string | null,
-    targetUsername: string,
     repositoryPath: string
   ): Promise<string[]> {
     try {
+      // Get current GitHub username
+      const actualTargetUsername = await this.getCurrentGitHubUsername();
+
       // Get PR reviews (not individual review comments)
       const reviews = await this.getPRReviews(prNumber, repositoryPath);
 
@@ -211,13 +224,14 @@ export class GitHubManager {
       // Only consider actual reviews with state (APPROVED, CHANGES_REQUESTED, COMMENTED)
       const newReviews = reviews.filter((review) => {
         logger.info(
-          `review author ${review.user.login}, target ${targetUsername}, ` +
+          `review author ${review.user.login}, target ${actualTargetUsername}, ` +
             `review time ${new Date(review.submitted_at)}, commit time ${lastCommitTimestamp ? new Date(lastCommitTimestamp) : 'null'}, ` +
             `review state ${review.state}`
         );
 
         const isFromTargetUser =
-          review.user.login.toLowerCase() === targetUsername.toLowerCase();
+          review.user.login.toLowerCase() ===
+          actualTargetUsername.toLowerCase();
         const isNewerThanCommit = lastCommitTimestamp
           ? new Date(review.submitted_at) > new Date(lastCommitTimestamp)
           : true;

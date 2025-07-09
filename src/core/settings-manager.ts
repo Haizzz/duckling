@@ -2,7 +2,6 @@ import { DatabaseManager } from './database';
 import { CodingTool } from '../types';
 
 export interface SettingsDefaults {
-  githubUsername: string;
   githubToken: string;
   repositoryUrl: string;
   defaultCodingTool: CodingTool;
@@ -16,7 +15,6 @@ export interface SettingsDefaults {
 
 export class SettingsManager {
   private static readonly DEFAULTS: SettingsDefaults = {
-    githubUsername: '',
     githubToken: '',
     repositoryUrl: '',
     defaultCodingTool: 'amp',

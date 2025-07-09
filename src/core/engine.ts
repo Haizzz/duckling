@@ -4,7 +4,8 @@ import { SettingsManager } from './settings-manager';
 import { GitManager } from './git-manager';
 import { CodingManager } from './coding-manager';
 import { PrecommitManager } from './precommit-manager';
-import { GitHubManager } from './github-manager';
+import { GitHubProvider } from './github-interface';
+import { DefaultGitHubProviderFactory } from './github-provider-factory';
 import { OpenAIManager } from './openai-manager';
 import { Task, TaskStatus, TaskUpdateEvent, CreateTaskRequest } from '../types';
 import { taskExecutor } from './task-executor';
@@ -16,7 +17,7 @@ export class CoreEngine extends EventEmitter {
   private settings: SettingsManager;
   private codingManager: CodingManager;
   private precommitManager: PrecommitManager;
-  private githubManager?: GitHubManager;
+  private githubManager?: GitHubProvider;
   private openaiManager: OpenAIManager;
   private isInitialized = false;
   private processingInterval?: NodeJS.Timeout;
@@ -40,30 +41,20 @@ export class CoreEngine extends EventEmitter {
     }
   }
 
-  private getGitHubManager(): GitHubManager {
+  private async getGitHubManager(): Promise<GitHubProvider> {
     if (this.githubManager) {
       return this.githubManager;
     }
 
-    const githubToken = this.settings.get('githubToken');
-    if (!githubToken) {
-      logger.error(
-        'GitHub token not configured. GitHub operations will be skipped. Please configure GitHub settings.'
-      );
-      throw new Error(
-        'GitHub token not configured. GitHub operations will be skipped. Please configure GitHub settings.'
-      );
-    }
-
     try {
-      this.githubManager = new GitHubManager(
-        githubToken,
+      const factory = new DefaultGitHubProviderFactory(
         this.db,
         this.openaiManager
       );
+      this.githubManager = await factory.createProvider();
       return this.githubManager;
     } catch (error) {
-      const errorMsg = `Failed to initialize PR manager: ${error}`;
+      const errorMsg = `Failed to initialize GitHub provider: ${error}`;
       logger.error(errorMsg);
       console.error(`❌ ${errorMsg}`);
       throw new Error(errorMsg);
@@ -453,7 +444,7 @@ export class CoreEngine extends EventEmitter {
     branchName: string
   ): Promise<void> {
     try {
-      const githubManager = this.getGitHubManager();
+      const githubManager = await this.getGitHubManager();
       const pr = await githubManager.createPRFromTask(
         branchName,
         task.description,
@@ -512,9 +503,7 @@ export class CoreEngine extends EventEmitter {
       return { comments: [] }; // Task completed or cancelled
     }
 
-    const githubManager = this.getGitHubManager();
-    const githubUsername = this.settings.get('githubUsername');
-    if (!githubUsername) return { comments: [] };
+    const githubManager = await this.getGitHubManager();
 
     // Get last commit timestamp for the branch
     let lastCommitTimestamp: string | null = null;
@@ -540,7 +529,6 @@ export class CoreEngine extends EventEmitter {
     const newComments = await githubManager.pollForComments(
       prNumber,
       lastCommitTimestamp,
-      githubUsername,
       task.repository_path
     );
 
