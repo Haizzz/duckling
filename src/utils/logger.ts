@@ -77,7 +77,19 @@ export class Logger {
     if (exitCode === 0) {
       this.info(`Command succeeded: ${command}`, taskId);
       if (stdout) {
-        this.debug(`stdout: ${stdout}`, taskId);
+        // For coding tools, log the full output at info level so it appears in the log file
+        if (command === 'amp' || command === 'codex') {
+          this.info(`Output from ${command}:`, taskId);
+          // Split output into lines and log each line individually to ensure proper formatting
+          const lines = stdout.split('\n');
+          lines.forEach((line) => {
+            if (line.trim()) {
+              this.info(`  ${line}`, taskId);
+            }
+          });
+        } else {
+          this.debug(`stdout: ${stdout}`, taskId);
+        }
       }
     } else {
       this.error(`Command failed: ${command} (exit code: ${exitCode})`, taskId);
@@ -85,7 +97,18 @@ export class Logger {
         this.error(`stderr: ${stderr}`, taskId);
       }
       if (stdout) {
-        this.debug(`stdout: ${stdout}`, taskId);
+        // For coding tools, log the full output at error level for debugging
+        if (command === 'amp' || command === 'codex') {
+          this.error(`Output from ${command}:`, taskId);
+          const lines = stdout.split('\n');
+          lines.forEach((line) => {
+            if (line.trim()) {
+              this.error(`  ${line}`, taskId);
+            }
+          });
+        } else {
+          this.debug(`stdout: ${stdout}`, taskId);
+        }
       }
     }
   }
