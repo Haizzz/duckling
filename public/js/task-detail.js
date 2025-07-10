@@ -200,7 +200,19 @@ class TaskDetail {
 
           <!-- Logs -->
           <div>
-            <h3 class="text-lg font-medium text-gray-900 mb-3">Recent Activity</h3>
+            <div class="flex justify-between items-center mb-3">
+              <h3 class="text-lg font-medium text-gray-900">Recent Activity</h3>
+              <a 
+                href="/api/tasks/${task.id}/logs/file" 
+                target="_blank" 
+                class="text-sm text-blue-600 hover:text-blue-800 underline flex items-center"
+              >
+                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                View full log file
+              </a>
+            </div>
             <div id="task-logs" class="bg-gray-900 rounded-lg p-4 max-h-96 overflow-y-auto">
               <div class="text-center py-4">
                 <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-400 mx-auto mb-2"></div>

@@ -6,6 +6,7 @@ import { DatabaseManager } from '../core/database';
 import { SettingsManager } from '../core/settings-manager';
 import { CoreEngine } from '../core/engine';
 import { ApiResponse, CreateTaskRequest } from '../types';
+import { LOGS_DIR } from '../utils/constants';
 
 export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
   const router = Router();
@@ -271,6 +272,46 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
       };
 
       res.json(response);
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  });
+
+  router.get('/tasks/:id/logs/file', async (req: Request, res: Response) => {
+    try {
+      const taskId = parseInt(req.params.id);
+      const logFilePath = pathLib.join(LOGS_DIR, `task-${taskId}.log`);
+
+      // Check if the task exists
+      const task = db.getTask(taskId);
+      if (!task) {
+        return res.status(404).json({
+          success: false,
+          error: 'Task not found',
+        });
+      }
+
+      // Check if log file exists
+      if (!fs.existsSync(logFilePath)) {
+        return res.status(404).json({
+          success: false,
+          error: 'Log file not found',
+        });
+      }
+
+      // Set appropriate headers for text file
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.setHeader(
+        'Content-Disposition',
+        `inline; filename="task-${taskId}.log"`
+      );
+
+      // Stream the log file
+      const fileStream = fs.createReadStream(logFilePath);
+      fileStream.pipe(res);
     } catch (error: any) {
       res.status(500).json({
         success: false,

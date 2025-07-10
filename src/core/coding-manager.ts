@@ -1,7 +1,11 @@
 import { withRetry } from '../utils/retry';
 import { CodingTool } from '../types';
 import { DatabaseManager } from './database';
-import { execCommand, execCommandWithInput } from '../utils/exec';
+import {
+  execCommand,
+  execCommandWithInput,
+  execCommandWithStreaming,
+} from '../utils/exec';
 import { createCodingPrompt } from './prompts';
 
 interface CodingContext {
@@ -58,7 +62,7 @@ export class CodingManager {
         cwd: repositoryPath,
       });
 
-      // Call amp with the prompt via stdin
+      // Call amp with the prompt via stdin and stream output
       const result = await execCommandWithInput('amp', prompt, [], {
         taskId: taskId.toString(),
         cwd: repositoryPath,
@@ -103,7 +107,7 @@ export class CodingManager {
         cwd: repositoryPath,
       });
 
-      const result = await execCommand(
+      const result = await execCommandWithStreaming(
         'codex',
         [
           '--disable-response-storage',
