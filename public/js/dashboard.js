@@ -454,9 +454,13 @@ class Dashboard {
     const canCancel = task.status !== 'completed' && task.status !== 'cancelled' && task.status !== 'failed';
     const canComplete = task.status !== 'completed' && task.status !== 'cancelled' && task.status !== 'failed';
 
-    // Add pulsing border if task is in progress or awaiting review
-    const isWorking = task.status === 'in-progress' || task.status === 'awaiting-review';
-    const borderClass = isWorking ? 'task-working' : '';
+    // Add pulsing border based on status
+    let borderClass = '';
+    if (task.status === 'in-progress' || task.status === 'addressing-review') {
+      borderClass = 'task-working';
+    } else if (task.status === 'awaiting-review') {
+      borderClass = 'task-awaiting-review';
+    }
 
     return `
       <div class="task-card bg-white border border-gray-200 rounded-lg p-6 hover:shadow-sm transition-shadow ${borderClass}" data-task-id="${task.id}">

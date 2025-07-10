@@ -1,9 +1,10 @@
 .status-badge {
   @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
 }
-.status-pending { @apply bg-yellow-100 text-yellow-800; }
-.status-in-progress { @apply bg-blue-100 text-blue-800; }
-.status-awaiting-review { @apply bg-purple-100 text-purple-800; }
+.status-pending { @apply bg-gray-100 text-gray-800; }
+.status-in-progress { @apply bg-yellow-100 text-yellow-800; }
+.status-addressing-review { @apply bg-yellow-100 text-yellow-800; }
+.status-awaiting-review { @apply bg-blue-100 text-blue-800; }
 .status-completed { @apply bg-green-100 text-green-800; }
 .status-failed { @apply bg-red-100 text-red-800; }
 .status-cancelled { @apply bg-gray-100 text-gray-800; }
@@ -85,6 +86,23 @@
   50% {
     border-color: #f59e0b;
     box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.1);
+  }
+}
+
+/* Pulsing blue border for awaiting review tasks */
+.task-awaiting-review {
+  @apply border-blue-400;
+  animation: pulse-blue 2s ease-in-out infinite;
+}
+
+@keyframes pulse-blue {
+  0%, 100% {
+    border-color: #60a5fa;
+    box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.3);
+  }
+  50% {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.1);
   }
 }
 

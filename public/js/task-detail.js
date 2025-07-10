@@ -79,8 +79,16 @@ class TaskDetail {
     // Update page title with task summary
     document.title = `Duckling - ${summary}`;
 
+    // Add border class based on status
+    let borderClass = '';
+    if (task.status === 'in-progress' || task.status === 'addressing-review') {
+      borderClass = 'task-working';
+    } else if (task.status === 'awaiting-review') {
+      borderClass = 'task-awaiting-review';
+    }
+
     container.innerHTML = `
-      <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
+      <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-8 ${borderClass}">
         <!-- Header -->
         <div class="flex justify-between items-start mb-6">
           <div class="flex-1">
