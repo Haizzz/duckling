@@ -63,9 +63,7 @@ export async function startDuckling(port: number = 5050): Promise<void> {
 }
 
 // Export main components for programmatic use
-export { DatabaseManager } from './core/database';
-export { CoreEngine } from './core/engine';
-export { APIServer } from './api/server';
+// Note: These exports are currently unused externally
 
 export * from './types';
 

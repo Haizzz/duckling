@@ -1,51 +1,6 @@
 // Utility functions
 window.Utils = {
-  // Format timestamp to relative time
-  formatRelativeTime(timestamp) {
-    const now = new Date();
-    const time = new Date(timestamp);
-    const diffMs = now - time;
-    const diffSecs = Math.floor(diffMs / 1000);
-    const diffMins = Math.floor(diffSecs / 60);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
 
-    if (diffSecs < 60) return `${diffSecs}s ago`;
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    
-    return time.toLocaleDateString();
-  },
-
-  // Format status for display
-  formatStatus(status) {
-    const statusMap = {
-      'pending': 'Pending',
-      'in_progress': 'In Progress',
-      'awaiting_review': 'Awaiting Review',
-      'addressing_review': 'Addressing Review',
-      'completed': 'Completed',
-      'failed': 'Failed',
-      'cancelled': 'Cancelled'
-    };
-    return statusMap[status] || status;
-  },
-
-
-
-  // Debounce function
-  debounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-      const later = () => {
-        clearTimeout(timeout);
-        func(...args);
-      };
-      clearTimeout(timeout);
-      timeout = setTimeout(later, wait);
-    };
-  },
 
   // Escape HTML
   escapeHtml(unsafe) {
@@ -69,15 +24,7 @@ window.Utils = {
     });
   },
 
-  // Parse query string
-  parseQuery(queryString) {
-    const params = new URLSearchParams(queryString);
-    const result = {};
-    for (const [key, value] of params) {
-      result[key] = value;
-    }
-    return result;
-  },
+
 
   // Build query string
   buildQuery(params) {
@@ -116,33 +63,7 @@ window.Utils = {
     }, 3000);
   },
 
-  // Validate form fields
-  validateForm(formData, rules) {
-    const errors = {};
-    
-    for (const [field, fieldRules] of Object.entries(rules)) {
-      const value = formData[field];
-      
-      if (fieldRules.required && (!value || value.trim() === '')) {
-        errors[field] = `${fieldRules.label || field} is required`;
-        continue;
-      }
-      
-      if (value && fieldRules.minLength && value.length < fieldRules.minLength) {
-        errors[field] = `${fieldRules.label || field} must be at least ${fieldRules.minLength} characters`;
-      }
-      
-      if (value && fieldRules.maxLength && value.length > fieldRules.maxLength) {
-        errors[field] = `${fieldRules.label || field} must be no more than ${fieldRules.maxLength} characters`;
-      }
-      
-      if (value && fieldRules.pattern && !fieldRules.pattern.test(value)) {
-        errors[field] = fieldRules.message || `${fieldRules.label || field} is invalid`;
-      }
-    }
-    
-    return errors;
-  },
+
 
   // Status badge generation (shared across dashboard and task detail)
   getStatusBadge(status) {
