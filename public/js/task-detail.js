@@ -434,79 +434,25 @@ class TaskDetail {
   }
 
   async cancelTask() {
-    if (!confirm('Are you sure you want to cancel this task?')) {
-      return;
-    }
-
-    try {
-      const response = await fetch(`/api/tasks/${this.taskId}/cancel`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
-
-      if (response.ok) {
-        this.hideTaskDropdown();
-        // Don't reload immediately - let real-time updates handle it
-        // The SSE will send a task-update event for the cancelled task
-      } else {
-        const result = await response.json();
-        throw new Error(result.error || 'Failed to cancel task');
-      }
-    } catch (error) {
-      console.error('Error cancelling task:', error);
-      alert('Failed to cancel task. Please try again.');
-    }
+    await Utils.cancelTask(this.taskId, {
+      hideDropdown: () => this.hideTaskDropdown()
+    });
   }
 
   async completeTask() {
-    if (!confirm('Are you sure you want to mark this task as complete?')) {
-      return;
-    }
-
-    try {
-      const response = await fetch(`/api/tasks/${this.taskId}/complete`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
-
-      if (response.ok) {
-        this.hideTaskDropdown();
-        // Don't reload immediately - let real-time updates handle it
-        // The SSE will send a task-update event for the completed task
-      } else {
-        const result = await response.json();
-        throw new Error(result.error || 'Failed to complete task');
-      }
-    } catch (error) {
-      console.error('Error completing task:', error);
-      alert('Failed to complete task. Please try again.');
-    }
+    await Utils.completeTask(this.taskId, {
+      hideDropdown: () => this.hideTaskDropdown()
+    });
   }
 
   async retryTask() {
-    if (!confirm('Are you sure you want to retry this task?')) {
-      return;
-    }
-
-    try {
-      const response = await fetch(`/api/tasks/${this.taskId}/retry`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
-
-      if (response.ok) {
-        this.hideTaskDropdown();
-        // Don't reload immediately - let real-time updates handle it
-        // The SSE will send a task-update event for the retried task
-        // Also re-start log refresh since the task is now active again
-        this.startLogRefresh();
-      } else {
-        const result = await response.json();
-        throw new Error(result.error || 'Failed to retry task');
-      }
-    } catch (error) {
-      console.error('Error retrying task:', error);
-      alert('Failed to retry task. Please try again.');
+    const success = await Utils.retryTask(this.taskId, {
+      hideDropdown: () => this.hideTaskDropdown()
+    });
+    
+    // Re-start log refresh since the task is now active again
+    if (success) {
+      this.startLogRefresh();
     }
   }
 

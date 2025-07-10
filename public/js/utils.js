@@ -192,5 +192,63 @@ window.Utils = {
       `;
       container.classList.remove('hidden');
     }
+  },
+
+  // Shared task action utilities
+  async performTaskAction(taskId, action, options = {}) {
+    const { confirmMessage, hideDropdown } = options;
+    
+    // Show confirmation if required
+    if (confirmMessage && !confirm(confirmMessage)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/tasks/${taskId}/${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (response.ok) {
+        // Hide dropdown if callback provided
+        if (hideDropdown) {
+          hideDropdown();
+        }
+        
+        // Show success toast
+        this.showToast(`Task ${action} successful`, 'success');
+        
+        return true;
+      } else {
+        const result = await response.json();
+        throw new Error(result.error || `Failed to ${action} task`);
+      }
+    } catch (error) {
+      console.error(`Error ${action} task:`, error);
+      this.showToast(`Failed to ${action} task. Please try again.`, 'error');
+      return false;
+    }
+  },
+
+  // Specific task action methods
+  async cancelTask(taskId, options = {}) {
+    return this.performTaskAction(taskId, 'cancel', {
+      confirmMessage: 'Are you sure you want to cancel this task?',
+      ...options
+    });
+  },
+
+  async completeTask(taskId, options = {}) {
+    return this.performTaskAction(taskId, 'complete', {
+      confirmMessage: 'Are you sure you want to mark this task as complete?',
+      ...options
+    });
+  },
+
+  async retryTask(taskId, options = {}) {
+    return this.performTaskAction(taskId, 'retry', {
+      // No confirmation required as per PR feedback
+      ...options
+    });
   }
 };
