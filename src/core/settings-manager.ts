@@ -1,5 +1,6 @@
 import { CodingTool } from '../types';
 import { DatabaseManager } from './database';
+import { DEFAULT_CODING_PROMPT } from './prompts';
 
 export interface SettingsDefaults {
   defaultCodingTool: CodingTool;
@@ -21,7 +22,7 @@ export class SettingsManager {
     commentPrefix: 'duckling',
     maxRetries: 3,
     openaiApiKey: '',
-    customPrompt: '',
+    customPrompt: DEFAULT_CODING_PROMPT,
   };
 
   constructor(private db: DatabaseManager) {}

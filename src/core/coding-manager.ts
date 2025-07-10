@@ -26,10 +26,7 @@ export class CodingManager {
     context: CodingContext
   ): Promise<string> {
     const customPrompt = this.settings.get('customPrompt');
-    const enhancedPrompt = createCodingPrompt(
-      prompt,
-      customPrompt || undefined
-    );
+    const enhancedPrompt = createCodingPrompt(prompt, customPrompt);
 
     return await withRetry(
       async () => {

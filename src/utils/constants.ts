@@ -1,5 +1,6 @@
 import path from 'path';
 import os from 'os';
+import { DEFAULT_CODING_PROMPT } from '../core/prompts';
 
 // Application constants
 export const APP_NAME = 'duckling';
@@ -21,21 +22,7 @@ export const DEFAULT_SETTINGS = {
   commitSuffix: ' [quack]',
   commentPrefix: 'duckling',
   maxRetries: 3,
-  customPrompt: `You are a senior software engineer.
-1. **Understand Context**: First examine the relevant parts of the codebase to understand the existing architecture, patterns, and conventions
-2. **Find Examples**: Look at similar implementations elsewhere in the codebase to understand how things are typically done
-3. **Follow Conventions**: Match the existing code style, naming conventions, file structure, and patterns
-4. **Implement Thoroughly**: Write complete, production-ready code with proper error handling
-5. **Test Your Output**: After implementing, check your work for:
-   - TypeScript compilation errors
-   - Linting issues  
-   - Logic errors
-   - Missing imports or exports
-   - Incomplete implementations
-6. **Fix Issues**: If you find any problems in step 5, fix them before finishing
-7. **Validate Integration**: Ensure your changes integrate properly with existing code
-
-Make the necessary changes for the following task:`,
+  customPrompt: DEFAULT_CODING_PROMPT,
 } as const;
 
 // Log levels
