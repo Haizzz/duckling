@@ -54,16 +54,146 @@ export async function execCommand(
   }
 }
 
-export async function execCommandWithInput(
+export async function execCommandWithInputStreaming(
   command: string,
   input: string,
   args: string[] = [],
   options: ExecaOptions & { taskId?: string; cwd?: string } = {}
 ): Promise<ExecResult> {
-  return execCommand(command, args, {
-    ...options,
-    input,
-  });
+  const { taskId, ...execaOptions } = options;
+  const cwd = options.cwd || process.cwd();
+
+  // Log the command being executed
+  logger.logCommand(command, args, cwd, taskId);
+
+  try {
+    const subprocess = execa(command, args, {
+      reject: false,
+      input,
+      stdio: 'pipe',
+      ...execaOptions,
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    // Stream stdout in real-time
+    if (subprocess.stdout) {
+      subprocess.stdout.on('data', (chunk: Buffer) => {
+        const data = chunk.toString();
+        stdout += data;
+        // Log each chunk to file logs immediately
+        if (taskId) {
+          logger.info(`stdout: ${data.trim()}`, taskId);
+        }
+      });
+    }
+
+    // Stream stderr in real-time
+    if (subprocess.stderr) {
+      subprocess.stderr.on('data', (chunk: Buffer) => {
+        const data = chunk.toString();
+        stderr += data;
+        // Log each chunk to file logs immediately
+        if (taskId) {
+          logger.warn(`stderr: ${data.trim()}`, taskId);
+        }
+      });
+    }
+
+    const result = await subprocess;
+
+    // Log the final result
+    logger.logCommandResult(command, result.exitCode, stdout, stderr, taskId);
+
+    return {
+      stdout,
+      stderr,
+      exitCode: result.exitCode,
+    };
+  } catch (error: any) {
+    // Log the error
+    logger.logCommandResult(
+      command,
+      error.exitCode || 1,
+      error.stdout,
+      error.stderr,
+      taskId
+    );
+
+    // Re-throw the error
+    throw error;
+  }
+}
+
+export async function execCommandStreaming(
+  command: string,
+  args: string[] = [],
+  options: ExecaOptions & { taskId?: string; cwd?: string } = {}
+): Promise<ExecResult> {
+  const { taskId, ...execaOptions } = options;
+  const cwd = options.cwd || process.cwd();
+
+  // Log the command being executed
+  logger.logCommand(command, args, cwd, taskId);
+
+  try {
+    const subprocess = execa(command, args, {
+      reject: false,
+      stdio: 'pipe',
+      ...execaOptions,
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    // Stream stdout in real-time
+    if (subprocess.stdout) {
+      subprocess.stdout.on('data', (chunk: Buffer) => {
+        const data = chunk.toString();
+        stdout += data;
+        // Log each chunk to file logs immediately
+        if (taskId) {
+          logger.info(`stdout: ${data.trim()}`, taskId);
+        }
+      });
+    }
+
+    // Stream stderr in real-time
+    if (subprocess.stderr) {
+      subprocess.stderr.on('data', (chunk: Buffer) => {
+        const data = chunk.toString();
+        stderr += data;
+        // Log each chunk to file logs immediately
+        if (taskId) {
+          logger.warn(`stderr: ${data.trim()}`, taskId);
+        }
+      });
+    }
+
+    const result = await subprocess;
+
+    // Log the final result
+    logger.logCommandResult(command, result.exitCode, stdout, stderr, taskId);
+
+    return {
+      stdout,
+      stderr,
+      exitCode: result.exitCode,
+    };
+  } catch (error: any) {
+    // Log the error
+    logger.logCommandResult(
+      command,
+      error.exitCode || 1,
+      error.stdout,
+      error.stderr,
+      taskId
+    );
+
+    // Re-throw the error
+    throw error;
+  }
 }
 
 export async function execShellCommand(

@@ -97,18 +97,5 @@ window.API = {
     return this.request('/health');
   },
 
-  // Server-Sent Events for real-time updates
-  createEventSource() {
-    const eventSource = new EventSource('/api/events');
 
-    eventSource.onerror = () => {
-      console.log('EventSource failed, retrying in 5s...');
-      setTimeout(() => {
-        eventSource.close();
-        this.createEventSource();
-      }, 5000);
-    };
-
-    return eventSource;
-  }
 };

@@ -121,8 +121,4 @@ export class APIServer {
       }
     });
   }
-
-  getApp(): express.Application {
-    return this.app;
-  }
 }

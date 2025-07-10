@@ -337,9 +337,4 @@ ${taskDescription}
 ## Branch
 \`${branchName}\``;
   }
-
-  // Method to refresh the OpenAI client when settings change
-  refreshClient(): void {
-    this.initializeClient();
-  }
 }

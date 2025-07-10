@@ -1,6 +1,10 @@
 import { withRetry } from '../utils/retry';
 import { CodingTool } from '../types';
-import { execCommand, execCommandWithInput } from '../utils/exec';
+import {
+  execCommand,
+  execCommandStreaming,
+  execCommandWithInputStreaming,
+} from '../utils/exec';
 import { createCodingPrompt } from './prompts';
 import { SettingsManager } from './settings-manager';
 
@@ -52,8 +56,7 @@ export class CodingManager {
         cwd: repositoryPath,
       });
 
-      // Call amp with the prompt via stdin
-      const result = await execCommandWithInput('amp', prompt, [], {
+      const result = await execCommandWithInputStreaming('amp', prompt, [], {
         taskId: taskId.toString(),
         cwd: repositoryPath,
         timeout: 30 * 60 * 1000, // 30 minutes timeout
@@ -96,7 +99,7 @@ export class CodingManager {
         cwd: repositoryPath,
       });
 
-      const result = await execCommand(
+      const result = await execCommandStreaming(
         'codex',
         [
           '--disable-response-storage',

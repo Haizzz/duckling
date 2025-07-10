@@ -345,11 +345,18 @@ export class CoreEngine extends EventEmitter {
               failureMessage: '❌ Code generation failed',
             },
             async () => {
-              await this.codingManager.generateCode(
+              const output = await this.codingManager.generateCode(
                 task.coding_tool,
                 task.description,
                 { taskId, repositoryPath: task.repository_path }
               );
+
+              // Log the actual output to task logs
+              this.db.addTaskLog({
+                task_id: taskId,
+                level: 'info',
+                message: `📝 Code generation output:\n${output}`,
+              });
             }
           );
 
@@ -581,6 +588,13 @@ export class CoreEngine extends EventEmitter {
       operation: 'handle-pr-comments',
       execute: async () => {
         try {
+          // Log the review comments first
+          this.db.addTaskLog({
+            task_id: taskId,
+            level: 'info',
+            message: `💬 PR review comments received:\n${concatenatedComments}`,
+          });
+
           this.db.addTaskLog({
             task_id: taskId,
             level: 'info',
@@ -588,11 +602,18 @@ export class CoreEngine extends EventEmitter {
           });
 
           // Generate response/fixes based on all comments at once
-          await this.codingManager.generateCode(
+          const output = await this.codingManager.generateCode(
             task.coding_tool,
             `Original task: ${task.description}\n\nPR review comments to address:\n\n${concatenatedComments}\n\nPlease address all the feedback above in one go.`,
             { taskId, repositoryPath: task.repository_path }
           );
+
+          // Log the code generation output
+          this.db.addTaskLog({
+            task_id: taskId,
+            level: 'info',
+            message: `📝 Review fix output:\n${output}`,
+          });
 
           this.db.addTaskLog({
             task_id: taskId,

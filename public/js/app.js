@@ -5,7 +5,6 @@ window.App = {
   
   async init() {
     this.setupEventStream();
-    this.setupRouter();
     this.hideLoading();
     
     // Cleanup on page unload
