@@ -100,7 +100,10 @@ export class GitManager {
       await this.git.reset(['--hard']);
       await this.git.clean('f', ['-d']);
       await this.git.checkout(defaultBranch);
-      await this.git.pull('origin', defaultBranch);
+
+      // Hard pull: fetch and reset to origin state to override any local changes
+      await this.git.fetch('origin', defaultBranch);
+      await this.git.reset(['--hard', `origin/${defaultBranch}`]);
 
       // Generate unique branch name
       let branchName = `${branchPrefix}${generatedBranchName}`;
@@ -254,19 +257,20 @@ export class GitManager {
       // Switch to the branch
       await this.git.checkout(branchName);
 
-      // Pull any remote changes to ensure we're up to date
+      // Hard pull: fetch and reset to origin state to override any local changes
       try {
-        await this.git.pull('origin', branchName);
+        await this.git.fetch('origin', branchName);
+        await this.git.reset(['--hard', `origin/${branchName}`]);
         if (taskId)
           logger.info(
-            `Pulled latest changes for branch: ${branchName}`,
+            `Hard pulled latest changes for branch: ${branchName}`,
             taskId.toString()
           );
       } catch (error: any) {
-        // If pull fails (e.g., no upstream), that's okay for local branches
+        // If hard pull fails (e.g., no upstream), that's okay for local branches
         if (taskId)
           logger.info(
-            `No upstream changes to pull for branch: ${branchName}`,
+            `No upstream changes to hard pull for branch: ${branchName}`,
             taskId.toString()
           );
       }
@@ -309,12 +313,14 @@ export class GitManager {
     taskId?: number
   ): Promise<void> {
     return await withRetry(async () => {
-      await this.git.pull('origin', branchName);
+      // Hard pull: fetch and reset to origin state to override any local changes
+      await this.git.fetch('origin', branchName);
+      await this.git.reset(['--hard', `origin/${branchName}`]);
       if (taskId)
         logger.info(
-          `Pulled latest changes from ${branchName}`,
+          `Hard pulled latest changes from ${branchName}`,
           taskId.toString()
         );
-    }, 'Pull latest changes');
+    }, 'Hard pull latest changes');
   }
 }
