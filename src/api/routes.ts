@@ -1,12 +1,12 @@
 import { Router, Request, Response } from 'express';
 import fs from 'fs';
 import pathLib from 'path';
-import os from 'os';
 import { execSync } from 'child_process';
 import { DatabaseManager } from '../core/database';
 import { CoreEngine } from '../core/engine';
 import { SettingsManager } from '../core/settings-manager';
 import { ApiResponse, CreateTaskRequest } from '../types';
+import { LOGS_DIR } from '../utils/constants';
 
 export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
   const router = Router();
@@ -311,9 +311,7 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
       }
 
       const logFilePath = pathLib.join(
-        process.env.HOME || os.homedir(),
-        '.duckling',
-        'logs',
+        LOGS_DIR,
         `task-${taskId}.log`
       );
 
