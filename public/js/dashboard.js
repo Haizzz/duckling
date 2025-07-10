@@ -393,11 +393,11 @@ class Dashboard {
 
     // Separate active and completed tasks (already pre-sorted by backend status filter)
     const activeTasks = this.loadedTasks.filter(task =>
-      ['pending', 'in-progress', 'awaiting-review'].includes(task.status)
+      ['pending', 'in-progress', 'addressing-review', 'awaiting-review'].includes(task.status)
     );
 
     const completedTasks = this.loadedTasks.filter(task =>
-      !['pending', 'in-progress', 'awaiting-review'].includes(task.status)
+      !['pending', 'in-progress', 'addressing-review', 'awaiting-review'].includes(task.status)
     );
 
     // Build HTML with divider if both sections exist
