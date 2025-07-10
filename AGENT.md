@@ -7,17 +7,17 @@ Duckling is an automated coding tool that wraps CLI coding assistants (OpenAI, A
 
 ### Installation
 ```bash
-npm install
-npm run build
+pnpm install
+pnpm run build
 ```
 
 ### Development
 ```bash
-npm run dev        # Start in development mode
-npm run build      # Build TypeScript
-npm run type-check # Check TypeScript types
-npm run lint       # Run ESLint
-npm run check      # Run full check: type-check, lint, format, and test
+pnpm run dev        # Start in development mode
+pnpm run build      # Build TypeScript
+pnpm run type-check # Check TypeScript types
+pnpm run lint       # Run ESLint
+pnpm run check      # Run full check: type-check, lint, format, and test
 ```
 
 ### Running Duckling
@@ -173,7 +173,7 @@ ls ~/.duckling/
 - **Integration Tests**: Test with real dependencies for integration scenarios
 
 ### Code Quality & Validation
-- **ALWAYS run `npm run check` after making changes** to verify:
+- **ALWAYS run `pnpm run check` after making changes** to verify:
   - TypeScript compilation passes
   - Linting rules are followed
   - Code is properly formatted
