@@ -221,19 +221,19 @@ git clone https://github.com/haizzz/duckling.git
 cd duckling
 
 # Install dependencies
-npm install
+pnpm install
 
 # Start in development mode
-npm run dev
+pnpm run dev
 
 # Run type checking
-npm run type-check
+pnpm run type-check
 
 # Run linting
-npm run lint
+pnpm run lint
 
 # Run all checks
-npm run check
+pnpm run check
 ```
 
 ### Project Structure
@@ -263,19 +263,19 @@ duckling/
 3. **Implement core logic** in appropriate manager
 4. **Add API routes** in `src/api/routes.ts`
 5. **Update frontend** in `public/js/`
-6. **Run checks**: `npm run check`
+6. **Run checks**: `pnpm run check`
 
 ### Testing
 
 ```bash
 # Run type checking
-npm run type-check
+pnpm run type-check
 
 # Run linting
-npm run lint
+pnpm run lint
 
 # Run all quality checks
-npm run check
+pnpm run check
 ```
 
 ## 🔍 Troubleshooting
@@ -315,7 +315,7 @@ A: Yes, as long as you have access via GitHub CLI authentication.
 A: Failed tasks are automatically retried up to the configured maximum (default: 3). Each retry includes the previous error context.
 
 **Q: Can I customize the precommit checks?**
-A: Yes! Add custom commands through the web interface. Common examples: `npm run lint`, `npm test`, `cargo check`.
+A: Yes! Add custom commands through the web interface. Common examples: `pnpm run lint`, `pnpm test`, `cargo check`.
 
 ## 📄 License
 
