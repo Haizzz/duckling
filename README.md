@@ -6,41 +6,12 @@
 
 **Duckling** is an automated asynchronous coding assistant that wraps CLI coding tools (OpenAI, Amp) to automate the entire development workflow from task assignment to PR merge.
 
-## ✨ Features
-
-- 🤖 **Autonomous Development**: Automatically creates branches, implements features, and opens pull requests
-- 📊 **Real-time Monitoring**: Live dashboard with task progress and log streaming
-- 🔄 **PR Review Integration**: Monitors pull request comments and implements requested changes
-- 🛠️ **Flexible Tool Support**: Works with OpenAI, Amp, and Claude coding assistants
-- 🎯 **Quality Control**: Runs precommit checks (linting, testing, type checking) before committing
-- 📝 **Smart Commits**: AI-generated commit messages and PR descriptions
-- 🚀 **Dependency Injection**: Modern architecture with proper separation of concerns
-
-## 🏗️ Architecture
-
-### Core Components
-
-- **CoreEngine**: Central orchestrator managing task lifecycle with timeout-based processing
-- **DependencyContainer**: Singleton dependency injection container managing service instances
-- **DatabaseManager**: SQLite-based persistence for tasks, logs, and settings
-- **APIServer**: Express.js REST API with Server-Sent Events for real-time updates
-- **Task Executors**: Queue-based task processing preventing overlapping operations
-- **Managers**: Specialized managers for Git, GitHub, coding tools, and precommit checks
-
-### Key Design Patterns
-
-- **Dependency Injection**: Clean separation of concerns with interface-based design
-- **Factory Pattern**: Dynamic creation of Git and GitHub managers per repository
-- **Observer Pattern**: Real-time updates via EventEmitter and Server-Sent Events
-- **Queue Pattern**: Task execution queue preventing concurrent operations
-- **Retry Pattern**: Automatic retry with exponential backoff for external API calls
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
 - **Node.js 20+**
-- **Git repository** (initialized with remote origin)
 - **GitHub CLI** (installed and authenticated)
 - **At least one coding tool installed**:
   - [Amp](https://ampcode.com/)
@@ -73,8 +44,8 @@
 3. **Configure through web interface**:
    - Open http://localhost:5050
    - Go to Settings
-   - Add your API keys
-   - Configure repository and preferences
+   - Add your repository path
+   - [Optional]Add your OpenAI API key
 
 ### Your First Task
 
@@ -82,6 +53,35 @@
 2. **Enter a task description**: "Add a login form to the homepage"
 3. **Submit**: Click the arrow button or press Enter
 4. **Monitor progress**: Watch real-time updates in the task detail view
+
+## ✨ Features
+
+- 🤖 **Autonomous Development**: Automatically creates branches, implements features, and opens pull requests
+- 📊 **Real-time Monitoring**: Live dashboard with task progress and log streaming
+- 🔄 **PR Review Integration**: Monitors pull request comments and implements requested changes
+- 🛠️ **Flexible Tool Support**: Works with OpenAI, Amp, and Claude coding assistants
+- 🎯 **Quality Control**: Runs precommit checks (linting, testing, type checking) before committing
+- 📝 **Smart Commits**: AI-generated commit messages and PR descriptions
+- 🚀 **Dependency Injection**: Modern architecture with proper separation of concerns
+
+## 🏗️ Architecture
+
+### Core Components
+
+- **CoreEngine**: Central orchestrator managing task lifecycle with timeout-based processing
+- **DependencyContainer**: Singleton dependency injection container managing service instances
+- **DatabaseManager**: SQLite-based persistence for tasks, logs, and settings
+- **APIServer**: Express.js REST API with Server-Sent Events for real-time updates
+- **Task Executors**: Queue-based task processing preventing overlapping operations
+- **Managers**: Specialized managers for Git, GitHub, coding tools, and precommit checks
+
+### Key Design Patterns
+
+- **Dependency Injection**: Clean separation of concerns with interface-based design
+- **Factory Pattern**: Dynamic creation of Git and GitHub managers per repository
+- **Observer Pattern**: Real-time updates via EventEmitter and Server-Sent Events
+- **Queue Pattern**: Task execution queue preventing concurrent operations
+- **Retry Pattern**: Automatic retry with exponential backoff for external API calls
 
 ## 📋 Task Lifecycle
 
