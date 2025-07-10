@@ -439,7 +439,7 @@ class Dashboard {
       '<span class="text-gray-400 text-sm">No PR yet</span>';
 
     const branchName = task.branch_name ?
-      `<span class="text-sm text-gray-600 font-mono">${this.escapeHtml(task.branch_name)}</span>` :
+      this.getBranchLink(task.branch_name, task.repository_path) :
       '<span class="text-gray-400 text-sm">No branch yet</span>';
 
     // Get repository info
@@ -740,6 +740,16 @@ class Dashboard {
 
   escapeHtml(text) {
     return Utils.escapeHtml(text || '');
+  }
+
+  getBranchLink(branchName, repositoryPath) {
+    const repository = this.repositories.find(repo => repo.path === repositoryPath);
+    if (repository && repository.owner && repository.name) {
+      const githubUrl = `https://github.com/${repository.owner}/${repository.name}/tree/${branchName}`;
+      return `<a href="${githubUrl}" target="_blank" class="text-blue-600 text-sm hover:text-blue-800 underline font-mono">${this.escapeHtml(branchName)}</a>`;
+    }
+    // Fallback to plain text if repository info is not available
+    return `<span class="text-sm text-gray-600 font-mono">${this.escapeHtml(branchName)}</span>`;
   }
 
   // Helper method to enable/disable task creation form
