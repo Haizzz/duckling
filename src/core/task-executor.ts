@@ -76,25 +76,6 @@ export class TaskExecutor extends EventEmitter {
 
     this.isProcessing = false;
   }
-
-  getCurrentOperation(): TaskOperation | null {
-    return this.currentOperation;
-  }
-
-  getQueuedOperations(): TaskOperation[] {
-    return [...this.operationQueue];
-  }
-
-  isTaskActive(taskId: number): boolean {
-    if (this.currentOperation?.taskId === taskId) {
-      return true;
-    }
-    return this.operationQueue.some((op) => op.taskId === taskId);
-  }
-
-  getQueueLength(): number {
-    return this.operationQueue.length;
-  }
 }
 
 export const taskExecutor = TaskExecutor.getInstance();

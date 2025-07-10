@@ -55,8 +55,4 @@ export class SettingsManager {
     }
     return settings as SettingsDefaults;
   }
-
-  static getDefaults(): SettingsDefaults {
-    return { ...SettingsManager.DEFAULTS };
-  }
 }

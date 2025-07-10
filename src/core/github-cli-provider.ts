@@ -372,17 +372,6 @@ export class GitHubCLIProvider {
     return { reviewComments, prComments };
   }
 
-  async getAllReviewComments(
-    prNumber: number,
-    repositoryPath: string
-  ): Promise<any[]> {
-    const { reviewComments, prComments } = await this.getAllCommentsSeparated(
-      prNumber,
-      repositoryPath
-    );
-    return [...reviewComments, ...prComments];
-  }
-
   async getPRStatus(
     prNumber: number,
     repositoryPath: string

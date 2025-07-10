@@ -234,11 +234,6 @@ export class GitManager {
     }, 'Push branch');
   }
 
-  async getCurrentBranch(): Promise<string> {
-    const status = await this.git.status();
-    return status.current || 'main';
-  }
-
   async switchToBranch(branchName: string, taskId?: number): Promise<void> {
     return await withRetry(async () => {
       if (taskId)
@@ -278,49 +273,4 @@ export class GitManager {
   }
 
   // Note: Branch deletion is not allowed per requirements
-
-  async fetchBranch(branchName: string, taskId?: number): Promise<void> {
-    return await withRetry(async () => {
-      if (taskId)
-        logger.info(
-          `Fetching latest changes for branch: ${branchName}`,
-          taskId.toString()
-        );
-      await this.git.fetch('origin', branchName);
-    }, `Fetch branch ${branchName}`);
-  }
-
-  async getChangedFiles(): Promise<string[]> {
-    const status = await this.git.status();
-    return [
-      ...status.created,
-      ...status.modified,
-      ...status.deleted,
-      ...status.renamed.map((r) => r.to || r.from),
-    ];
-  }
-
-  async getDiff(branchName?: string): Promise<string> {
-    if (branchName) {
-      return await this.git.diff([`origin/main...${branchName}`]);
-    } else {
-      return await this.git.diff();
-    }
-  }
-
-  async pullLatest(
-    branchName: string = 'main',
-    taskId?: number
-  ): Promise<void> {
-    return await withRetry(async () => {
-      // Hard pull: fetch and reset to origin state to override any local changes
-      await this.git.fetch('origin', branchName);
-      await this.git.reset(['--hard', `origin/${branchName}`]);
-      if (taskId)
-        logger.info(
-          `Hard pulled latest changes from ${branchName}`,
-          taskId.toString()
-        );
-    }, 'Hard pull latest changes');
-  }
 }
