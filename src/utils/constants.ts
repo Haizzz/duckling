@@ -1,5 +1,6 @@
 import path from 'path';
 import os from 'os';
+import { DEFAULT_CODING_PROMPT } from '../core/prompts';
 
 // Application constants
 export const APP_NAME = 'duckling';
@@ -21,6 +22,7 @@ export const DEFAULT_SETTINGS = {
   commitSuffix: ' [quack]',
   commentPrefix: 'duckling',
   maxRetries: 3,
+  customPrompt: DEFAULT_CODING_PROMPT,
 } as const;
 
 // Log levels

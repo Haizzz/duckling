@@ -146,6 +146,13 @@
           </div>
           <div class="px-6 py-4 space-y-4">
             <div>
+              <label for="custom-prompt" class="block text-sm font-medium text-gray-700">Custom Prompt</label>
+              <textarea id="custom-prompt" name="customPrompt" rows="8"
+                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400 font-mono text-sm"
+                placeholder="Enter your custom base prompt for coding agents..."></textarea>
+              <p class="text-xs text-gray-500 mt-1">Base prompt that will be sent to coding agents before the task description. Leave empty to use the default prompt.</p>
+            </div>
+            <div>
               <label for="branch-prefix" class="block text-sm font-medium text-gray-700">Branch Prefix</label>
               <input type="text" id="branch-prefix" name="branchPrefix" value="duckling-"
                 class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
