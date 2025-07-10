@@ -588,6 +588,13 @@ export class CoreEngine extends EventEmitter {
       operation: 'handle-pr-comments',
       execute: async () => {
         try {
+          // Update status to addressing-review
+          this.db.updateTask(taskId, {
+            status: 'addressing-review',
+            current_stage: 'addressing_review',
+          });
+          this.emitTaskUpdate(taskId, 'addressing-review');
+
           // Log the review comments first
           this.db.addTaskLog({
             task_id: taskId,
@@ -642,6 +649,13 @@ export class CoreEngine extends EventEmitter {
             level: 'info',
             message: '✅ All PR feedback addressed and changes pushed',
           });
+
+          // Update status back to awaiting-review
+          this.db.updateTask(taskId, {
+            status: 'awaiting-review',
+            current_stage: 'awaiting_review',
+          });
+          this.emitTaskUpdate(taskId, 'awaiting-review');
         } catch (error: any) {
           this.db.addTaskLog({
             task_id: taskId,
