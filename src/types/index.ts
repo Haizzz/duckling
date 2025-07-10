@@ -68,6 +68,7 @@ export interface DucklingSettings {
   pr_prefix: string;
   commit_suffix: string;
   max_retries: number;
+  custom_prompt?: string;
 
   // GitHub settings
   poll_interval_seconds: number;

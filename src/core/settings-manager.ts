@@ -9,6 +9,7 @@ export interface SettingsDefaults {
   commentPrefix: string;
   maxRetries: number;
   openaiApiKey: string;
+  customPrompt: string;
 }
 
 export class SettingsManager {
@@ -20,6 +21,7 @@ export class SettingsManager {
     commentPrefix: 'duckling',
     maxRetries: 3,
     openaiApiKey: '',
+    customPrompt: '',
   };
 
   constructor(private db: DatabaseManager) {}

@@ -109,6 +109,7 @@ export class DatabaseManager {
       { key: 'prTitlePrefix', value: DEFAULT_SETTINGS.prTitlePrefix },
       { key: 'commitSuffix', value: DEFAULT_SETTINGS.commitSuffix },
       { key: 'maxRetries', value: DEFAULT_SETTINGS.maxRetries.toString() },
+      { key: 'customPrompt', value: DEFAULT_SETTINGS.customPrompt },
     ];
 
     const insertSetting = this.db.prepare(`
