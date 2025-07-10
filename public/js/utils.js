@@ -60,12 +60,31 @@ window.Utils = {
   // Format date to local time with user-friendly format
   formatLocalDateTime(timestamp) {
     const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffHours / 24);
+    
+    // Show relative time for recent timestamps
+    if (diffMs < 60000) { // Less than 1 minute
+      return 'just now';
+    } else if (diffMs < 3600000) { // Less than 1 hour
+      const minutes = Math.floor(diffMs / 60000);
+      return `${minutes}m ago`;
+    } else if (diffHours < 24) { // Less than 24 hours
+      return `${diffHours}h ago`;
+    } else if (diffDays < 7) { // Less than 7 days
+      return `${diffDays}d ago`;
+    }
+    
+    // For older timestamps, use full date with better localization
     return date.toLocaleString(undefined, {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
+      timeZoneName: 'short'
     });
   },
 

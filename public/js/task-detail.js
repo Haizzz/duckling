@@ -300,13 +300,31 @@ class TaskDetail {
       return;
     }
 
-    const logsHTML = logs.map(log => `
-      <div class="flex items-start space-x-2 mb-2 text-sm font-mono">
-        <span class="text-gray-400">${new Date(log.timestamp).toLocaleTimeString()}</span>
-        <span class="text-${this.getLogColor(log.level)}-400 font-medium">[${log.level.toUpperCase()}]</span>
-        <span class="text-gray-300 flex-1 whitespace-pre-wrap">${this.escapeHtml(log.message)}</span>
-      </div>
-    `).join('');
+    const logsHTML = logs.map(log => {
+      const timestamp = new Date(log.timestamp);
+      const timeString = timestamp.toLocaleTimeString(undefined, {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+      const fullTimeString = timestamp.toLocaleString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        timeZoneName: 'short'
+      });
+      
+      return `
+        <div class="flex items-start space-x-2 mb-2 text-sm font-mono">
+          <span class="text-gray-400" title="${fullTimeString}">${timeString}</span>
+          <span class="text-${this.getLogColor(log.level)}-400 font-medium">[${log.level.toUpperCase()}]</span>
+          <span class="text-gray-300 flex-1 whitespace-pre-wrap">${this.escapeHtml(log.message)}</span>
+        </div>
+      `;
+    }).join('');
 
     container.innerHTML = logsHTML;
     this.setupScrollListener(container);
@@ -320,13 +338,31 @@ class TaskDetail {
     this.logs = [...this.logs, ...newLogs];
 
     // Only append new logs instead of re-rendering everything
-    const newLogsHTML = newLogs.map(log => `
-      <div class="flex items-start space-x-2 mb-2 text-sm font-mono">
-        <span class="text-gray-400">${new Date(log.timestamp).toLocaleTimeString()}</span>
-        <span class="text-${this.getLogColor(log.level)}-400 font-medium">[${log.level.toUpperCase()}]</span>
-        <span class="text-gray-300 flex-1 whitespace-pre-wrap">${this.escapeHtml(log.message)}</span>
-      </div>
-    `).join('');
+    const newLogsHTML = newLogs.map(log => {
+      const timestamp = new Date(log.timestamp);
+      const timeString = timestamp.toLocaleTimeString(undefined, {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+      const fullTimeString = timestamp.toLocaleString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        timeZoneName: 'short'
+      });
+      
+      return `
+        <div class="flex items-start space-x-2 mb-2 text-sm font-mono">
+          <span class="text-gray-400" title="${fullTimeString}">${timeString}</span>
+          <span class="text-${this.getLogColor(log.level)}-400 font-medium">[${log.level.toUpperCase()}]</span>
+          <span class="text-gray-300 flex-1 whitespace-pre-wrap">${this.escapeHtml(log.message)}</span>
+        </div>
+      `;
+    }).join('');
 
     container.insertAdjacentHTML('beforeend', newLogsHTML);
     
@@ -507,7 +543,13 @@ class TaskDetail {
     // Add a small visual indicator that the page was updated
     const lastUpdated = document.getElementById('last-updated');
     if (lastUpdated) {
-      lastUpdated.textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+      const now = new Date();
+      const timeString = now.toLocaleTimeString(undefined, {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+      lastUpdated.textContent = `Last updated: ${timeString}`;
       lastUpdated.style.color = '#10b981'; // Green color
 
       // Reset color after 2 seconds
