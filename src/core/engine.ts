@@ -204,9 +204,10 @@ export class CoreEngine extends EventEmitter {
 
   private async processReviews(): Promise<void> {
     const awaitingReviewTasks = this.db.getTasks({ status: 'awaiting-review' });
+    const addressingReviewTasks = this.db.getTasks({ status: 'addressing-review' });
 
     // Single pass: for each task, check for new reviews, address them, and update status
-    for (const task of awaitingReviewTasks) {
+    for (const task of [...awaitingReviewTasks, ...addressingReviewTasks]) {
       if (!task.pr_number || !task.branch_name) {
         continue;
       }
