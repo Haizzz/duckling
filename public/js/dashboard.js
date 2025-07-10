@@ -81,7 +81,7 @@ class Dashboard {
 
           // Hide helper message if it exists
           this.hideConfigurationHelper();
-          
+
           // Show optional warnings if any, otherwise hide them
           if (warnings.length > 0) {
             this.showWarningMessage(warnings.join(', '));
@@ -294,13 +294,13 @@ class Dashboard {
     this.loadedTasks = [];
     this.hasMore = true;
     this.hasMoreCompleted = true;
-    
+
     // Load ALL active tasks (these are more important and usually fewer)
-    await this.loadTasksByStatus(['pending', 'in-progress', 'awaiting-review']);
-    
+    await this.loadTasksByStatus(['pending', 'in-progress', 'addressing-review', 'awaiting-review']);
+
     // Load only first page of completed tasks
     await this.loadCompletedTasks();
-    
+
     this.renderTasks();
     this.updateLoadMoreButton();
   }
@@ -309,15 +309,15 @@ class Dashboard {
     for (const status of statuses) {
       let currentPage = 1;
       let hasMore = true;
-      
+
       while (hasMore) {
         try {
           const response = await fetch(`/api/tasks?page=${currentPage}&limit=${this.tasksPerPage}&status=${status}`);
           const result = await response.json();
-          
+
           if (response.ok && result.success) {
             this.loadedTasks.push(...result.data.tasks);
-            
+
             const pagination = result.data.pagination;
             hasMore = pagination ? currentPage < pagination.totalPages : result.data.tasks.length === this.tasksPerPage;
             currentPage++;
@@ -335,15 +335,15 @@ class Dashboard {
   async loadCompletedTasks() {
     const completedStatuses = ['completed', 'cancelled', 'failed'];
     let hasMoreTasks = false;
-    
+
     for (const status of completedStatuses) {
       try {
         const response = await fetch(`/api/tasks?page=${this.completedPage}&limit=${this.tasksPerPage}&status=${status}`);
         const result = await response.json();
-        
+
         if (response.ok && result.success) {
           this.loadedTasks.push(...result.data.tasks);
-          
+
           const pagination = result.data.pagination;
           if (pagination && this.completedPage < pagination.totalPages) {
             hasMoreTasks = true;
@@ -355,16 +355,16 @@ class Dashboard {
         console.error(`Error loading ${status} tasks:`, error);
       }
     }
-    
+
     this.hasMoreCompleted = hasMoreTasks;
   }
 
   async loadMoreTasks() {
     if (this.isLoading || !this.hasMoreCompleted) return;
-    
+
     this.isLoading = true;
     this.completedPage++;
-    
+
     try {
       await this.loadCompletedTasks();
       this.renderTasks();
@@ -392,21 +392,21 @@ class Dashboard {
     }
 
     // Separate active and completed tasks (already pre-sorted by backend status filter)
-    const activeTasks = this.loadedTasks.filter(task => 
+    const activeTasks = this.loadedTasks.filter(task =>
       ['pending', 'in-progress', 'awaiting-review'].includes(task.status)
     );
 
-    const completedTasks = this.loadedTasks.filter(task => 
+    const completedTasks = this.loadedTasks.filter(task =>
       !['pending', 'in-progress', 'awaiting-review'].includes(task.status)
     );
 
     // Build HTML with divider if both sections exist
     let tasksHTML = '';
-    
+
     if (activeTasks.length > 0) {
       tasksHTML += activeTasks.map(task => this.renderTaskCard(task)).join('');
     }
-    
+
     if (activeTasks.length > 0 && completedTasks.length > 0) {
       tasksHTML += `
         <div class="flex items-center py-4">
@@ -416,7 +416,7 @@ class Dashboard {
         </div>
       `;
     }
-    
+
     if (completedTasks.length > 0) {
       tasksHTML += completedTasks.map(task => this.renderTaskCard(task)).join('');
     }
@@ -564,7 +564,7 @@ class Dashboard {
   updateLoadMoreButton() {
     const container = document.getElementById('load-more-container');
     const loadMoreBtn = document.getElementById('load-more-btn');
-    
+
     if (container && loadMoreBtn) {
       if (this.hasMoreCompleted && !this.isLoading) {
         container.classList.remove('hidden');
@@ -692,7 +692,7 @@ class Dashboard {
 
   toggleTaskDropdown(taskId) {
     const dropdown = document.getElementById(`task-dropdown-${taskId}`);
-    
+
     // Hide all other dropdowns first
     document.querySelectorAll('[id^="task-dropdown-"]').forEach(el => {
       if (el.id !== `task-dropdown-${taskId}`) {
