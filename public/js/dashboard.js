@@ -102,10 +102,10 @@ class Dashboard {
       // Create the helper element
       helperEl = document.createElement('div');
       helperEl.id = 'config-helper';
-      helperEl.className = 'bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 max-w-2xl mx-auto';
+      helperEl.className = 'bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 max-w-6xl mx-auto';
 
-      const taskInputContainer = document.querySelector('.max-w-2xl.mx-auto');
-      taskInputContainer.parentNode.insertBefore(helperEl, taskInputContainer);
+      const taskInputContainer = document.querySelector('.max-w-6xl.mx-auto.space-y-4');
+      taskInputContainer.insertBefore(helperEl, taskInputContainer.firstChild);
     }
 
     const toolsText = missingRequirements.includes('at least one coding tool (Amp or OpenAI)')
@@ -156,10 +156,10 @@ class Dashboard {
       // Create the warning element
       warningEl = document.createElement('div');
       warningEl.id = 'config-warning';
-      warningEl.className = 'bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 max-w-2xl mx-auto';
+      warningEl.className = 'bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 max-w-6xl mx-auto';
 
-      const taskInputContainer = document.querySelector('.max-w-2xl.mx-auto');
-      taskInputContainer.parentNode.insertBefore(warningEl, taskInputContainer);
+      const taskInputContainer = document.querySelector('.max-w-6xl.mx-auto.space-y-4');
+      taskInputContainer.insertBefore(warningEl, taskInputContainer.firstChild);
     }
 
     warningEl.innerHTML = `

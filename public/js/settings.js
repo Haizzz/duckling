@@ -109,7 +109,17 @@ class Settings {
       });
 
       if (response.ok) {
-        this.showSuccess();
+        const result = await response.json();
+        console.log('Settings save response:', result);
+        let message = 'Settings saved successfully!'; // Default fallback
+        
+        // Try to get message from server response
+        if (result && result.data && result.data.message) {
+          message = result.data.message;
+        }
+        
+        console.log('Toast message:', message);
+        this.showSettingsSaveSuccess(message);
       } else {
         const error = await response.json();
         console.error('Server error saving settings:', error);
@@ -121,14 +131,7 @@ class Settings {
     }
   }
 
-  showSuccess() {
-    Utils.showToast('Settings saved successfully!', 'success');
 
-    // Also refresh the configuration status
-    setTimeout(() => {
-      this.loadSettings();
-    }, 500);
-  }
 
   setSecureField(fieldId, value) {
     const field = document.getElementById(fieldId);
@@ -326,6 +329,17 @@ class Settings {
 
   showSuccess(message) {
     Utils.showToast(message, 'success');
+  }
+
+  showSettingsSaveSuccess(message) {
+    // Ensure we always have a message
+    const finalMessage = message && message.trim() ? message : 'Settings saved successfully!';
+    Utils.showToast(finalMessage, 'success');
+
+    // Also refresh the configuration status for settings saves
+    setTimeout(() => {
+      this.loadSettings();
+    }, 500);
   }
 
   async loadRepositories() {

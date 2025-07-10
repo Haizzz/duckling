@@ -272,7 +272,7 @@ class TaskDetail {
       <div class="flex items-start space-x-2 mb-2 text-sm font-mono">
         <span class="text-gray-400">${new Date(log.timestamp).toLocaleTimeString()}</span>
         <span class="text-${this.getLogColor(log.level)}-400 font-medium">[${log.level.toUpperCase()}]</span>
-        <span class="text-gray-300 flex-1">${this.escapeHtml(log.message)}</span>
+        <span class="text-gray-300 flex-1 whitespace-pre-wrap">${this.escapeHtml(log.message)}</span>
       </div>
     `).join('');
 
@@ -292,7 +292,7 @@ class TaskDetail {
       <div class="flex items-start space-x-2 mb-2 text-sm font-mono">
         <span class="text-gray-400">${new Date(log.timestamp).toLocaleTimeString()}</span>
         <span class="text-${this.getLogColor(log.level)}-400 font-medium">[${log.level.toUpperCase()}]</span>
-        <span class="text-gray-300 flex-1">${this.escapeHtml(log.message)}</span>
+        <span class="text-gray-300 flex-1 whitespace-pre-wrap">${this.escapeHtml(log.message)}</span>
       </div>
     `).join('');
 

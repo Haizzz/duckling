@@ -84,7 +84,7 @@ export async function execCommandWithInputStreaming(
         stdout += data;
         // Log each chunk to file logs immediately
         if (taskId) {
-          logger.info(`stdout: ${data.trim()}`, taskId);
+          logger.info(`stdout:\n${data.trim()}`, taskId);
         }
       });
     }
@@ -96,7 +96,7 @@ export async function execCommandWithInputStreaming(
         stderr += data;
         // Log each chunk to file logs immediately
         if (taskId) {
-          logger.warn(`stderr: ${data.trim()}`, taskId);
+          logger.warn(`stderr:\n${data.trim()}`, taskId);
         }
       });
     }
@@ -154,7 +154,7 @@ export async function execCommandStreaming(
         stdout += data;
         // Log each chunk to file logs immediately
         if (taskId) {
-          logger.info(`stdout: ${data.trim()}`, taskId);
+          logger.info(`stdout:\n${data.trim()}`, taskId);
         }
       });
     }
@@ -166,7 +166,7 @@ export async function execCommandStreaming(
         stderr += data;
         // Log each chunk to file logs immediately
         if (taskId) {
-          logger.warn(`stderr: ${data.trim()}`, taskId);
+          logger.warn(`stderr:\n${data.trim()}`, taskId);
         }
       });
     }

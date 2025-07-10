@@ -91,6 +91,7 @@ window.Utils = {
 
   // Show toast notification
   showToast(message, type = 'info') {
+    console.log('showToast called with message:', JSON.stringify(message), 'type:', type);
     const toast = document.createElement('div');
     toast.className = `fixed top-4 right-4 px-4 py-2 rounded-md shadow-lg z-50 ${
       type === 'success' ? 'bg-green-600 text-white' :

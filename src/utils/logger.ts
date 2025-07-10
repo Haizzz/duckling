@@ -77,15 +77,15 @@ export class Logger {
     if (exitCode === 0) {
       this.info(`Command succeeded: ${command}`, taskId);
       if (stdout) {
-        this.debug(`stdout: ${stdout}`, taskId);
+        this.debug(`stdout:\n${stdout}`, taskId);
       }
     } else {
       this.error(`Command failed: ${command} (exit code: ${exitCode})`, taskId);
       if (stderr) {
-        this.error(`stderr: ${stderr}`, taskId);
+        this.error(`stderr:\n${stderr}`, taskId);
       }
       if (stdout) {
-        this.debug(`stdout: ${stdout}`, taskId);
+        this.debug(`stdout:\n${stdout}`, taskId);
       }
     }
   }
