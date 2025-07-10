@@ -75,6 +75,7 @@ class Settings {
     this.setSecureField('openai-api-key', settings.openaiApiKey);
 
     // Task configuration
+    document.getElementById('custom-prompt').value = settings.customPrompt || '';
     document.getElementById('branch-prefix').value = settings.branchPrefix || 'duckling-';
     document.getElementById('pr-title-prefix').value = settings.prTitlePrefix || '[DUCKLING]';
     document.getElementById('commit-suffix').value = settings.commitSuffix || ' [quack]';
