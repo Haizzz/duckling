@@ -6,6 +6,7 @@ import { DatabaseManager } from '../core/database';
 import { CoreEngine } from '../core/engine';
 import { SettingsManager } from '../core/settings-manager';
 import { ApiResponse, CreateTaskRequest } from '../types';
+import { LOGS_DIR } from '../utils/constants';
 
 export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
   const router = Router();
@@ -291,6 +292,49 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
       res.json(response);
     } catch (error: any) {
       res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  });
+
+  router.get('/tasks/:id/log-file', async (req: Request, res: Response) => {
+    try {
+      const taskId = parseInt(req.params.id);
+      const task = db.getTask(taskId);
+
+      if (!task) {
+        return res.status(404).json({
+          success: false,
+          error: 'Task not found',
+        });
+      }
+
+      const logFilePath = pathLib.join(
+        LOGS_DIR,
+        `task-${taskId}.log`
+      );
+
+      // Check if log file exists
+      if (!fs.existsSync(logFilePath)) {
+        return res.status(404).json({
+          success: false,
+          error: 'Log file not found',
+        });
+      }
+
+      // Set headers for file download
+      res.setHeader('Content-Type', 'text/plain');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="task-${taskId}.log"`
+      );
+
+      // Stream the file
+      const stream = fs.createReadStream(logFilePath);
+      stream.pipe(res);
+    } catch (error: any) {
+      res.status(500).json({
         success: false,
         error: error.message,
       });

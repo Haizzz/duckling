@@ -9,6 +9,8 @@ class Dashboard {
     this.hasMore = true;
     this.hasRecentSSEUpdate = false;
     this.isUpdating = false; // Prevent race conditions in updates
+    this.completedPage = 1; // Separate pagination for completed tasks
+    this.hasMoreCompleted = true; // Track if more completed tasks are available
     this.init();
   }
 
@@ -288,14 +290,16 @@ class Dashboard {
 
   async loadAllTasks() {
     this.currentPage = 1;
+    this.completedPage = 1;
     this.loadedTasks = [];
     this.hasMore = true;
+    this.hasMoreCompleted = true;
     
-    // Load active tasks first (these are more important)
+    // Load ALL active tasks (these are more important and usually fewer)
     await this.loadTasksByStatus(['pending', 'in-progress', 'awaiting-review']);
     
-    // Then load completed tasks
-    await this.loadTasksByStatus(['completed', 'cancelled', 'failed']);
+    // Load only first page of completed tasks
+    await this.loadCompletedTasks();
     
     this.renderTasks();
     this.updateLoadMoreButton();
@@ -328,9 +332,46 @@ class Dashboard {
     }
   }
 
+  async loadCompletedTasks() {
+    const completedStatuses = ['completed', 'cancelled', 'failed'];
+    let hasMoreTasks = false;
+    
+    for (const status of completedStatuses) {
+      try {
+        const response = await fetch(`/api/tasks?page=${this.completedPage}&limit=${this.tasksPerPage}&status=${status}`);
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+          this.loadedTasks.push(...result.data.tasks);
+          
+          const pagination = result.data.pagination;
+          if (pagination && this.completedPage < pagination.totalPages) {
+            hasMoreTasks = true;
+          } else if (!pagination && result.data.tasks.length === this.tasksPerPage) {
+            hasMoreTasks = true;
+          }
+        }
+      } catch (error) {
+        console.error(`Error loading ${status} tasks:`, error);
+      }
+    }
+    
+    this.hasMoreCompleted = hasMoreTasks;
+  }
+
   async loadMoreTasks() {
-    // Not needed anymore since we load all tasks
-    return;
+    if (this.isLoading || !this.hasMoreCompleted) return;
+    
+    this.isLoading = true;
+    this.completedPage++;
+    
+    try {
+      await this.loadCompletedTasks();
+      this.renderTasks();
+      this.updateLoadMoreButton();
+    } finally {
+      this.isLoading = false;
+    }
   }
 
   async refreshTasks() {
@@ -509,9 +550,20 @@ class Dashboard {
 
   updateLoadMoreButton() {
     const container = document.getElementById('load-more-container');
-    if (container) {
-      // Hide load more button since we load all tasks at once now
-      container.classList.add('hidden');
+    const loadMoreBtn = document.getElementById('load-more-btn');
+    
+    if (container && loadMoreBtn) {
+      if (this.hasMoreCompleted && !this.isLoading) {
+        container.classList.remove('hidden');
+        loadMoreBtn.disabled = false;
+        loadMoreBtn.textContent = 'Load More';
+      } else if (this.isLoading) {
+        container.classList.remove('hidden');
+        loadMoreBtn.disabled = true;
+        loadMoreBtn.textContent = 'Loading...';
+      } else {
+        container.classList.add('hidden');
+      }
     }
   }
 
