@@ -310,10 +310,7 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
         });
       }
 
-      const logFilePath = pathLib.join(
-        LOGS_DIR,
-        `task-${taskId}.log`
-      );
+      const logFilePath = pathLib.join(LOGS_DIR, `task-${taskId}.log`);
 
       // Check if log file exists
       if (!fs.existsSync(logFilePath)) {
