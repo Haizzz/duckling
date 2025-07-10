@@ -1,13 +1,42 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
-import { DatabaseManager } from '../core/database';
-import { CoreEngine } from '../core/engine';
 import { CodingTool, CreateTaskRequest } from '../types';
 import { startDuckling } from '../index';
+import { DatabaseManager } from '../core/database';
+import { SettingsManager } from '../core/settings-manager';
+import { CodingManager } from '../core/coding-manager';
+import { PrecommitManager } from '../core/precommit-manager';
+import { OpenAIManager } from '../core/openai-manager';
+import { CoreEngine } from '../core/engine';
 import * as readline from 'readline';
 
 const program = new Command();
+
+// Helper function to create services
+function createServices() {
+  const db = new DatabaseManager();
+  const settings = new SettingsManager(db);
+  const codingManager = new CodingManager(settings);
+  const precommitManager = new PrecommitManager(db);
+  const openaiManager = new OpenAIManager(db, settings);
+  const engine = new CoreEngine(
+    db,
+    settings,
+    codingManager,
+    precommitManager,
+    openaiManager
+  );
+
+  return {
+    db,
+    settings,
+    codingManager,
+    precommitManager,
+    openaiManager,
+    engine,
+  };
+}
 
 program
   .name('duckling')
@@ -35,26 +64,12 @@ program
   .description('Configure Duckling settings')
   .action(async () => {
     try {
-      const db = new DatabaseManager();
-
-      // Check if already configured
-      const repositoryUrl = db.getSetting('repositoryUrl');
-      if (repositoryUrl) {
-        console.log(
-          '✅ Duckling is already configured. Use "duckling start" to run the server.'
-        );
-        console.log(
-          '💡 You can modify settings through the web interface at http://localhost:5050/settings'
-        );
-        return;
-      }
+      const services = createServices();
 
       console.log(
-        '🔧 Duckling needs to be configured through the web interface.'
+        '💡 Use the web interface at http://localhost:5050/settings to configure Duckling'
       );
-      console.log(
-        '📝 Run "duckling start" and visit http://localhost:5050 to complete setup.'
-      );
+      services.db.close();
     } catch (error: any) {
       console.error('❌ Failed to check configuration:', error.message);
       process.exit(1);
@@ -107,9 +122,8 @@ taskCmd
 
       rl.close();
 
-      const db = new DatabaseManager();
-      const engine = new CoreEngine(db);
-      await engine.initialize();
+      const services = createServices();
+      await services.engine.initialize();
 
       const taskRequest: CreateTaskRequest = {
         title: title.trim(),
@@ -118,14 +132,14 @@ taskCmd
         repositoryPath: process.cwd(), // Use current directory for CLI
       };
 
-      const taskId = await engine.createTask(taskRequest);
+      const taskId = await services.engine.createTask(taskRequest);
 
       console.log(`\n✅ Task created successfully!`);
       console.log(`📋 Task ID: ${taskId}`);
       console.log(`🔗 View task: http://localhost:5050/task/${taskId}`);
 
-      engine.shutdown();
-      db.close();
+      services.engine.shutdown();
+      services.db.close();
     } catch (error: any) {
       console.error('❌ Failed to create task:', error.message);
       process.exit(1);
@@ -143,7 +157,7 @@ taskCmd
   .option('-l, --limit <limit>', 'Limit number of results', '10')
   .action(async (options) => {
     try {
-      const db = new DatabaseManager();
+      const services = createServices();
 
       const filters: any = {
         limit: parseInt(options.limit),
@@ -153,25 +167,26 @@ taskCmd
         filters.status = options.status;
       }
 
-      const tasks = db.getTasks(filters);
+      const tasks = services.db.getTasks(filters);
 
       if (tasks.length === 0) {
         console.log('📭 No tasks found');
+        services.db.close();
         return;
       }
 
       console.log(`📋 Found ${tasks.length} task(s):\n`);
 
-      tasks.forEach((task) => {
-        const statusEmoji =
-          {
-            pending: '⏳',
-            'in-progress': '🔄',
-            'awaiting-review': '👀',
-            completed: '✅',
-            failed: '❌',
-            cancelled: '🚫',
-          }[task.status] || '❓';
+      tasks.forEach((task: any) => {
+        const statusEmojis: Record<string, string> = {
+          pending: '⏳',
+          'in-progress': '🔄',
+          'awaiting-review': '👀',
+          completed: '✅',
+          failed: '❌',
+          cancelled: '🚫',
+        };
+        const statusEmoji = statusEmojis[task.status] || '❓';
 
         console.log(`${statusEmoji} ${task.title}`);
         console.log(`   ID: ${task.id}`);
@@ -186,7 +201,7 @@ taskCmd
         console.log('');
       });
 
-      db.close();
+      services.db.close();
     } catch (error: any) {
       console.error('❌ Failed to list tasks:', error.message);
       process.exit(1);
@@ -199,31 +214,30 @@ taskCmd
   .description('Cancel a task')
   .action(async (taskId) => {
     try {
-      const db = new DatabaseManager();
-      const engine = new CoreEngine(db);
-      await engine.initialize();
+      const services = createServices();
+      await services.engine.initialize();
 
-      const task = db.getTask(parseInt(taskId));
+      const task = services.db.getTask(parseInt(taskId));
       if (!task) {
         console.log(`❌ Task not found: ${taskId}`);
-        engine.shutdown();
-        db.close();
+        services.engine.shutdown();
+        services.db.close();
         return;
       }
 
       if (task.status === 'completed' || task.status === 'cancelled') {
         console.log(`❌ Cannot cancel task in status: ${task.status}`);
-        engine.shutdown();
-        db.close();
+        services.engine.shutdown();
+        services.db.close();
         return;
       }
 
-      await engine.cancelTask(parseInt(taskId));
+      await services.engine.cancelTask(parseInt(taskId));
 
       console.log(`✅ Task cancelled: ${task.title}`);
 
-      engine.shutdown();
-      db.close();
+      services.engine.shutdown();
+      services.db.close();
     } catch (error: any) {
       console.error('❌ Failed to cancel task:', error.message);
       process.exit(1);
@@ -236,13 +250,12 @@ program
   .description('Show system status and configuration')
   .action(async () => {
     try {
-      const db = new DatabaseManager();
+      const services = createServices();
 
       console.log('🔧 Duckling System Status\n');
 
       // Check configuration
-      const repositoryUrl = db.getSetting('repositoryUrl');
-      const isConfigured = !!repositoryUrl;
+      const isConfigured = true; // Always configured since no required settings
 
       console.log(
         `Configuration: ${isConfigured ? '✅ Complete' : '❌ Incomplete'}`
@@ -250,16 +263,18 @@ program
 
       if (isConfigured) {
         // Show configuration details
-        const defaultTool = db.getSetting('defaultCodingTool');
-        console.log(`Default Tool: ${defaultTool?.value || 'Not set'}`);
+        const defaultTool = services.settings.get('defaultCodingTool');
+        console.log(`Default Tool: ${defaultTool || 'Not set'}`);
 
         // Show task statistics
-        const allTasks = db.getTasks();
-        const pendingTasks = db.getTasks({ status: 'pending' });
-        const inProgressTasks = db.getTasks({ status: 'in-progress' });
-        const awaitingReviewTasks = db.getTasks({ status: 'awaiting-review' });
-        const completedTasks = db.getTasks({ status: 'completed' });
-        const failedTasks = db.getTasks({ status: 'failed' });
+        const allTasks = services.db.getTasks();
+        const pendingTasks = services.db.getTasks({ status: 'pending' });
+        const inProgressTasks = services.db.getTasks({ status: 'in-progress' });
+        const awaitingReviewTasks = services.db.getTasks({
+          status: 'awaiting-review',
+        });
+        const completedTasks = services.db.getTasks({ status: 'completed' });
+        const failedTasks = services.db.getTasks({ status: 'failed' });
 
         console.log('\n📊 Task Statistics:');
         console.log(`   Total: ${allTasks.length}`);
@@ -274,7 +289,7 @@ program
         );
       }
 
-      db.close();
+      services.db.close();
     } catch (error: any) {
       console.error('❌ Failed to get status:', error.message);
       process.exit(1);

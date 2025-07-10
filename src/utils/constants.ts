@@ -23,18 +23,6 @@ export const DEFAULT_SETTINGS = {
   maxRetries: 3,
 } as const;
 
-// Git settings
-export const GIT_CONFIG = {
-  timeout: 300000, // 5 minutes
-  maxRetries: 3,
-} as const;
-
-// API settings
-export const API_CONFIG = {
-  timeout: 300000, // 5 minutes
-  maxRetries: 3,
-} as const;
-
 // Log levels
 export const LOG_LEVELS = ['debug', 'info', 'warn', 'error'] as const;
 export type LogLevel = (typeof LOG_LEVELS)[number];

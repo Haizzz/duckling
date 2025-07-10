@@ -31,7 +31,7 @@ export async function withRetry<T>(
   throw lastError!;
 }
 
-export function sleep(ms: number): Promise<void> {
+function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 

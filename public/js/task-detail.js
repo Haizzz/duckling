@@ -168,7 +168,7 @@ class TaskDetail {
               ${task.branch_name ? `
                 <div class="flex justify-between">
                   <span class="text-gray-600">Branch:</span>
-                  ${this.escapeHtml(task.branchName)}
+                  <span class="font-mono text-sm">${this.escapeHtml(task.branch_name)}</span>
                 </div>
               ` : ''}
               ${task.pr_url ? `

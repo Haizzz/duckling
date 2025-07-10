@@ -1,28 +1,24 @@
-import { DatabaseManager } from './database';
 import { CodingTool } from '../types';
+import { DatabaseManager } from './database';
 
 export interface SettingsDefaults {
-  repositoryUrl: string;
   defaultCodingTool: CodingTool;
   branchPrefix: string;
   prTitlePrefix: string;
   commitSuffix: string;
   commentPrefix: string;
   maxRetries: number;
-  ampApiKey: string;
   openaiApiKey: string;
 }
 
 export class SettingsManager {
   private static readonly DEFAULTS: SettingsDefaults = {
-    repositoryUrl: '',
     defaultCodingTool: 'amp',
     branchPrefix: 'duckling-',
     prTitlePrefix: '[DUCKLING]',
     commitSuffix: ' [quack]',
     commentPrefix: 'duckling',
     maxRetries: 3,
-    ampApiKey: '',
     openaiApiKey: '',
   };
 

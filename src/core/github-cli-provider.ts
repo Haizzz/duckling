@@ -2,15 +2,15 @@
  * GitHub CLI Provider - Implements GitHub operations using GitHub CLI
  */
 
-import { DatabaseManager } from './database';
-import { OpenAIManager } from './openai-manager';
-import { SettingsManager } from './settings-manager';
 import { executeGitHubCLI } from '../utils/github-cli-utils';
 import { validateAndGetRepoInfo } from '../utils/git-utils';
 import { withRetry } from '../utils/retry';
 import { logger } from '../utils/logger';
 import { execCommand } from '../utils/exec';
 import { processAllComments, CommentData } from '../utils/comment-processor';
+import { DatabaseManager } from './database';
+import { OpenAIManager } from './openai-manager';
+import { SettingsManager } from './settings-manager';
 
 export class GitHubCLIProvider {
   private db: DatabaseManager;
@@ -18,7 +18,7 @@ export class GitHubCLIProvider {
   private settings: SettingsManager;
   private repoOwner: string = '';
   private repoName: string = '';
-  private initialized: boolean = false;
+  private currentRepoPath: string = '';
 
   constructor(
     db: DatabaseManager,
@@ -31,13 +31,14 @@ export class GitHubCLIProvider {
   }
 
   private async ensureInitialized(repositoryPath: string) {
-    if (this.initialized) return;
+    // Re-initialize if repository path has changed
+    if (this.currentRepoPath === repositoryPath) return;
 
     try {
       const repoInfo = await validateAndGetRepoInfo(repositoryPath);
       this.repoOwner = repoInfo.owner;
       this.repoName = repoInfo.name;
-      this.initialized = true;
+      this.currentRepoPath = repositoryPath;
     } catch (error) {
       throw new Error(`Failed to get repository information: ${error}`);
     }
@@ -50,13 +51,7 @@ export class GitHubCLIProvider {
       try {
         const result = await execCommand(
           'gh',
-          [
-            'repo',
-            'view',
-            `${this.repoOwner}/${this.repoName}`,
-            '--json',
-            'defaultBranchRef',
-          ],
+          ['repo', 'view', '--json', 'defaultBranchRef'],
           { cwd: repositoryPath }
         );
         if (result.exitCode !== 0) {

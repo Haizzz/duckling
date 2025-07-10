@@ -71,7 +71,6 @@ class Settings {
 
     // Coding tools
     document.getElementById('default-coding-tool').value = settings.defaultCodingTool || 'amp';
-    this.setSecureField('amp-api-key', settings.ampApiKey);
     this.setSecureField('openai-api-key', settings.openaiApiKey);
 
     // Task configuration
@@ -244,30 +243,49 @@ class Settings {
     const statusEl = document.getElementById('config-status');
 
     // GitHub CLI is guaranteed to be available if server is running
-    const hasAmpTool = settings.ampApiKey === '***CONFIGURED***';
     const hasOpenAiTool = settings.openaiApiKey === '***CONFIGURED***';
-    const hasOpenAiForCommits = settings.openaiApiKey === '***CONFIGURED***';
 
     const missingRequirements = [];
-    if (!hasOpenAiForCommits) missingRequirements.push('OpenAI API key');
-    if (!hasAmpTool && !hasOpenAiTool) missingRequirements.push('at least one coding tool (Amp or OpenAI)');
+
+    // Optional warnings
+    const warnings = [];
+    if (!hasOpenAiTool) warnings.push('OpenAI API key (optional - for commit messages and OpenAI coding)');
 
     if (missingRequirements.length === 0) {
-      // All requirements met
-      statusEl.className = 'bg-green-50 border border-green-200 rounded-lg p-4';
-      statusEl.innerHTML = `
-        <div class="flex items-center">
-          <div class="flex-shrink-0">
-            <svg class="h-5 w-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-            </svg>
+      // No blocking issues
+      if (warnings.length === 0) {
+        // Everything is configured
+        statusEl.className = 'bg-green-50 border border-green-200 rounded-lg p-4';
+        statusEl.innerHTML = `
+          <div class="flex items-center">
+            <div class="flex-shrink-0">
+              <svg class="h-5 w-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+              </svg>
+            </div>
+            <div class="ml-3">
+              <h3 class="text-sm font-medium text-green-800">Ready to Go!</h3>
+              <p class="text-sm text-green-700 mt-1">Duckling is ready to create tasks. All optional features are configured!</p>
+            </div>
           </div>
-          <div class="ml-3">
-            <h3 class="text-sm font-medium text-green-800">Configuration Complete</h3>
-            <p class="text-sm text-green-700 mt-1">All required settings are configured. You can create tasks!</p>
+        `;
+      } else {
+        // Show optional warnings
+        statusEl.className = 'bg-blue-50 border border-blue-200 rounded-lg p-4';
+        statusEl.innerHTML = `
+          <div class="flex items-start">
+            <div class="flex-shrink-0">
+              <svg class="w-5 h-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+              </svg>
+            </div>
+            <div class="ml-3">
+              <h3 class="text-sm font-medium text-blue-800">Ready to Go!</h3>
+              <p class="text-sm text-blue-700 mt-1">Duckling is ready to create tasks. Optional features missing: ${warnings.join(', ')}</p>
+            </div>
           </div>
-        </div>
-      `;
+        `;
+      }
     } else {
       // Missing requirements
       const toolsText = missingRequirements.includes('at least one coding tool (Amp or OpenAI)')

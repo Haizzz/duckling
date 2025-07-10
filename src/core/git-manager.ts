@@ -1,12 +1,12 @@
 import { simpleGit, SimpleGit } from 'simple-git';
 import { withRetry } from '../utils/retry';
 import { logger } from '../utils/logger';
-import { DatabaseManager } from './database';
-import { SettingsManager } from './settings-manager';
-import { OpenAIManager } from './openai-manager';
 import { GitHubCLIProvider } from './github-cli-provider';
 import * as path from 'path';
 import * as fs from 'fs';
+import { DatabaseManager } from './database';
+import { SettingsManager } from './settings-manager';
+import { OpenAIManager } from './openai-manager';
 
 export class GitManager {
   private git: SimpleGit;
@@ -18,11 +18,12 @@ export class GitManager {
   constructor(
     db: DatabaseManager,
     repoPath: string,
-    openaiManager?: OpenAIManager
+    openaiManager: OpenAIManager,
+    settings: SettingsManager
   ) {
     this.db = db;
-    this.settings = new SettingsManager(db);
-    this.openaiManager = openaiManager || new OpenAIManager(db);
+    this.settings = settings;
+    this.openaiManager = openaiManager;
     this.repoPath = repoPath;
 
     // Validate git repository before initializing SimpleGit

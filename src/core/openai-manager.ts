@@ -1,7 +1,5 @@
 import OpenAI from 'openai';
 import { logger } from '../utils/logger';
-import { DatabaseManager } from './database';
-import { SettingsManager } from './settings-manager';
 import { withRetry } from '../utils/retry';
 import {
   createPRDescriptionPrompt,
@@ -10,15 +8,17 @@ import {
   createTaskSummaryPrompt,
   createCommitMessagePrompt,
 } from './prompts';
+import { DatabaseManager } from './database';
+import { SettingsManager } from './settings-manager';
 
 export class OpenAIManager {
   private db: DatabaseManager;
   private settings: SettingsManager;
   private openai: OpenAI | null = null;
 
-  constructor(db: DatabaseManager) {
+  constructor(db: DatabaseManager, settings: SettingsManager) {
     this.db = db;
-    this.settings = new SettingsManager(db);
+    this.settings = settings;
     this.initializeClient();
   }
 

@@ -1,8 +1,8 @@
 import { withRetry } from '../utils/retry';
 import { CodingTool } from '../types';
-import { DatabaseManager } from './database';
 import { execCommand, execCommandWithInput } from '../utils/exec';
 import { createCodingPrompt } from './prompts';
+import { SettingsManager } from './settings-manager';
 
 interface CodingContext {
   taskId: number;
@@ -10,10 +10,10 @@ interface CodingContext {
 }
 
 export class CodingManager {
-  private db: DatabaseManager;
+  private settings: SettingsManager;
 
-  constructor(db: DatabaseManager) {
-    this.db = db;
+  constructor(settings: SettingsManager) {
+    this.settings = settings;
   }
 
   async generateCode(
@@ -46,12 +46,6 @@ export class CodingManager {
     const { taskId, repositoryPath } = context;
 
     try {
-      // Get API key from settings
-      const apiKeySetting = this.db.getSetting('ampApiKey');
-      if (!apiKeySetting) {
-        throw new Error('Amp API key not configured');
-      }
-
       // Check if amp is available
       await execCommand('which', ['amp'], {
         taskId: taskId.toString(),
@@ -65,7 +59,6 @@ export class CodingManager {
         timeout: 30 * 60 * 1000, // 30 minutes timeout
         env: {
           ...process.env,
-          AMP_API_KEY: apiKeySetting.value,
         },
       });
 
@@ -92,8 +85,8 @@ export class CodingManager {
 
     try {
       // Get API key from settings
-      const apiKeySetting = this.db.getSetting('openaiApiKey');
-      if (!apiKeySetting) {
+      const apiKey = this.settings.get('openaiApiKey');
+      if (!apiKey) {
         throw new Error('OpenAI API key not configured');
       }
 
@@ -118,7 +111,7 @@ export class CodingManager {
           timeout: 30 * 60 * 1000, // 30 minutes timeout
           env: {
             ...process.env,
-            OPENAI_API_KEY: apiKeySetting.value,
+            OPENAI_API_KEY: apiKey,
           },
         }
       );

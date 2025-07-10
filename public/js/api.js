@@ -92,14 +92,6 @@ window.API = {
     });
   },
 
-  // Configuration check
-  async checkConfiguration() {
-    const settings = await this.getSettings();
-    return {
-      configured: !!(settings.repositoryUrl && (settings.openai_api_key || settings.amp_api_key))
-    };
-  },
-
   // Health check
   async getHealth() {
     return this.request('/health');

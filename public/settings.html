@@ -69,7 +69,9 @@
               <div class="flex">
                 <div class="flex-shrink-0">
                   <svg class="h-5 w-5 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
-                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                    <path fill-rule="evenodd"
+                      d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                      clip-rule="evenodd"></path>
                   </svg>
                 </div>
                 <div class="ml-3">
@@ -88,7 +90,8 @@
                 Add Repository
               </button>
             </div>
-            <p class="text-xs text-gray-500">Add the full path to a Git repository. The repository must exist and be a valid Git repository with a GitHub remote.</p>
+            <p class="text-xs text-gray-500">Add the full path to a Git repository. The repository must exist and be a
+              valid Git repository with a GitHub remote.</p>
 
             <!-- Repository List -->
             <div id="repository-list" class="space-y-2">
@@ -118,11 +121,8 @@
             <div>
               <h3 class="text-sm font-medium text-gray-900 mb-3">Amp Code</h3>
               <div>
-                <label for="amp-api-key" class="block text-sm font-medium text-gray-700">API Key</label>
-                <input type="password" id="amp-api-key" name="ampApiKey"
-                  class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
-                <p class="text-xs text-gray-500 mt-1">Sourcegraph Amp API key for AI-powered code generation and
-                  assistance</p>
+                <p class="text-xs text-gray-500 mt-1">Assumes Amp is already authenticated via CLI. Use <code>amp
+                    login</code> to authenticate.</p>
               </div>
             </div>
             <div>

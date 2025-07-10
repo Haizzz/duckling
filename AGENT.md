@@ -1,7 +1,7 @@
 # Duckling Development Guide
 
 ## Overview
-Duckling is an automated coding tool that wraps CLI coding assistants (OpenAI Codex, Claude Code, Amp Code) to automate the entire development workflow from task assignment to PR merge.
+Duckling is an automated coding tool that wraps CLI coding assistants (OpenAI, Amp) to automate the entire development workflow from task assignment to PR merge.
 
 ## Quick Start
 
@@ -41,17 +41,28 @@ duckling task cancel <taskId>
 ## Architecture
 
 ### Core Components
+- **Simple Dependency Injection**: Constructor injection pattern where dependencies are passed as parameters
 - **Core Engine**: Main orchestration logic with timeout-based processing and retry mechanisms
 - **Express API**: RESTful API with real-time updates via Server-Sent Events
 - **Frontend**: Plain HTML/CSS/JS single-page application with real-time updates
 - **CLI**: Command-line interface for basic operations
 - **SQLite Database**: Local storage for tasks, logs, and settings
 
+### Simple Dependency Injection
+- **Constructor Injection**: Dependencies are passed as constructor parameters, not created internally
+- **Direct Creation**: Dependencies are created directly in entry points and passed to services
+- **Concrete Classes**: Uses concrete classes directly without interface abstractions
+- **Dependency Flow**: Dependencies flow from entry points down through constructor parameters
+
 ### Key Files
-- `src/core/engine.ts` - Main business logic with separate task and review processing
+- `src/core/engine.ts` - Main business logic with dependency injection
 - `src/core/database.ts` - SQLite database manager
-- `src/core/git-manager.ts` - Git operations with intelligent commit message generation and automatic suffix handling
+- `src/core/git-manager.ts` - Git operations with intelligent commit message generation
+- `src/core/github-cli-provider.ts` - GitHub CLI integration with PR and comment management
 - `src/core/openai-manager.ts` - OpenAI integration for commit messages and task summaries
+- `src/core/coding-manager.ts` - Coding assistant integration (Amp, OpenAI)
+- `src/core/precommit-manager.ts` - Precommit check execution and management
+- `src/core/settings-manager.ts` - Application settings management
 - `src/core/task-executor.ts` - Task execution queue to prevent overlapping operations
 - `src/api/server.ts` - Express.js server
 - `src/api/routes.ts` - API route handlers
@@ -64,13 +75,10 @@ duckling task cancel <taskId>
 
 ### Prerequisites
 - **GitHub CLI**: Must be installed and authenticated before starting Duckling
-
-### Required Settings
-- **Coding Tool API Key**: At least one of Amp, OpenAI, or Claude
-- **Repository URL**: GitHub repository to work with
-
+- **Amp CLI**: Must be authenticated via `amp login` for Amp usage
 
 ### Optional Settings
+- **OpenAI API Key**: For OpenAI coding assistance and commit message generation
 - Branch prefix (default: `duckling-`)
 - PR title prefix (default: `[DUCKLING]`)
 - Commit suffix (default: ` [quack]`)
@@ -97,7 +105,7 @@ duckling task cancel <taskId>
 
 ### Manual Testing Flow
 1. Start Duckling: `duckling start`
-2. Configure settings at http://localhost:3000/settings
+2. Configure optional settings at http://localhost:5050/settings
 3. Create a test task through the web interface
 4. Monitor task progress in real-time
 5. Check logs and task details
@@ -118,7 +126,8 @@ duckling task cancel <taskId>
 2. **Git errors**: Ensure working directory is a git repository
 3. **API failures**: Verify API keys and network connectivity
 4. **Permission errors**: Check GitHub CLI authentication
-5. **Missing CLI tools**: Ensure coding assistant CLIs are installed
+5. **Missing CLI tools**: Ensure coding assistant CLIs are installed (amp login)
+6. **Wrong repository info**: GitHubCLIProvider now reinitializes per repository
 
 ### Debug Commands
 ```bash
@@ -126,7 +135,7 @@ duckling task cancel <taskId>
 duckling status
 
 # View task logs
-# Via web: http://localhost:3000/task/:id/logs
+# Via web: http://localhost:5050/task/:id/logs
 
 # Database location
 ls ~/.duckling/
@@ -141,16 +150,27 @@ ls ~/.duckling/
 ### Adding New Features
 1. Update types in `src/types/index.ts`
 2. Add database schema changes in `src/core/database.ts`
-3. Implement core logic in appropriate manager
-4. Add API routes in `src/api/routes.ts`
-5. Update frontend in `public/js/`
-6. Add CLI commands if needed
+3. Implement core logic in appropriate manager with constructor injection
+4. Update entry points to create new services with dependencies
+5. Add API routes in `src/api/routes.ts`
+6. Update frontend in `public/js/`
+7. Add CLI commands if needed
+
+### Simple Dependency Injection Best Practices
+- **Constructor Injection**: Dependencies are passed as constructor parameters
+- **Direct Creation**: Create dependencies directly in entry points and pass them to services
+- **Dependency Flow**: Dependencies flow from entry points down through constructor parameters
 
 ### Error Handling
 - Use `withRetry` utility for external API calls
 - Log errors to database with task association
 - Emit task updates for real-time UI updates
 - Provide meaningful error messages to users
+
+### Testing with Dependency Injection
+- **Mock Dependencies**: Create mock instances of dependencies for unit testing
+- **Dependency Isolation**: Test services in isolation by passing mock dependencies
+- **Integration Tests**: Test with real dependencies for integration scenarios
 
 ### Code Quality & Validation
 - **ALWAYS run `npm run check` after making changes** to verify:
@@ -167,9 +187,30 @@ ls ~/.duckling/
 - Add JSDoc comments for public APIs
 - Use async/await for asynchronous operations
 - Handle errors gracefully with user-friendly messages
+- Use dependency injection for all service dependencies
+
+## Recent Improvements
+
+### Architecture Simplifications
+- **Removed Factory Pattern**: Direct dependency creation in entry points instead of factory functions
+- **Simplified Dependencies**: CodingManager no longer requires DatabaseManager
+- **No Required Settings**: All configuration is now optional with helpful warnings
+- **Clean Authentication**: Amp assumes CLI authentication, OpenAI is optional
+
+### Bug Fixes
+- **Repository Switching**: GitHubCLIProvider now properly reinitializes for different repositories
+- **Optional Configuration**: OpenAI API key shows warnings instead of blocking errors
+- **Removed Unused Code**: Cleaned up repositoryUrl and unused hasAmpTool variables
+
+### Current State
+- **Zero Required Configuration**: Application works out of the box
+- **GitHub CLI**: Only hard requirement for repository operations
+- **Amp Integration**: Uses existing CLI authentication
+- **OpenAI Integration**: Optional for enhanced commit messages and coding assistance
 
 ## Security Considerations
-- API keys stored in SQLite database with file permissions
+- OpenAI API keys stored in SQLite database with file permissions
+- Amp authentication handled via CLI (no keys stored)
 - No secrets in logs or error messages
 - Input validation on all API endpoints
 - Sandboxed execution of coding tools

@@ -57,15 +57,14 @@ class Dashboard {
         const settings = result.data;
 
         // GitHub CLI is guaranteed to be available if server is running
-        const hasAmpTool = settings.ampApiKey === '***CONFIGURED***';
         const hasOpenAiTool = settings.openaiApiKey === '***CONFIGURED***';
-        const hasOpenAiForCommits = settings.openaiApiKey === '***CONFIGURED***'; // Required for both tools
 
-        // Determine what's missing
+        // Determine what's missing (only blocking issues)
         const missingRequirements = [];
 
-        if (!hasOpenAiForCommits) missingRequirements.push('OpenAI API key');
-        if (!hasAmpTool && !hasOpenAiTool) missingRequirements.push('at least one coding tool (Amp or OpenAI)');
+        // Optional warnings (not blocking)
+        const warnings = [];
+        if (!hasOpenAiTool) warnings.push('OpenAI API key (optional - for commit messages and OpenAI coding)');
 
         if (missingRequirements.length > 0) {
           // Mark settings as missing and update form state
@@ -80,6 +79,13 @@ class Dashboard {
 
           // Hide helper message if it exists
           this.hideConfigurationHelper();
+          
+          // Show optional warnings if any, otherwise hide them
+          if (warnings.length > 0) {
+            this.showWarningMessage(warnings.join(', '));
+          } else {
+            this.hideWarningMessage();
+          }
         }
 
         // Always update form state to consider both repositories and settings
@@ -141,6 +147,45 @@ class Dashboard {
     const helperEl = document.getElementById('config-helper');
     if (helperEl) {
       helperEl.classList.add('hidden');
+    }
+  }
+
+  showWarningMessage(message) {
+    let warningEl = document.getElementById('config-warning');
+    if (!warningEl) {
+      // Create the warning element
+      warningEl = document.createElement('div');
+      warningEl.id = 'config-warning';
+      warningEl.className = 'bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 max-w-2xl mx-auto';
+
+      const taskInputContainer = document.querySelector('.max-w-2xl.mx-auto');
+      taskInputContainer.parentNode.insertBefore(warningEl, taskInputContainer);
+    }
+
+    warningEl.innerHTML = `
+      <div class="flex items-start">
+        <div class="flex-shrink-0">
+          <svg class="w-5 h-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+          </svg>
+        </div>
+        <div class="ml-3">
+          <h3 class="text-sm font-medium text-blue-800">Optional Configuration</h3>
+          <p class="text-sm text-blue-700 mt-1">Missing: ${message}</p>
+          <p class="text-sm text-blue-600 mt-1">
+            <a href="/settings" class="underline hover:text-blue-800">Configure in Settings</a>
+          </p>
+        </div>
+      </div>
+    `;
+
+    warningEl.classList.remove('hidden');
+  }
+
+  hideWarningMessage() {
+    const warningEl = document.getElementById('config-warning');
+    if (warningEl) {
+      warningEl.classList.add('hidden');
     }
   }
 

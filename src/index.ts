@@ -1,13 +1,31 @@
-import { DatabaseManager } from './core/database';
-import { CoreEngine } from './core/engine';
 import { APIServer } from './api/server';
 import { isGitHubCLIAvailable } from './utils/github-cli-utils';
+import { DatabaseManager } from './core/database';
+import { SettingsManager } from './core/settings-manager';
+import { CodingManager } from './core/coding-manager';
+import { PrecommitManager } from './core/precommit-manager';
+import { OpenAIManager } from './core/openai-manager';
+import { CoreEngine } from './core/engine';
 
 export async function startDuckling(port: number = 5050): Promise<void> {
   console.log('🚀 Starting Duckling...');
 
+  // Create dependencies
   const db = new DatabaseManager();
-  const engine = new CoreEngine(db);
+  const settings = new SettingsManager(db);
+  const codingManager = new CodingManager(settings);
+  const precommitManager = new PrecommitManager(db);
+  const openaiManager = new OpenAIManager(db, settings);
+
+  // Create engine with dependencies
+  const engine = new CoreEngine(
+    db,
+    settings,
+    codingManager,
+    precommitManager,
+    openaiManager
+  );
+
   const server = new APIServer(db, engine);
 
   // Check GitHub CLI availability - fail if not available
@@ -45,7 +63,9 @@ export async function startDuckling(port: number = 5050): Promise<void> {
 }
 
 // Export main components for programmatic use
-export { DatabaseManager, CoreEngine, APIServer };
+export { DatabaseManager } from './core/database';
+export { CoreEngine } from './core/engine';
+export { APIServer } from './api/server';
 
 export * from './types';
 

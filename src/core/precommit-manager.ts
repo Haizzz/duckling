@@ -1,7 +1,7 @@
-import { DatabaseManager } from './database';
 import { PrecommitCheck } from '../types';
 import { logger } from '../utils/logger';
 import { execShellCommand } from '../utils/exec';
+import { DatabaseManager } from './database';
 
 export class PrecommitManager {
   private db: DatabaseManager;

@@ -59,7 +59,3 @@ export async function validateAndGetRepoInfo(
     throw error;
   }
 }
-
-export function getGitHubUrl(repoInfo: GitRepoInfo): string {
-  return `https://github.com/${repoInfo.owner}/${repoInfo.name}`;
-}

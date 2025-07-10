@@ -2,11 +2,8 @@
  * GitHub CLI Utilities - Detection and validation for GitHub CLI
  */
 
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import { logger } from './logger';
-
-const execAsync = promisify(exec);
+import { execCommand } from './exec';
 
 /**
  * Check if GitHub CLI is available (both installed and authenticated)
@@ -14,7 +11,7 @@ const execAsync = promisify(exec);
 export async function isGitHubCLIAvailable(): Promise<boolean> {
   // Check if GitHub CLI is installed
   try {
-    await execAsync('gh --version');
+    await execCommand('gh', ['--version']);
   } catch (error) {
     logger.debug('GitHub CLI not installed:', String(error));
     return false;
@@ -22,8 +19,8 @@ export async function isGitHubCLIAvailable(): Promise<boolean> {
 
   // Check authentication status by exit code (works for both github.com and enterprise)
   try {
-    await execAsync('gh auth status');
-    return true;
+    const result = await execCommand('gh', ['auth', 'status']);
+    return result.exitCode === 0;
   } catch (error) {
     // If gh auth status returns non-zero exit code, user is not authenticated
     logger.debug('GitHub CLI not authenticated:', String(error));
@@ -38,7 +35,7 @@ export async function executeGitHubCLI(
   command: string
 ): Promise<{ stdout: string; stderr: string }> {
   try {
-    const result = await execAsync(`gh ${command}`);
+    const result = await execCommand('gh', command.split(' '));
     return { stdout: result.stdout, stderr: result.stderr };
   } catch (error: any) {
     logger.error('GitHub CLI command failed:', error.message);

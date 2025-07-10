@@ -1,15 +1,15 @@
 import { EventEmitter } from 'events';
-import { DatabaseManager } from './database';
-import { SettingsManager } from './settings-manager';
-import { GitManager } from './git-manager';
-import { CodingManager } from './coding-manager';
-import { PrecommitManager } from './precommit-manager';
-import { GitHubCLIProvider } from './github-cli-provider';
-import { OpenAIManager } from './openai-manager';
 import { Task, TaskStatus, TaskUpdateEvent, CreateTaskRequest } from '../types';
 import { taskExecutor } from './task-executor';
 import { logger } from '../utils/logger';
 import { withTaskLogMessages } from '../utils/task-logging';
+import { DatabaseManager } from './database';
+import { SettingsManager } from './settings-manager';
+import { CodingManager } from './coding-manager';
+import { PrecommitManager } from './precommit-manager';
+import { OpenAIManager } from './openai-manager';
+import { GitManager } from './git-manager';
+import { GitHubCLIProvider } from './github-cli-provider';
 
 export class CoreEngine extends EventEmitter {
   private db: DatabaseManager;
@@ -22,18 +22,29 @@ export class CoreEngine extends EventEmitter {
   private processingInterval?: NodeJS.Timeout;
   private isProcessing = false;
 
-  constructor(db: DatabaseManager) {
+  constructor(
+    db: DatabaseManager,
+    settings: SettingsManager,
+    codingManager: CodingManager,
+    precommitManager: PrecommitManager,
+    openaiManager: OpenAIManager
+  ) {
     super();
     this.db = db;
-    this.settings = new SettingsManager(db);
-    this.openaiManager = new OpenAIManager(db);
-    this.codingManager = new CodingManager(db);
-    this.precommitManager = new PrecommitManager(db);
+    this.settings = settings;
+    this.codingManager = codingManager;
+    this.precommitManager = precommitManager;
+    this.openaiManager = openaiManager;
   }
 
   private getGitManager(repositoryPath: string): GitManager {
     try {
-      return new GitManager(this.db, repositoryPath, this.openaiManager);
+      return new GitManager(
+        this.db,
+        repositoryPath,
+        this.openaiManager,
+        this.settings
+      );
     } catch (error: any) {
       logger.error(`Failed to initialize GitManager: ${error.message}`);
       throw new Error(`Git repository validation failed: ${error.message}`);

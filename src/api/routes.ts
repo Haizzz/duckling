@@ -3,8 +3,8 @@ import fs from 'fs';
 import pathLib from 'path';
 import { execSync } from 'child_process';
 import { DatabaseManager } from '../core/database';
-import { SettingsManager } from '../core/settings-manager';
 import { CoreEngine } from '../core/engine';
+import { SettingsManager } from '../core/settings-manager';
 import { ApiResponse, CreateTaskRequest } from '../types';
 
 export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
@@ -303,7 +303,7 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
       const settingsObj = settings.getAll();
 
       // For password fields, return a special indicator if value exists
-      const secureFields = ['ampApiKey', 'openaiApiKey'];
+      const secureFields = ['openaiApiKey'];
       const sanitizedSettings: Record<string, any> = {};
 
       for (const [key, value] of Object.entries(settingsObj)) {
