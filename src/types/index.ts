@@ -19,6 +19,7 @@ export type TaskStatus =
   | 'pending'
   | 'in-progress'
   | 'awaiting-review'
+  | 'addressing-review'
   | 'completed'
   | 'failed'
   | 'cancelled';
