@@ -130,6 +130,7 @@ graph TD
 | Commit Suffix | ` [quack]` | Suffix for commit messages |
 | Base Branch | `main` | Target branch for PRs |
 | Max Retries | `3` | Maximum retry attempts |
+| Task Timeout | `60` minutes | Time limit for task processing |
 | Poll Interval | `30s` | PR comment polling interval |
 | Auto-merge | `false` | Auto-merge approved PRs |
 | Comment prefix | `duckling` | Comments must start with this prefix to be processed |
@@ -316,6 +317,9 @@ A: Failed tasks are automatically retried up to the configured maximum (default:
 
 **Q: Can I customize the precommit checks?**
 A: Yes! Add custom commands through the web interface. Common examples: `pnpm run lint`, `pnpm test`, `cargo check`.
+
+**Q: What happens when a task times out?**
+A: Tasks that exceed the configured timeout (default: 60 minutes) are automatically cancelled and marked as failed. The timeout applies to all task processing phases including code generation, precommit checks, and review processing. A timeout log entry is added to help with debugging.
 
 ## 📄 License
 

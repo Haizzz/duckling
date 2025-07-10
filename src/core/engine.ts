@@ -204,7 +204,9 @@ export class CoreEngine extends EventEmitter {
 
   private async processReviews(): Promise<void> {
     const awaitingReviewTasks = this.db.getTasks({ status: 'awaiting-review' });
-    const addressingReviewTasks = this.db.getTasks({ status: 'addressing-review' });
+    const addressingReviewTasks = this.db.getTasks({
+      status: 'addressing-review',
+    });
 
     // Single pass: for each task, check for new reviews, address them, and update status
     for (const task of [...awaitingReviewTasks, ...addressingReviewTasks]) {
@@ -258,6 +260,34 @@ export class CoreEngine extends EventEmitter {
     }
   }
 
+  private async executeWithTimeout<T>(
+    operation: () => Promise<T>,
+    timeoutMs: number,
+    taskId: number,
+    timeoutMessage: string
+  ): Promise<T> {
+    return new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        this.db.addTaskLog({
+          task_id: taskId,
+          level: 'error',
+          message: `⏰ ${timeoutMessage} after ${timeoutMs / 1000 / 60} minutes`,
+        });
+        reject(new Error(timeoutMessage));
+      }, timeoutMs);
+
+      operation()
+        .then((result) => {
+          clearTimeout(timeoutId);
+          resolve(result);
+        })
+        .catch((error) => {
+          clearTimeout(timeoutId);
+          reject(error);
+        });
+    });
+  }
+
   private async processTask(taskId: number): Promise<void> {
     logger.info(`Processing task: ${taskId}`);
     const task = this.db.getTask(taskId);
@@ -268,191 +298,207 @@ export class CoreEngine extends EventEmitter {
     // Get git manager for the task's repository
     const gitManager = this.getGitManager(task.repository_path);
 
+    // Get task timeout setting
+    const taskTimeoutMinutes = this.settings.get('taskTimeoutMinutes');
+    const taskTimeoutMs = taskTimeoutMinutes * 60 * 1000;
+
     // Use task executor to ensure only one task operation at a time
     await taskExecutor.executeTask({
       taskId: taskId,
       operation: 'process-task',
       execute: async () => {
-        try {
-          // Log which repository we're working on
-          this.db.addTaskLog({
-            task_id: taskId,
-            level: 'info',
-            message: `🏠 Working on repository: ${task.repository_path}`,
-          });
-          // Update status to in progress
-          this.db.addTaskLog({
-            task_id: taskId,
-            level: 'info',
-            message: '🎯 Task started - transitioning to in-progress status',
-          });
-          this.db.updateTask(taskId, {
-            status: 'in-progress',
-            current_stage: 'creating_branch',
-          });
-          this.emitTaskUpdate(taskId, 'in-progress');
-
-          // Step 1: Create branch
-          const generatedBranchName = await withTaskLogMessages(
-            {
-              taskId,
-              startMessage: '🌿 Generating branch name...',
-              completeMessage: `✅ Branch name generation completed`,
-              failureMessage: '❌ Failed to generate branch name',
-            },
-            async () => {
-              const name = await this.openaiManager.generateBranchName(
-                task.description,
-                taskId
-              );
-              // Update the completion message with the actual name
+        // Wrap task execution with timeout
+        await this.executeWithTimeout(
+          async () => {
+            try {
+              // Log which repository we're working on
               this.db.addTaskLog({
                 task_id: taskId,
                 level: 'info',
-                message: `✅ Branch name generated: ${name}`,
+                message: `🏠 Working on repository: ${task.repository_path}`,
               });
-              return name;
-            }
-          );
-
-          const branchName = await withTaskLogMessages(
-            {
-              taskId,
-              startMessage: '🔄 Creating and checking out branch...',
-              completeMessage: `✅ Branch created and checked out`,
-              failureMessage: '❌ Failed to create branch',
-            },
-            async () => {
-              const name = await gitManager.createAndCheckoutBranch(
-                generatedBranchName,
-                taskId
-              );
-              this.db.updateTask(taskId, { branch_name: name });
+              // Update status to in progress
               this.db.addTaskLog({
                 task_id: taskId,
                 level: 'info',
-                message: `✅ Branch created and checked out: ${name}`,
+                message:
+                  '🎯 Task started - transitioning to in-progress status',
               });
-              // Emit update to notify UI of branch name
+              this.db.updateTask(taskId, {
+                status: 'in-progress',
+                current_stage: 'creating_branch',
+              });
               this.emitTaskUpdate(taskId, 'in-progress');
-              return name;
-            }
-          );
 
-          // Step 2: Generate code
-          this.db.updateTask(taskId, { current_stage: 'generating_code' });
-          this.emitTaskUpdate(taskId, 'in-progress');
-
-          await withTaskLogMessages(
-            {
-              taskId,
-              startMessage: `💻 Starting code generation with ${task.coding_tool}...`,
-              completeMessage: '✅ Code generation completed successfully',
-              failureMessage: '❌ Code generation failed',
-            },
-            async () => {
-              const output = await this.codingManager.generateCode(
-                task.coding_tool,
-                task.description,
-                { taskId, repositoryPath: task.repository_path }
+              // Step 1: Create branch
+              const generatedBranchName = await withTaskLogMessages(
+                {
+                  taskId,
+                  startMessage: '🌿 Generating branch name...',
+                  completeMessage: `✅ Branch name generation completed`,
+                  failureMessage: '❌ Failed to generate branch name',
+                },
+                async () => {
+                  const name = await this.openaiManager.generateBranchName(
+                    task.description,
+                    taskId
+                  );
+                  // Update the completion message with the actual name
+                  this.db.addTaskLog({
+                    task_id: taskId,
+                    level: 'info',
+                    message: `✅ Branch name generated: ${name}`,
+                  });
+                  return name;
+                }
               );
 
-              // Log the actual output to task logs
+              const branchName = await withTaskLogMessages(
+                {
+                  taskId,
+                  startMessage: '🔄 Creating and checking out branch...',
+                  completeMessage: `✅ Branch created and checked out`,
+                  failureMessage: '❌ Failed to create branch',
+                },
+                async () => {
+                  const name = await gitManager.createAndCheckoutBranch(
+                    generatedBranchName,
+                    taskId
+                  );
+                  this.db.updateTask(taskId, { branch_name: name });
+                  this.db.addTaskLog({
+                    task_id: taskId,
+                    level: 'info',
+                    message: `✅ Branch created and checked out: ${name}`,
+                  });
+                  // Emit update to notify UI of branch name
+                  this.emitTaskUpdate(taskId, 'in-progress');
+                  return name;
+                }
+              );
+
+              // Step 2: Generate code
+              this.db.updateTask(taskId, { current_stage: 'generating_code' });
+              this.emitTaskUpdate(taskId, 'in-progress');
+
+              await withTaskLogMessages(
+                {
+                  taskId,
+                  startMessage: `💻 Starting code generation with ${task.coding_tool}...`,
+                  completeMessage: '✅ Code generation completed successfully',
+                  failureMessage: '❌ Code generation failed',
+                },
+                async () => {
+                  const output = await this.codingManager.generateCode(
+                    task.coding_tool,
+                    task.description,
+                    { taskId, repositoryPath: task.repository_path }
+                  );
+
+                  // Log the actual output to task logs
+                  this.db.addTaskLog({
+                    task_id: taskId,
+                    level: 'info',
+                    message: `📝 Code generation output:\n${output}`,
+                  });
+                }
+              );
+
+              // Step 3: Run precommit checks
+              this.db.updateTask(taskId, {
+                current_stage: 'running_precommit_checks',
+              });
+              this.emitTaskUpdate(taskId, 'in-progress');
+
+              await withTaskLogMessages(
+                {
+                  taskId,
+                  startMessage: '🔍 Starting precommit checks...',
+                  completeMessage: '✅ Precommit checks completed successfully',
+                  failureMessage: '❌ Precommit checks failed',
+                },
+                async () => {
+                  await this.runPrecommitChecks(taskId);
+                }
+              );
+
+              // Step 4: Commit and push changes
+              this.db.updateTask(taskId, {
+                current_stage: 'committing_changes',
+              });
+              this.emitTaskUpdate(taskId, 'in-progress');
+
+              await withTaskLogMessages(
+                {
+                  taskId,
+                  startMessage: '📝 Committing changes...',
+                  completeMessage: '✅ Changes committed successfully',
+                  failureMessage: '❌ Failed to commit changes',
+                },
+                async () => {
+                  await gitManager.commitChanges(task.description, taskId);
+                }
+              );
+
+              await withTaskLogMessages(
+                {
+                  taskId,
+                  startMessage: '🚀 Pushing branch to remote...',
+                  completeMessage: '✅ Branch pushed to remote successfully',
+                  failureMessage: '❌ Failed to push branch',
+                },
+                async () => {
+                  await gitManager.pushBranch(branchName, taskId);
+                }
+              );
+
+              // Wait for GitHub to process the push
               this.db.addTaskLog({
                 task_id: taskId,
                 level: 'info',
-                message: `📝 Code generation output:\n${output}`,
+                message:
+                  '⏳ Waiting 10 seconds for GitHub to process the push...',
               });
+              await new Promise((resolve) => setTimeout(resolve, 10000));
+
+              // Step 5: Create PR
+              this.db.updateTask(taskId, { current_stage: 'creating_pr' });
+              this.emitTaskUpdate(taskId, 'in-progress');
+
+              await withTaskLogMessages(
+                {
+                  taskId,
+                  startMessage: '🔄 Creating pull request...',
+                  completeMessage: '✅ Pull request created successfully',
+                  failureMessage: '❌ Failed to create PR',
+                },
+                async () => {
+                  await this.createPR(taskId, task, branchName);
+                }
+              );
+            } catch (error: any) {
+              this.db.addTaskLog({
+                task_id: taskId,
+                level: 'error',
+                message: '❌ Task failed - transitioning to failed status',
+              });
+              this.db.updateTask(taskId, {
+                status: 'failed',
+                current_stage: 'failed',
+              });
+              this.db.addTaskLog({
+                task_id: taskId,
+                level: 'error',
+                message: `💥 Task failed: ${error.message}`,
+              });
+              this.emitTaskUpdate(taskId, 'failed');
+              throw error;
             }
-          );
-
-          // Step 3: Run precommit checks
-          this.db.updateTask(taskId, {
-            current_stage: 'running_precommit_checks',
-          });
-          this.emitTaskUpdate(taskId, 'in-progress');
-
-          await withTaskLogMessages(
-            {
-              taskId,
-              startMessage: '🔍 Starting precommit checks...',
-              completeMessage: '✅ Precommit checks completed successfully',
-              failureMessage: '❌ Precommit checks failed',
-            },
-            async () => {
-              await this.runPrecommitChecks(taskId);
-            }
-          );
-
-          // Step 4: Commit and push changes
-          this.db.updateTask(taskId, { current_stage: 'committing_changes' });
-          this.emitTaskUpdate(taskId, 'in-progress');
-
-          await withTaskLogMessages(
-            {
-              taskId,
-              startMessage: '📝 Committing changes...',
-              completeMessage: '✅ Changes committed successfully',
-              failureMessage: '❌ Failed to commit changes',
-            },
-            async () => {
-              await gitManager.commitChanges(task.description, taskId);
-            }
-          );
-
-          await withTaskLogMessages(
-            {
-              taskId,
-              startMessage: '🚀 Pushing branch to remote...',
-              completeMessage: '✅ Branch pushed to remote successfully',
-              failureMessage: '❌ Failed to push branch',
-            },
-            async () => {
-              await gitManager.pushBranch(branchName, taskId);
-            }
-          );
-
-          // Wait for GitHub to process the push
-          this.db.addTaskLog({
-            task_id: taskId,
-            level: 'info',
-            message: '⏳ Waiting 10 seconds for GitHub to process the push...',
-          });
-          await new Promise((resolve) => setTimeout(resolve, 10000));
-
-          // Step 5: Create PR
-          this.db.updateTask(taskId, { current_stage: 'creating_pr' });
-          this.emitTaskUpdate(taskId, 'in-progress');
-
-          await withTaskLogMessages(
-            {
-              taskId,
-              startMessage: '🔄 Creating pull request...',
-              completeMessage: '✅ Pull request created successfully',
-              failureMessage: '❌ Failed to create PR',
-            },
-            async () => {
-              await this.createPR(taskId, task, branchName);
-            }
-          );
-        } catch (error: any) {
-          this.db.addTaskLog({
-            task_id: taskId,
-            level: 'error',
-            message: '❌ Task failed - transitioning to failed status',
-          });
-          this.db.updateTask(taskId, {
-            status: 'failed',
-            current_stage: 'failed',
-          });
-          this.db.addTaskLog({
-            task_id: taskId,
-            level: 'error',
-            message: `💥 Task failed: ${error.message}`,
-          });
-          this.emitTaskUpdate(taskId, 'failed');
-          throw error;
-        }
+          },
+          taskTimeoutMs,
+          taskId,
+          'Task processing timed out'
+        );
       },
     });
   }
@@ -588,88 +634,101 @@ export class CoreEngine extends EventEmitter {
     const task = this.db.getTask(taskId);
     if (!task) return;
 
+    // Get task timeout setting
+    const taskTimeoutMinutes = this.settings.get('taskTimeoutMinutes');
+    const taskTimeoutMs = taskTimeoutMinutes * 60 * 1000;
+
     // Use task executor to ensure only one task operation at a time
     await taskExecutor.executeTask({
       taskId: taskId,
       operation: 'handle-pr-comments',
       execute: async () => {
-        try {
-          // Update status to addressing-review
-          this.db.updateTask(taskId, {
-            status: 'addressing-review',
-            current_stage: 'addressing_review',
-          });
-          this.emitTaskUpdate(taskId, 'addressing-review');
+        // Wrap review handling with timeout
+        await this.executeWithTimeout(
+          async () => {
+            try {
+              // Update status to addressing-review
+              this.db.updateTask(taskId, {
+                status: 'addressing-review',
+                current_stage: 'addressing_review',
+              });
+              this.emitTaskUpdate(taskId, 'addressing-review');
 
-          // Log the review comments first
-          this.db.addTaskLog({
-            task_id: taskId,
-            level: 'info',
-            message: `💬 PR review comments received:\n${concatenatedComments}`,
-          });
+              // Log the review comments first
+              this.db.addTaskLog({
+                task_id: taskId,
+                level: 'info',
+                message: `💬 PR review comments received:\n${concatenatedComments}`,
+              });
 
-          this.db.addTaskLog({
-            task_id: taskId,
-            level: 'info',
-            message: '🛠️ Generating fixes for all PR review comments...',
-          });
+              this.db.addTaskLog({
+                task_id: taskId,
+                level: 'info',
+                message: '🛠️ Generating fixes for all PR review comments...',
+              });
 
-          // Generate response/fixes based on all comments at once
-          const output = await this.codingManager.generateCode(
-            task.coding_tool,
-            `Original task: ${task.description}\n\nPR review comments to address:\n\n${concatenatedComments}\n\nPlease address all the feedback above in one go.`,
-            { taskId, repositoryPath: task.repository_path }
-          );
+              // Generate response/fixes based on all comments at once
+              const output = await this.codingManager.generateCode(
+                task.coding_tool,
+                `Original task: ${task.description}\n\nPR review comments to address:\n\n${concatenatedComments}\n\nPlease address all the feedback above in one go.`,
+                { taskId, repositoryPath: task.repository_path }
+              );
 
-          // Log the code generation output
-          this.db.addTaskLog({
-            task_id: taskId,
-            level: 'info',
-            message: `📝 Review fix output:\n${output}`,
-          });
+              // Log the code generation output
+              this.db.addTaskLog({
+                task_id: taskId,
+                level: 'info',
+                message: `📝 Review fix output:\n${output}`,
+              });
 
-          this.db.addTaskLog({
-            task_id: taskId,
-            level: 'info',
-            message: '✅ Code changes generated, running precommit checks...',
-          });
+              this.db.addTaskLog({
+                task_id: taskId,
+                level: 'info',
+                message:
+                  '✅ Code changes generated, running precommit checks...',
+              });
 
-          // Apply changes and run checks
-          await this.runPrecommitChecks(taskId);
+              // Apply changes and run checks
+              await this.runPrecommitChecks(taskId);
 
-          this.db.addTaskLog({
-            task_id: taskId,
-            level: 'info',
-            message: '📝 Committing and pushing fixes...',
-          });
+              this.db.addTaskLog({
+                task_id: taskId,
+                level: 'info',
+                message: '📝 Committing and pushing fixes...',
+              });
 
-          // Commit and push changes
-          const gitManager = this.getGitManager(task.repository_path);
-          await gitManager.commitChanges(`Address PR feedback`, taskId);
-          if (task.branch_name) {
-            await gitManager.pushBranch(task.branch_name, taskId);
-          }
+              // Commit and push changes
+              const gitManager = this.getGitManager(task.repository_path);
+              await gitManager.commitChanges(`Address PR feedback`, taskId);
+              if (task.branch_name) {
+                await gitManager.pushBranch(task.branch_name, taskId);
+              }
 
-          this.db.addTaskLog({
-            task_id: taskId,
-            level: 'info',
-            message: '✅ All PR feedback addressed and changes pushed',
-          });
+              this.db.addTaskLog({
+                task_id: taskId,
+                level: 'info',
+                message: '✅ All PR feedback addressed and changes pushed',
+              });
 
-          // Update status back to awaiting-review
-          this.db.updateTask(taskId, {
-            status: 'awaiting-review',
-            current_stage: 'awaiting_review',
-          });
-          this.emitTaskUpdate(taskId, 'awaiting-review');
-        } catch (error: any) {
-          this.db.addTaskLog({
-            task_id: taskId,
-            level: 'error',
-            message: `❌ Error handling PR comments: ${error.message}`,
-          });
-          throw error;
-        }
+              // Update status back to awaiting-review
+              this.db.updateTask(taskId, {
+                status: 'awaiting-review',
+                current_stage: 'awaiting_review',
+              });
+              this.emitTaskUpdate(taskId, 'awaiting-review');
+            } catch (error: any) {
+              this.db.addTaskLog({
+                task_id: taskId,
+                level: 'error',
+                message: `❌ Error handling PR comments: ${error.message}`,
+              });
+              throw error;
+            }
+          },
+          taskTimeoutMs,
+          taskId,
+          'Review processing timed out'
+        );
       },
     });
   }
