@@ -1,11 +1,5 @@
 import { DatabaseManager } from '../../core/database';
-import {
-  Task,
-  TaskLog,
-  Setting,
-  PrecommitCheck,
-  Repository,
-} from '../../types';
+import { Task } from '../../types';
 import Database from 'better-sqlite3';
 import fs from 'fs';
 import { DUCKLING_DIR, DATABASE_PATH } from '../../utils/constants';

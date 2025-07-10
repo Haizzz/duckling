@@ -1,14 +1,17 @@
-module.exports = {
+import type { Config } from 'jest';
+
+const config: Config = {
   preset: 'ts-jest',
   testEnvironment: 'node',
   roots: ['<rootDir>/src'],
-  testMatch: ['**/__tests__/**/*.test.ts'],
-  testPathIgnorePatterns: ['src/__tests__/cli/index.test.ts'],
+  testMatch: [
+    '**/core/**/*.test.ts',
+    '**/utils/**/*.test.ts',
+  ],
   collectCoverageFrom: [
-    'src/**/*.ts',
+    'src/core/**/*.ts',
+    'src/utils/**/*.ts',
     '!src/**/*.d.ts',
-    '!src/index.ts',
-    '!src/cli.ts',
   ],
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],
@@ -16,6 +19,17 @@ module.exports = {
   transform: {
     '^.+\\.(ts|tsx)$': 'ts-jest',
   },
+  transformIgnorePatterns: [
+    'node_modules/(?!(execa)/)',
+  ],
   setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],
   testTimeout: 10000,
+  extensionsToTreatAsEsm: ['.ts'],
+  globals: {
+    'ts-jest': {
+      useESM: true,
+    },
+  },
 };
+
+export default config;
