@@ -453,6 +453,7 @@ class Dashboard {
 
     const canCancel = task.status !== 'completed' && task.status !== 'cancelled' && task.status !== 'failed';
     const canComplete = task.status !== 'completed' && task.status !== 'cancelled' && task.status !== 'failed';
+    const canRetry = task.status === 'failed' || task.status === 'cancelled';
 
     // Add pulsing border if task is in progress or awaiting review
     const isWorking = task.status === 'in-progress' || task.status === 'awaiting-review';
@@ -498,7 +499,7 @@ class Dashboard {
             <span>Created ${createdDate}</span>
             <span>Updated ${updatedDate}</span>
           </div>
-          ${(canCancel || canComplete) ? `
+          ${(canCancel || canComplete || canRetry) ? `
             <div class="relative inline-block text-left">
               <button 
                 onclick="window.Dashboard.toggleTaskDropdown('${task.id}')"
@@ -515,6 +516,14 @@ class Dashboard {
                 class="hidden absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-10"
               >
                 <div class="py-1">
+                  ${canRetry ? `
+                    <button 
+                      onclick="window.Dashboard.retryTask('${task.id}')"
+                      class="block w-full text-left px-4 py-2 text-sm text-blue-700 hover:bg-blue-50 hover:text-blue-800"
+                    >
+                      Retry Task
+                    </button>
+                  ` : ''}
                   ${canComplete ? `
                     <button 
                       onclick="window.Dashboard.completeTask('${task.id}')"
@@ -706,6 +715,31 @@ class Dashboard {
     } catch (error) {
       console.error('Error completing task:', error);
       this.showError('Failed to complete task. Please try again.');
+    }
+  }
+
+  async retryTask(taskId) {
+    if (!confirm('Are you sure you want to retry this task?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/tasks/${taskId}/retry`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (response.ok) {
+        // Don't refresh immediately - let real-time updates handle it
+        // The SSE will send a task-update event for the retried task
+        this.hideTaskDropdown(taskId);
+      } else {
+        const result = await response.json();
+        throw new Error(result.error || 'Failed to retry task');
+      }
+    } catch (error) {
+      console.error('Error retrying task:', error);
+      this.showError('Failed to retry task. Please try again.');
     }
   }
 

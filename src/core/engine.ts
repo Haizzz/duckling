@@ -145,16 +145,21 @@ export class CoreEngine extends EventEmitter {
       throw new Error('Task not found');
     }
 
-    if (task.status !== 'failed') {
-      throw new Error('Can only retry failed tasks');
+    if (task.status !== 'failed' && task.status !== 'cancelled') {
+      throw new Error('Can only retry failed or cancelled tasks');
     }
 
-    this.db.updateTask(taskId, { status: 'pending' });
+    // Reset task to pending state and clear completion timestamp
+    this.db.updateTask(taskId, {
+      status: 'pending',
+      current_stage: undefined,
+      completed_at: undefined,
+    });
 
     this.db.addTaskLog({
       task_id: taskId,
       level: 'info',
-      message: 'Task retry requested',
+      message: `Task retry requested (was ${task.status})`,
     });
 
     // Task will be picked up by periodic processing

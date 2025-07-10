@@ -244,6 +244,47 @@ taskCmd
     }
   });
 
+// Retry task command
+taskCmd
+  .command('retry <taskId>')
+  .description('Retry a failed or cancelled task')
+  .action(async (taskId) => {
+    try {
+      const services = createServices();
+      await services.engine.initialize();
+
+      const task = services.db.getTask(parseInt(taskId));
+      if (!task) {
+        console.log(`❌ Task not found: ${taskId}`);
+        services.engine.shutdown();
+        services.db.close();
+        return;
+      }
+
+      if (task.status !== 'failed' && task.status !== 'cancelled') {
+        console.log(
+          `❌ Cannot retry task in status: ${task.status}. Only failed or cancelled tasks can be retried.`
+        );
+        services.engine.shutdown();
+        services.db.close();
+        return;
+      }
+
+      await services.engine.retryTask(parseInt(taskId));
+
+      console.log(`✅ Task retry initiated: ${task.title}`);
+      console.log(
+        `🔗 View task: http://localhost:5050/task-detail.html?id=${taskId}`
+      );
+
+      services.engine.shutdown();
+      services.db.close();
+    } catch (error: any) {
+      console.error('❌ Failed to retry task:', error.message);
+      process.exit(1);
+    }
+  });
+
 // Status command - show system status
 program
   .command('status')

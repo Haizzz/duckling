@@ -75,6 +75,7 @@ class TaskDetail {
     const summary = task.summary || task.description.substring(0, 80) + (task.description.length > 80 ? '...' : '');
     const canCancel = task.status !== 'completed' && task.status !== 'cancelled' && task.status !== 'failed';
     const canComplete = task.status !== 'completed' && task.status !== 'cancelled' && task.status !== 'failed';
+    const canRetry = task.status === 'failed' || task.status === 'cancelled';
 
     // Update page title with task summary
     document.title = `Duckling - ${summary}`;
@@ -89,7 +90,7 @@ class TaskDetail {
               ${statusBadge}
             </div>
           </div>
-          ${(canCancel || canComplete) ? `
+          ${(canCancel || canComplete || canRetry) ? `
             <div class="relative inline-block text-left">
               <button 
                 onclick="TaskDetailInstance.toggleTaskDropdown()"
@@ -106,6 +107,17 @@ class TaskDetail {
                 class="hidden absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-md shadow-lg z-10"
               >
                 <div class="py-1">
+                  ${canRetry ? `
+                    <button 
+                      onclick="TaskDetailInstance.retryTask()"
+                      class="block w-full text-left px-4 py-2 text-sm text-blue-700 hover:bg-blue-50 hover:text-blue-800"
+                    >
+                      <svg class="inline-block w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"></path>
+                      </svg>
+                      Retry Task
+                    </button>
+                  ` : ''}
                   ${canComplete ? `
                     <button 
                       onclick="TaskDetailInstance.completeTask()"
@@ -468,6 +480,33 @@ class TaskDetail {
     } catch (error) {
       console.error('Error completing task:', error);
       alert('Failed to complete task. Please try again.');
+    }
+  }
+
+  async retryTask() {
+    if (!confirm('Are you sure you want to retry this task?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/tasks/${this.taskId}/retry`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (response.ok) {
+        this.hideTaskDropdown();
+        // Don't reload immediately - let real-time updates handle it
+        // The SSE will send a task-update event for the retried task
+        // Also re-start log refresh since the task is now active again
+        this.startLogRefresh();
+      } else {
+        const result = await response.json();
+        throw new Error(result.error || 'Failed to retry task');
+      }
+    } catch (error) {
+      console.error('Error retrying task:', error);
+      alert('Failed to retry task. Please try again.');
     }
   }
 
