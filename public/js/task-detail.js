@@ -168,7 +168,7 @@ class TaskDetail {
               ${task.branch_name ? `
                 <div class="flex justify-between">
                   <span class="text-gray-600">Branch:</span>
-                  <span class="font-mono text-sm">${this.escapeHtml(task.branch_name)}</span>
+                  <span>${this.getBranchLink(task.branch_name, task.repository_path)}</span>
                 </div>
               ` : ''}
               ${task.pr_url ? `
@@ -526,6 +526,16 @@ class TaskDetail {
 
   escapeHtml(text) {
     return Utils.escapeHtml(text || '');
+  }
+
+  getBranchLink(branchName, repositoryPath) {
+    const repository = this.repositories.find(repo => repo.path === repositoryPath);
+    if (repository && repository.owner && repository.name) {
+      const githubUrl = `https://github.com/${repository.owner}/${repository.name}/tree/${branchName}`;
+      return `<a href="${githubUrl}" target="_blank" class="text-blue-600 hover:text-blue-800 underline font-mono text-sm">${this.escapeHtml(branchName)}</a>`;
+    }
+    // Fallback to plain text if repository info is not available
+    return `<span class="font-mono text-sm">${this.escapeHtml(branchName)}</span>`;
   }
 
   async loadRepositories() {
