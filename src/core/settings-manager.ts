@@ -11,6 +11,7 @@ export interface SettingsDefaults {
   maxRetries: number;
   openaiApiKey: string;
   customPrompt: string;
+  taskTimeoutMinutes: number;
 }
 
 export class SettingsManager {
@@ -23,6 +24,7 @@ export class SettingsManager {
     maxRetries: 3,
     openaiApiKey: '',
     customPrompt: DEFAULT_CODING_PROMPT,
+    taskTimeoutMinutes: 60,
   };
 
   constructor(private db: DatabaseManager) {}

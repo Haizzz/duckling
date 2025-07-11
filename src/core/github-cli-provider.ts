@@ -449,15 +449,10 @@ export class GitHubCLIProvider {
 
       // Use GraphQL to get recent PRs and filter out tool-generated ones
       const graphqlQuery = `query { viewer { pullRequests(first: 5, states: [OPEN, CLOSED, MERGED], orderBy: {field: CREATED_AT, direction: DESC}) { nodes { number title body author { login } } } } }`;
-      
+
       const result = await execCommand(
         'gh',
-        [
-          'api',
-          'graphql',
-          '-f',
-          `query=${graphqlQuery}`
-        ],
+        ['api', 'graphql', '-f', `query=${graphqlQuery}`],
         { cwd: repositoryPath }
       );
 
@@ -467,10 +462,12 @@ export class GitHubCLIProvider {
       }
 
       const graphqlResponse = JSON.parse(result.stdout);
-      
+
       // Filter out PRs created by this tool (those with the prefix)
       const allPRs = graphqlResponse.data.viewer.pullRequests.nodes;
-      const recentPRs = allPRs.filter((pr: any) => !pr.title.startsWith(prTitlePrefix));
+      const recentPRs = allPRs.filter(
+        (pr: any) => !pr.title.startsWith(prTitlePrefix)
+      );
 
       // For each PR, try to get the diff as well
       const prsWithDiff = await Promise.all(
@@ -497,7 +494,9 @@ export class GitHubCLIProvider {
         })
       );
 
-      logger.info(`Found ${prsWithDiff.length} recent user PRs as examples (excluding tool-generated PRs)`);
+      logger.info(
+        `Found ${prsWithDiff.length} recent user PRs as examples (excluding tool-generated PRs)`
+      );
       return prsWithDiff;
     } catch (error) {
       logger.warn(`Failed to fetch recent PRs: ${error}`);

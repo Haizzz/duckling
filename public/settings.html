@@ -189,6 +189,12 @@
               <p class="text-xs text-gray-500 mt-1">Maximum number of retry attempts when tasks fail due to transient
                 errors</p>
             </div>
+            <div>
+              <label for="task-timeout-minutes" class="block text-sm font-medium text-gray-700">Task Timeout (minutes)</label>
+              <input type="number" id="task-timeout-minutes" name="taskTimeoutMinutes" value="60" min="5" max="480" step="5"
+                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
+              <p class="text-xs text-gray-500 mt-1">Maximum time allowed for processing each task (including pending, in-progress, review processing, etc.)</p>
+            </div>
 
 
           </div>

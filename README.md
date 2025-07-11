@@ -130,6 +130,7 @@ graph TD
 | Commit Suffix | ` [quack]` | Suffix for commit messages |
 | Base Branch | `main` | Target branch for PRs |
 | Max Retries | `3` | Maximum retry attempts |
+| Task Timeout | `60 minutes` | Maximum time for task processing |
 | Poll Interval | `30s` | PR comment polling interval |
 | Auto-merge | `false` | Auto-merge approved PRs |
 | Comment prefix | `duckling` | Comments must start with this prefix to be processed |

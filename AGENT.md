@@ -84,6 +84,7 @@ duckling task cancel <taskId>
 - Commit suffix (default: ` [quack]`)
 - Base branch (default: `main`)
 - Maximum retries (default: 3)
+- Task timeout (default: 60 minutes)
 - Auto-merge (default: false)
 - Poll interval for PR comments (default: 30 seconds)
 

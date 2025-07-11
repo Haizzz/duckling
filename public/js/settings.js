@@ -80,6 +80,7 @@ class Settings {
     document.getElementById('commit-suffix').value = settings.commitSuffix || ' [quack]';
     document.getElementById('comment-prefix').value = settings.commentPrefix || 'duckling';
     document.getElementById('max-retries').value = settings.maxRetries || 3;
+    document.getElementById('task-timeout-minutes').value = settings.taskTimeoutMinutes || 60;
 
 
     // Show configuration status
@@ -100,6 +101,7 @@ class Settings {
 
     // Convert numeric fields
     settings.maxRetries = parseInt(settings.maxRetries);
+    settings.taskTimeoutMinutes = parseInt(settings.taskTimeoutMinutes);
 
 
     try {

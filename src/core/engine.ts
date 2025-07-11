@@ -192,13 +192,62 @@ export class CoreEngine extends EventEmitter {
     }, 60000); // 1 minute
   }
 
+  private async withTaskTimeout<T>(
+    taskId: number,
+    operation: () => Promise<T>
+  ): Promise<T> {
+    const timeoutMinutes = this.settings.get('taskTimeoutMinutes');
+    const timeoutMs = timeoutMinutes * 60 * 1000;
+
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.db.addTaskLog({
+          task_id: taskId,
+          level: 'warn',
+          message: `⏰ Task processing timed out after ${timeoutMinutes} minutes`,
+        });
+
+        // Update task status to failed due to timeout
+        this.db.updateTask(taskId, {
+          status: 'failed',
+          current_stage: 'timed_out',
+        });
+        this.emitTaskUpdate(taskId, 'failed');
+
+        reject(
+          new Error(`Task processing timed out after ${timeoutMinutes} minutes`)
+        );
+      }, timeoutMs);
+
+      operation()
+        .then((result) => {
+          clearTimeout(timer);
+          resolve(result);
+        })
+        .catch((error) => {
+          clearTimeout(timer);
+          reject(error);
+        });
+    });
+  }
+
   private async processPendingTasks(): Promise<void> {
     // Process pending and in_progress tasks (in case server was interrupted)
     const pendingTasks = this.db.getTasks({ status: 'pending' });
     const inProgressTasks = this.db.getTasks({ status: 'in-progress' });
 
     for (const task of [...pendingTasks, ...inProgressTasks]) {
-      await this.processTask(task.id);
+      try {
+        await this.withTaskTimeout(task.id, async () => {
+          await this.processTask(task.id);
+        });
+      } catch (error: any) {
+        this.db.addTaskLog({
+          task_id: task.id,
+          level: 'error',
+          message: `❌ Error processing task: ${error.message}`,
+        });
+      }
     }
   }
 
@@ -215,41 +264,43 @@ export class CoreEngine extends EventEmitter {
       }
 
       try {
-        const gitManager = this.getGitManager(task.repository_path);
-        await gitManager.switchToBranch(task.branch_name, task.id);
-        const result = await this.collectPRComments(task.id, task.pr_number);
+        await this.withTaskTimeout(task.id, async () => {
+          const gitManager = this.getGitManager(task.repository_path);
+          await gitManager.switchToBranch(task.branch_name!, task.id);
+          const result = await this.collectPRComments(task.id, task.pr_number!);
 
-        // Handle status updates first (completed/cancelled)
-        if (result.statusUpdate) {
-          if (result.statusUpdate === 'completed') {
-            this.db.updateTask(task.id, {
-              status: 'completed',
-              current_stage: 'completed',
-              completed_at: new Date().toISOString(),
-            });
-            this.emitTaskUpdate(task.id, 'completed');
-          } else if (result.statusUpdate === 'cancelled') {
-            this.db.updateTask(task.id, {
-              status: 'cancelled',
-              current_stage: 'cancelled',
-            });
-            this.emitTaskUpdate(task.id, 'cancelled');
+          // Handle status updates first (completed/cancelled)
+          if (result.statusUpdate) {
+            if (result.statusUpdate === 'completed') {
+              this.db.updateTask(task.id, {
+                status: 'completed',
+                current_stage: 'completed',
+                completed_at: new Date().toISOString(),
+              });
+              this.emitTaskUpdate(task.id, 'completed');
+            } else if (result.statusUpdate === 'cancelled') {
+              this.db.updateTask(task.id, {
+                status: 'cancelled',
+                current_stage: 'cancelled',
+              });
+              this.emitTaskUpdate(task.id, 'cancelled');
+            }
+            return; // Skip comment processing if task is completed/cancelled
           }
-          continue; // Skip comment processing if task is completed/cancelled
-        }
 
-        // If there are new comments, concatenate them and address all at once
-        if (result.comments.length > 0) {
-          const concatenatedComments = result.comments.join('\n\n---\n\n');
+          // If there are new comments, concatenate them and address all at once
+          if (result.comments.length > 0) {
+            const concatenatedComments = result.comments.join('\n\n---\n\n');
 
-          this.db.addTaskLog({
-            task_id: task.id,
-            level: 'info',
-            message: `💬 Processing ${result.comments.length} PR review comment(s)...`,
-          });
+            this.db.addTaskLog({
+              task_id: task.id,
+              level: 'info',
+              message: `💬 Processing ${result.comments.length} PR review comment(s)...`,
+            });
 
-          await this.handleAllPRComments(task.id, concatenatedComments);
-        }
+            await this.handleAllPRComments(task.id, concatenatedComments);
+          }
+        });
       } catch (error: any) {
         this.db.addTaskLog({
           task_id: task.id,
