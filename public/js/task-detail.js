@@ -287,6 +287,25 @@ class TaskDetail {
     }
   }
 
+  formatLogTimestamp(timestamp) {
+    const date = new Date(timestamp);
+    const timeString = date.toLocaleTimeString(undefined, {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+    const fullTimeString = date.toLocaleString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      timeZoneName: 'short'
+    });
+    return { timeString, fullTimeString };
+  }
+
   renderLogs(logs) {
     const container = document.getElementById('task-logs');
 
@@ -301,21 +320,7 @@ class TaskDetail {
     }
 
     const logsHTML = logs.map(log => {
-      const timestamp = new Date(log.timestamp);
-      const timeString = timestamp.toLocaleTimeString(undefined, {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-      });
-      const fullTimeString = timestamp.toLocaleString(undefined, {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        timeZoneName: 'short'
-      });
+      const { timeString, fullTimeString } = this.formatLogTimestamp(log.timestamp);
       
       return `
         <div class="flex items-start space-x-2 mb-2 text-sm font-mono">
@@ -339,21 +344,7 @@ class TaskDetail {
 
     // Only append new logs instead of re-rendering everything
     const newLogsHTML = newLogs.map(log => {
-      const timestamp = new Date(log.timestamp);
-      const timeString = timestamp.toLocaleTimeString(undefined, {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-      });
-      const fullTimeString = timestamp.toLocaleString(undefined, {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        timeZoneName: 'short'
-      });
+      const { timeString, fullTimeString } = this.formatLogTimestamp(log.timestamp);
       
       return `
         <div class="flex items-start space-x-2 mb-2 text-sm font-mono">
