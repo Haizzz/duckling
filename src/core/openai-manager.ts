@@ -144,7 +144,11 @@ export class OpenAIManager {
     return this.generateSimpleBranchName(taskDescription, maxBranchNameLength);
   }
 
-  async generatePRTitle(taskDescription: string): Promise<string> {
+  async generatePRTitle(
+    taskDescription: string,
+    recentPRs: Array<{ title: string; body: string; diff?: string }> = [],
+    prDiff: string = ''
+  ): Promise<string> {
     const prefix = this.settings.get('prTitlePrefix');
 
     if (!this.openai) {
@@ -153,7 +157,7 @@ export class OpenAIManager {
     }
 
     try {
-      const prompt = createPRTitlePrompt(taskDescription);
+      const prompt = createPRTitlePrompt(taskDescription, recentPRs, prDiff);
 
       const result = await this.callOpenAI(prompt);
 
@@ -177,7 +181,9 @@ export class OpenAIManager {
 
   async generatePRDescription(
     taskDescription: string,
-    branchName: string
+    branchName: string,
+    recentPRs: Array<{ title: string; body: string; diff?: string }> = [],
+    prDiff: string = ''
   ): Promise<string> {
     if (!this.openai) {
       // Fallback to simple generation if OpenAI not available
@@ -185,7 +191,11 @@ export class OpenAIManager {
     }
 
     try {
-      const prompt = createPRDescriptionPrompt(taskDescription);
+      const prompt = createPRDescriptionPrompt(
+        taskDescription,
+        recentPRs,
+        prDiff
+      );
 
       const result = await this.callOpenAI(prompt);
 

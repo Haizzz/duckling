@@ -25,22 +25,58 @@ ${originalPrompt}`;
 };
 
 export const createPRDescriptionPrompt = (
-  taskDescription: string
-): string => `Generate a professional pull request description for this task: "${taskDescription}".
+  taskDescription: string,
+  recentPRs: Array<{ title: string; body: string; diff?: string }> = [],
+  prDiff: string = ''
+): string => {
+  let examplesText = '';
 
-Use this exact format, only including sections if you have specific details (don't make things up):
+  if (recentPRs.length > 0) {
+    examplesText = `Here are examples of recent PR descriptions from this repository (ONLY the description content, use these as style guides):
 
-**Summary**: [Brief description of what was changed]
-**Problem**: [What issue this solves - only include if clear from the task]
-**Solution**: [How the problem was solved - only include if clear from the task]
+`;
+    recentPRs.forEach((pr, index) => {
+      if (pr.body && pr.body.trim()) {
+        examplesText += `Example ${index + 1} Description:
+${pr.body}
+
+`;
+      }
+    });
+
+    if (examplesText === `Here are examples of recent PR descriptions from this repository (ONLY the description content, use these as style guides):
+
+`) {
+      examplesText = ''; // No examples found
+    }
+  }
+
+  let diffText = '';
+  if (prDiff) {
+    diffText = `Current PR diff (for context):
+${prDiff.substring(0, 2000)}${prDiff.length > 2000 ? '...' : ''}
+
+`;
+  }
+
+  return `${examplesText}
+
+Generate the pull request description for this task
+${taskDescription}
+${diffText}
 
 Rules:
+- Generate ONLY the description content, NOT the title or diff
 - Keep each section short and factual
 - Don't include a section if you don't have specific details about it
 - No fluff or generic statements
 - If you only know what was done but not why, only include Summary
+- Learn from the style and format of the example descriptions above
+- Use similar terminology and structure as the examples when appropriate
+- Only include information from the current task description and diff text, not the provided examples
 
 PR description:`;
+};
 
 export const createBranchNamePrompt = (
   taskDescription: string,
@@ -57,15 +93,46 @@ export const createBranchNamePrompt = (
 Branch name: `;
 
 export const createPRTitlePrompt = (
-  taskDescription: string
-): string => `Generate a clear, professional pull request title for this task: "${taskDescription}".
-  Rules:
+  taskDescription: string,
+  recentPRs: Array<{ title: string; body: string; diff?: string }> = [],
+  prDiff: string = ''
+): string => {
+  let examplesText = '';
+
+  if (recentPRs.length > 0) {
+    examplesText = `Here are examples of recent PR titles from this repository (use these as style guides):
+
+`;
+    recentPRs.forEach((pr, index) => {
+      examplesText += `Example ${index + 1}: ${pr.title}
+`;
+    });
+  }
+
+  let diffText = '';
+  if (prDiff) {
+    diffText = `Current PR diff:
+${prDiff.substring(0, 1000)}${prDiff.length > 1000 ? '...' : ''}
+
+`;
+  }
+
+  return `${examplesText}
+Generate the pull request title for this task
+${taskDescription}
+${diffText}
+
+Rules:
 - Maximum 80 characters total
 - Use imperative mood(e.g., "Add", "Fix", "Update")
 - Be specific and descriptive
 - Examples: "Fix authentication bug in login flow", "Add user profile settings page"
+- Learn from the style and format of the example PR titles above
+- Use similar terminology and structure as the examples when appropriate
+- Only include information from the current task description and diff text, not the provided examples
 
 PR title: `;
+};
 
 export const createTaskSummaryPrompt = (
   taskDescription: string

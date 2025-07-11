@@ -83,11 +83,23 @@ export class GitHubCLIProvider {
       message: '🤖 Generating PR title and description...',
     });
 
-    // Generate intelligent title and description using OpenAI
-    const title = await this.openaiManager.generatePRTitle(taskDescription);
+    // Get recent PRs as examples
+    const recentPRs = await this.getRecentUserPRs(repositoryPath);
+
+    // Get current PR diff for context
+    const prDiff = await this.getBranchDiff(branchName, repositoryPath);
+
+    // Generate intelligent title and description using OpenAI with examples
+    const title = await this.openaiManager.generatePRTitle(
+      taskDescription,
+      recentPRs,
+      prDiff
+    );
     const description = await this.openaiManager.generatePRDescription(
       taskDescription,
-      branchName
+      branchName,
+      recentPRs,
+      prDiff
     );
 
     this.db.addTaskLog({
@@ -425,6 +437,99 @@ export class GitHubCLIProvider {
       'Get PR status via GitHub CLI',
       2
     );
+  }
+
+  async getRecentUserPRs(
+    repositoryPath: string
+  ): Promise<Array<{ title: string; body: string; diff?: string }>> {
+    await this.ensureInitialized(repositoryPath);
+
+    try {
+      const prTitlePrefix = this.settings.get('prTitlePrefix');
+
+      // Use GraphQL to get recent PRs and filter out tool-generated ones
+      const graphqlQuery = `query { viewer { pullRequests(first: 5, states: [OPEN, CLOSED, MERGED], orderBy: {field: CREATED_AT, direction: DESC}) { nodes { number title body author { login } } } } }`;
+      
+      const result = await execCommand(
+        'gh',
+        [
+          'api',
+          'graphql',
+          '-f',
+          `query=${graphqlQuery}`
+        ],
+        { cwd: repositoryPath }
+      );
+
+      if (result.exitCode !== 0) {
+        logger.warn(`Could not fetch recent PRs: ${result.stderr}`);
+        return [];
+      }
+
+      const graphqlResponse = JSON.parse(result.stdout);
+      
+      // Filter out PRs created by this tool (those with the prefix)
+      const allPRs = graphqlResponse.data.viewer.pullRequests.nodes;
+      const recentPRs = allPRs.filter((pr: any) => !pr.title.startsWith(prTitlePrefix));
+
+      // For each PR, try to get the diff as well
+      const prsWithDiff = await Promise.all(
+        recentPRs.map(async (pr: any) => {
+          try {
+            const diffResult = await execCommand(
+              'gh',
+              ['pr', 'diff', pr.number.toString()],
+              { cwd: repositoryPath }
+            );
+
+            // No need to strip prefix since we filtered out tool-generated PRs
+            return {
+              title: pr.title,
+              body: pr.body || '',
+              diff: diffResult.exitCode === 0 ? diffResult.stdout : undefined,
+            };
+          } catch (error) {
+            return {
+              title: pr.title,
+              body: pr.body || '',
+            };
+          }
+        })
+      );
+
+      logger.info(`Found ${prsWithDiff.length} recent user PRs as examples (excluding tool-generated PRs)`);
+      return prsWithDiff;
+    } catch (error) {
+      logger.warn(`Failed to fetch recent PRs: ${error}`);
+      return [];
+    }
+  }
+
+  async getBranchDiff(
+    branchName: string,
+    repositoryPath: string
+  ): Promise<string> {
+    await this.ensureInitialized(repositoryPath);
+
+    try {
+      const defaultBranch = await this.getDefaultBranch(repositoryPath);
+
+      const result = await execCommand(
+        'git',
+        ['diff', `${defaultBranch}...${branchName}`],
+        { cwd: repositoryPath }
+      );
+
+      if (result.exitCode !== 0) {
+        logger.warn(`Could not get branch diff: ${result.stderr}`);
+        return '';
+      }
+
+      return result.stdout;
+    } catch (error) {
+      logger.warn(`Failed to get branch diff: ${error}`);
+      return '';
+    }
   }
 
   private logPREvent(taskId: number, message: string): void {
