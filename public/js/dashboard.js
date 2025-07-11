@@ -473,7 +473,7 @@ class Dashboard {
         
         <!-- Task Spec -->
         <div class="mb-3">
-          <p class="text-sm text-gray-700">${this.escapeHtml(task.description)}</p>
+          <p class="text-sm text-gray-700">${this.escapeHtml(task.description.length > 500 ? task.description.substring(0, 500) + '...' : task.description)}</p>
         </div>
         
         
