@@ -619,7 +619,7 @@ export class CoreEngine extends EventEmitter {
           // Generate response/fixes based on all comments at once
           const output = await this.codingManager.generateCode(
             task.coding_tool,
-            `Original task: ${task.description}\n\nPR review comments to address:\n\n${concatenatedComments}\n\nPlease address all the feedback above in one go.`,
+            `Original task: ${task.description}\n\nPR review comments to address:\n\n${concatenatedComments}\n\nAddress all the feedback above. Make all necessary code changes based on the review comments. Do not ask for clarification - analyze the available context and make the best decisions to resolve each comment. If a comment is ambiguous, choose the most logical interpretation based on the codebase patterns and the original task requirements.`,
             { taskId, repositoryPath: task.repository_path }
           );
 
