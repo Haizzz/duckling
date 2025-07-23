@@ -44,9 +44,12 @@ ${pr.body}
       }
     });
 
-    if (examplesText === `Here are examples of recent PR descriptions from this repository (ONLY the description content, use these as style guides):
+    if (
+      examplesText ===
+      `Here are examples of recent PR descriptions from this repository (ONLY the description content, use these as style guides):
 
-`) {
+`
+    ) {
       examplesText = ''; // No examples found
     }
   }
