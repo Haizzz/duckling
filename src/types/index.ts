@@ -24,7 +24,7 @@ export type TaskStatus =
   | 'failed'
   | 'cancelled';
 
-export type CodingTool = 'openai' | 'amp';
+export type CodingTool = 'openai' | 'amp' | 'claude';
 
 export interface TaskLog {
   id: number;

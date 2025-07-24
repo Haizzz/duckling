@@ -113,9 +113,9 @@ taskCmd
       }
 
       const codingTool =
-        (await question('Coding tool (amp/openai) [amp]: ')) || 'amp';
-      if (!['amp', 'openai'].includes(codingTool)) {
-        console.log('❌ Invalid coding tool. Use: amp or openai');
+        (await question('Coding tool (amp/openai/claude) [amp]: ')) || 'amp';
+      if (!['amp', 'openai', 'claude'].includes(codingTool)) {
+        console.log('❌ Invalid coding tool. Use: amp, openai, or claude');
         rl.close();
         return;
       }

@@ -89,9 +89,7 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
       }
 
       // Get default coding tool from settings
-      const defaultCodingTool = db.getSetting('defaultCodingTool');
-      const codingTool =
-        (defaultCodingTool?.value as 'amp' | 'openai') || 'amp'; // Default to amp if not set
+      const codingTool = settings.get('defaultCodingTool');
 
       const taskRequest: CreateTaskRequest = {
         title:
@@ -371,9 +369,9 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
 
   router.put('/settings', async (req: Request, res: Response) => {
     try {
-      const settings = req.body;
+      const settingsData = req.body;
       // Update each setting
-      for (const [key, value] of Object.entries(settings)) {
+      for (const [key, value] of Object.entries(settingsData)) {
         // Skip empty API keys/tokens (means don't change the existing value)
         if (
           (key.toLowerCase().includes('token') ||
@@ -383,7 +381,7 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
           continue;
         }
 
-        db.setSetting(key, value as string);
+        settings.set(key as any, value);
       }
 
       const response: ApiResponse = {

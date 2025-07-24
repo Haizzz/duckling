@@ -35,6 +35,8 @@ export class CodingManager {
             return await this.callAmp(enhancedPrompt, context);
           case 'openai':
             return await this.callCodex(enhancedPrompt, context);
+          case 'claude':
+            return await this.callClaude(enhancedPrompt, context);
           default:
             throw new Error(`Unsupported coding tool: ${tool}`);
         }
@@ -131,6 +133,43 @@ export class CodingManager {
       if (error.code === 'ENOENT') {
         throw new Error(
           "Codex CLI not found. Please install codex and ensure it's in your PATH."
+        );
+      }
+      throw error;
+    }
+  }
+
+  private async callClaude(
+    prompt: string,
+    context: CodingContext
+  ): Promise<string> {
+    const { taskId, repositoryPath } = context;
+
+    try {
+      // Check if claude is available
+      await execCommand('which', ['claude'], {
+        taskId: taskId.toString(),
+        cwd: repositoryPath,
+      });
+
+      const result = await execCommandWithInputStreaming('claude', prompt, [], {
+        taskId: taskId.toString(),
+        cwd: repositoryPath,
+        timeout: 30 * 60 * 1000, // 30 minutes timeout
+        env: {
+          ...process.env,
+        },
+      });
+
+      if (result.exitCode !== 0) {
+        throw new Error(result.stderr || result.stdout || 'Claude command failed');
+      }
+
+      return result.stdout;
+    } catch (error: any) {
+      if (error.code === 'ENOENT') {
+        throw new Error(
+          "Claude CLI not found. Please install claude and ensure it's in your PATH."
         );
       }
       throw error;

@@ -114,25 +114,34 @@
                 class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
                 <option value="amp">Amp Code</option>
                 <option value="openai">OpenAI</option>
+                <option value="claude">Claude</option>
               </select>
               <p class="text-xs text-gray-500 mt-1">Choose which coding assistant to use by default for new tasks</p>
             </div>
 
             <div>
-              <h3 class="text-sm font-medium text-gray-900 mb-3">Amp Code</h3>
+              <h3 class="text-sm font-medium text-gray-900 mb-3">Amp</h3>
               <div>
                 <p class="text-xs text-gray-500 mt-1">Assumes Amp is already authenticated via CLI. Use <code>amp
                     login</code> to authenticate.</p>
               </div>
             </div>
             <div>
-              <h3 class="text-sm font-medium text-gray-900 mb-3">OpenAI</h3>
+              <h3 class="text-sm font-medium text-gray-900 mb-3">Claude</h3>
+              <div>
+                <p class="text-xs text-gray-500 mt-1">Assumes Claude is already authenticated via CLI. Use <code>claude
+                    login</code> to authenticate.</p>
+              </div>
+            </div>
+            <div>
+              <h3 class="text-sm font-medium text-gray-900 mb-3">Codex</h3>
               <div>
                 <label for="openai-api-key" class="block text-sm font-medium text-gray-700">API Key</label>
                 <input type="password" id="openai-api-key" name="openaiApiKey"
                   class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
-                <p class="text-xs text-gray-500 mt-1"><strong>Optional:</strong> OpenAI API key for enhanced commit messages,
-                  task summaries, and code generation. Without this key, Duckling will use basic commit messages and only work with the Amp coding tool.</p>
+                <p class="text-xs text-gray-500 mt-1"><strong>Optional:</strong> OpenAI API key for enhanced commit
+                  messages,
+                  task summaries, and code generation. Without this key, Duckling will use basic commit messages</p>
               </div>
             </div>
           </div>
@@ -150,7 +159,8 @@
               <textarea id="custom-prompt" name="customPrompt" rows="8"
                 class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400 font-mono text-sm"
                 placeholder="Enter your custom base prompt for coding agents..."></textarea>
-              <p class="text-xs text-gray-500 mt-1">Base prompt that will be sent to coding agents before the task description. Leave empty to use the default prompt.</p>
+              <p class="text-xs text-gray-500 mt-1">Base prompt that will be sent to coding agents before the task
+                description. Leave empty to use the default prompt.</p>
             </div>
             <div>
               <label for="branch-prefix" class="block text-sm font-medium text-gray-700">Branch Prefix</label>

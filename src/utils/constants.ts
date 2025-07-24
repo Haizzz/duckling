@@ -12,7 +12,7 @@ export const DATABASE_PATH = path.join(DUCKLING_DIR, 'duckling.db');
 export const LOGS_DIR = path.join(DUCKLING_DIR, 'logs');
 
 // Supported coding tools
-export const CODING_TOOLS = ['amp', 'openai'] as const;
+export const CODING_TOOLS = ['amp', 'openai', 'claude'] as const;
 export type CodingTool = (typeof CODING_TOOLS)[number];
 
 // Default settings
