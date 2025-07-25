@@ -1,7 +1,6 @@
 import { withRetry } from '../utils/retry';
 import { CodingTool } from '../types';
 import {
-  execCommand,
   execCommandStreaming,
   execCommandWithInputStreaming,
 } from '../utils/exec';
@@ -53,12 +52,6 @@ export class CodingManager {
     const { taskId, repositoryPath } = context;
 
     try {
-      // Check if amp is available
-      await execCommand('which', ['amp'], {
-        taskId: taskId.toString(),
-        cwd: repositoryPath,
-      });
-
       const result = await execCommandWithInputStreaming('amp', prompt, [], {
         taskId: taskId.toString(),
         cwd: repositoryPath,
@@ -95,12 +88,6 @@ export class CodingManager {
       if (!apiKey) {
         throw new Error('OpenAI API key not configured');
       }
-
-      // Check if codex is available
-      await execCommand('which', ['codex'], {
-        taskId: taskId.toString(),
-        cwd: repositoryPath,
-      });
 
       const result = await execCommandStreaming(
         'codex',
@@ -146,12 +133,6 @@ export class CodingManager {
     const { taskId, repositoryPath } = context;
 
     try {
-      // Check if claude is available
-      await execCommand('which', ['claude'], {
-        taskId: taskId.toString(),
-        cwd: repositoryPath,
-      });
-
       const result = await execCommandWithInputStreaming('claude', prompt, [], {
         taskId: taskId.toString(),
         cwd: repositoryPath,
@@ -162,7 +143,9 @@ export class CodingManager {
       });
 
       if (result.exitCode !== 0) {
-        throw new Error(result.stderr || result.stdout || 'Claude command failed');
+        throw new Error(
+          result.stderr || result.stdout || 'Claude command failed'
+        );
       }
 
       return result.stdout;
