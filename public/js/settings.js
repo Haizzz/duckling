@@ -73,6 +73,10 @@ class Settings {
     document.getElementById('default-coding-tool').value = settings.defaultCodingTool || 'amp';
     this.setSecureField('openai-api-key', settings.openaiApiKey);
 
+    // Integration settings
+    this.setSecureField('jira-api-key', settings.jiraApiKey);
+    document.getElementById('jira-jql-query').value = settings.jiraJqlQuery || '';
+
     // Task configuration
     document.getElementById('custom-prompt').value = settings.customPrompt || '';
     document.getElementById('branch-prefix').value = settings.branchPrefix || 'duckling-';
