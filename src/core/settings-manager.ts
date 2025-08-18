@@ -31,7 +31,7 @@ export class SettingsManager {
     customPrompt: DEFAULT_CODING_PROMPT,
   };
 
-  constructor(private db: DatabaseManager) { }
+  constructor(private db: DatabaseManager) {}
 
   get<K extends keyof SettingsDefaults>(key: K): SettingsDefaults[K] {
     const setting = this.db.getSetting(key);
