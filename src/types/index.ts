@@ -10,6 +10,8 @@ export interface Task {
   branch_name?: string;
   pr_number?: number;
   pr_url?: string;
+  worktree_id?: string;
+  worktree_path?: string;
   created_at: string;
   updated_at: string;
   completed_at?: string;

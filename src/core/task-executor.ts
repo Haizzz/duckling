@@ -1,17 +1,18 @@
 import { EventEmitter } from 'events';
 import { logger } from '../utils/logger';
+import { WorktreeManager, WorktreeAcquisition } from './worktree-manager';
 
 export interface TaskOperation {
   taskId: number;
   operation: string;
-  execute: () => Promise<void>;
+  execute: (worktreeAcquisition?: WorktreeAcquisition) => Promise<void>;
+  requiresWorktree?: boolean;
 }
 
 export class TaskExecutor extends EventEmitter {
   private static instance: TaskExecutor;
-  private currentOperation: TaskOperation | null = null;
-  private operationQueue: TaskOperation[] = [];
-  private isProcessing = false;
+  private activeOperations: Map<number, TaskOperation> = new Map();
+  private worktreeManager: WorktreeManager | null = null;
 
   static getInstance(): TaskExecutor {
     if (!TaskExecutor.instance) {
@@ -20,80 +21,106 @@ export class TaskExecutor extends EventEmitter {
     return TaskExecutor.instance;
   }
 
-  async executeTask(operation: TaskOperation): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const wrappedOperation: TaskOperation = {
-        ...operation,
-        execute: async () => {
-          try {
-            await operation.execute();
-            resolve();
-          } catch (error) {
-            reject(error);
-          }
-        },
-      };
-
-      this.operationQueue.push(wrappedOperation);
-      this.processQueue();
-    });
+  setWorktreeManager(worktreeManager: WorktreeManager): void {
+    this.worktreeManager = worktreeManager;
   }
 
-  private async processQueue(): Promise<void> {
-    if (this.isProcessing || this.operationQueue.length === 0) {
-      return;
+  async executeTask(operation: TaskOperation): Promise<void> {
+    // Check if this task is already running
+    if (this.activeOperations.has(operation.taskId)) {
+      throw new Error(`Task ${operation.taskId} is already running`);
     }
 
-    this.isProcessing = true;
+    // Add to active operations
+    this.activeOperations.set(operation.taskId, operation);
 
-    while (this.operationQueue.length > 0) {
-      const operation = this.operationQueue.shift()!;
-      this.currentOperation = operation;
+    logger.info(
+      `Starting task operation: ${operation.operation}`,
+      operation.taskId.toString()
+    );
+    this.emit('operation-start', operation);
 
-      logger.info(
-        `Starting task operation: ${operation.operation}`,
-        operation.taskId.toString()
-      );
-      this.emit('operation-start', operation);
+    try {
+      if (operation.requiresWorktree !== false && this.worktreeManager) {
+        // Most operations require a worktree
+        const acquisition = await this.worktreeManager.acquireWorktree(
+          operation.taskId
+        );
 
-      try {
+        try {
+          await operation.execute(acquisition);
+        } finally {
+          // Always release the worktree
+          await acquisition.release();
+        }
+      } else {
+        // Operation doesn't require a worktree (like status updates)
         await operation.execute();
-        logger.info(
-          `Completed task operation: ${operation.operation}`,
-          operation.taskId.toString()
-        );
-        this.emit('operation-complete', operation);
-      } catch (error) {
-        logger.error(
-          `Failed task operation: ${operation.operation} - ${error}`,
-          operation.taskId.toString()
-        );
-        this.emit('operation-error', operation, error);
       }
 
-      this.currentOperation = null;
+      logger.info(
+        `Completed task operation: ${operation.operation}`,
+        operation.taskId.toString()
+      );
+      this.emit('operation-complete', operation);
+    } catch (error) {
+      logger.error(
+        `Failed task operation: ${operation.operation} - ${error}`,
+        operation.taskId.toString()
+      );
+      this.emit('operation-error', operation, error);
+      throw error;
+    } finally {
+      // Remove from active operations
+      this.activeOperations.delete(operation.taskId);
     }
-
-    this.isProcessing = false;
   }
 
-  getCurrentOperation(): TaskOperation | null {
-    return this.currentOperation;
+  getCurrentOperations(): TaskOperation[] {
+    return Array.from(this.activeOperations.values());
   }
 
-  getQueuedOperations(): TaskOperation[] {
-    return [...this.operationQueue];
+  getActiveTaskIds(): number[] {
+    return Array.from(this.activeOperations.keys());
   }
 
   isTaskActive(taskId: number): boolean {
-    if (this.currentOperation?.taskId === taskId) {
-      return true;
-    }
-    return this.operationQueue.some((op) => op.taskId === taskId);
+    return this.activeOperations.has(taskId);
   }
 
-  getQueueLength(): number {
-    return this.operationQueue.length;
+  getActiveOperationCount(): number {
+    return this.activeOperations.size;
+  }
+
+  // Get the maximum number of concurrent operations (based on worktrees)
+  getMaxConcurrentOperations(): number {
+    if (!this.worktreeManager) {
+      return 1; // Fallback to single operation
+    }
+    const status = this.worktreeManager.getWorktreeStatus();
+    return status.total;
+  }
+
+  // Check if we can accept more operations
+  canAcceptNewOperation(): boolean {
+    return this.getActiveOperationCount() < this.getMaxConcurrentOperations();
+  }
+
+  // Get operation status for monitoring
+  getOperationStatus(): {
+    activeOperations: number;
+    maxConcurrentOperations: number;
+    canAcceptNew: boolean;
+    activeTaskIds: number[];
+    worktreeStatus?: any;
+  } {
+    return {
+      activeOperations: this.getActiveOperationCount(),
+      maxConcurrentOperations: this.getMaxConcurrentOperations(),
+      canAcceptNew: this.canAcceptNewOperation(),
+      activeTaskIds: this.getActiveTaskIds(),
+      worktreeStatus: this.worktreeManager?.getWorktreeStatus(),
+    };
   }
 }
 

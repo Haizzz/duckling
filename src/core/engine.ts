@@ -9,6 +9,8 @@ import { CodingManager } from './coding-manager';
 import { PrecommitManager } from './precommit-manager';
 import { OpenAIManager } from './openai-manager';
 import { GitManager } from './git-manager';
+import { WorktreeGitManager } from './worktree-git-manager';
+import { WorktreeManager } from './worktree-manager';
 import { GitHubCLIProvider } from './github-cli-provider';
 import { JiraManager } from './jira-manager';
 
@@ -20,6 +22,7 @@ export class CoreEngine extends EventEmitter {
   private githubManager?: GitHubCLIProvider;
   private openaiManager: OpenAIManager;
   private jiraManager: JiraManager;
+  private worktreeManager?: WorktreeManager;
   private isInitialized = false;
   private processingInterval?: NodeJS.Timeout;
   private isProcessing = false;
@@ -80,10 +83,42 @@ export class CoreEngine extends EventEmitter {
   async initialize(): Promise<void> {
     if (this.isInitialized) return;
 
+    // Initialize worktree management
+    await this.initializeWorktreeManager();
+
     // Start periodic task processing based on state
     this.startTaskProcessing();
 
     this.isInitialized = true;
+  }
+
+  private async initializeWorktreeManager(): Promise<void> {
+    try {
+      // For now, use the first repository we encounter, or a default path
+      // In a production system, this could be configurable per repository
+      const tasks = this.db.getTasks();
+      let mainRepoPath: string = process.cwd(); // Default fallback
+
+      if (tasks.length > 0) {
+        mainRepoPath = tasks[0].repository_path;
+      }
+
+      // Initialize WorktreeManager
+      this.worktreeManager = await WorktreeManager.initialize(
+        this.db,
+        mainRepoPath
+      );
+
+      // Set the worktree manager in the task executor
+      taskExecutor.setWorktreeManager(this.worktreeManager);
+
+      logger.info(
+        `WorktreeManager initialized for repository: ${mainRepoPath}`
+      );
+    } catch (error) {
+      logger.error(`Failed to initialize WorktreeManager: ${error}`);
+      // Continue without worktree management - will fall back to sequential processing
+    }
   }
 
   async createTask(request: CreateTaskRequest): Promise<number> {
@@ -215,12 +250,39 @@ export class CoreEngine extends EventEmitter {
       status: 'addressing-review',
     });
 
-    for (const task of [
+    const tasksToProcess = [
       ...pendingTasks,
       ...inProgressTasks,
       ...addressingReviewTasks,
-    ]) {
-      await this.processTask(task.id);
+    ];
+
+    // Process tasks concurrently up to the limit of available worktrees
+    const concurrentPromises: Promise<void>[] = [];
+
+    for (const task of tasksToProcess) {
+      // Skip if task is already being processed
+      if (taskExecutor.isTaskActive(task.id)) {
+        continue;
+      }
+
+      // Check if we can start more concurrent tasks
+      if (!taskExecutor.canAcceptNewOperation()) {
+        logger.info(
+          `Maximum concurrent tasks reached, queueing remaining tasks`
+        );
+        break;
+      }
+
+      // Start processing task concurrently
+      const taskPromise = this.processTask(task.id).catch((error) => {
+        logger.error(`Error processing task ${task.id}: ${error}`);
+      });
+      concurrentPromises.push(taskPromise);
+    }
+
+    // Wait for all concurrent tasks to complete (or fail)
+    if (concurrentPromises.length > 0) {
+      await Promise.allSettled(concurrentPromises);
     }
   }
 
@@ -234,6 +296,8 @@ export class CoreEngine extends EventEmitter {
       }
 
       try {
+        // For review processing, we'll use the main repository
+        // since we're just checking for comments, not making changes
         const gitManager = this.getGitManager(task.repository_path);
         await gitManager.switchToBranch(task.branch_name, task.id);
         const result = await this.collectPRComments(task.id, task.pr_number);
@@ -286,20 +350,31 @@ export class CoreEngine extends EventEmitter {
       throw new Error('Task not found');
     }
 
-    // Get git manager for the task's repository
-    const gitManager = this.getGitManager(task.repository_path);
-
-    // Use task executor to ensure only one task operation at a time
+    // Use task executor with worktree management
     await taskExecutor.executeTask({
       taskId: taskId,
       operation: 'process-task',
-      execute: async () => {
+      execute: async (worktreeAcquisition) => {
         try {
-          // Log which repository we're working on
+          if (!worktreeAcquisition) {
+            throw new Error('Worktree acquisition failed');
+          }
+
+          // Create git manager for the assigned worktree
+          const gitManager = new WorktreeGitManager(
+            this.db,
+            task.repository_path,
+            worktreeAcquisition.worktree.path,
+            this.openaiManager,
+            this.settings,
+            this.jiraManager
+          );
+
+          // Log which repository and worktree we're working on
           this.db.addTaskLog({
             task_id: taskId,
             level: 'info',
-            message: `🏠 Working on repository: ${task.repository_path}`,
+            message: `🏠 Working on repository: ${task.repository_path} in worktree: ${worktreeAcquisition.worktree.path}`,
           });
           // Update status to in progress
           this.db.addTaskLog({
@@ -375,7 +450,7 @@ export class CoreEngine extends EventEmitter {
               const output = await this.codingManager.generateCode(
                 task.coding_tool,
                 task.description,
-                { taskId, repositoryPath: task.repository_path }
+                { taskId, repositoryPath: worktreeAcquisition.worktree.path }
               );
 
               // Log the actual output to task logs
@@ -401,7 +476,10 @@ export class CoreEngine extends EventEmitter {
               failureMessage: '❌ Precommit checks failed',
             },
             async () => {
-              await this.runPrecommitChecks(taskId);
+              await this.runPrecommitChecks(
+                taskId,
+                worktreeAcquisition.worktree.path
+              );
             }
           );
 
@@ -478,7 +556,10 @@ export class CoreEngine extends EventEmitter {
     });
   }
 
-  private async runPrecommitChecks(taskId: number): Promise<void> {
+  private async runPrecommitChecks(
+    taskId: number,
+    worktreePath?: string
+  ): Promise<void> {
     const task = this.db.getTask(taskId);
     if (!task) throw new Error('Task not found');
 
@@ -488,7 +569,8 @@ export class CoreEngine extends EventEmitter {
       message: '🧪 Running initial precommit checks...',
     });
 
-    await this.precommitManager.runChecks(taskId, task.repository_path);
+    const repositoryPath = worktreePath || task.repository_path;
+    await this.precommitManager.runChecks(taskId, repositoryPath);
   }
 
   private async createPR(
@@ -608,12 +690,26 @@ export class CoreEngine extends EventEmitter {
     const task = this.db.getTask(taskId);
     if (!task) return;
 
-    // Use task executor to ensure only one task operation at a time
+    // Use task executor with worktree management
     await taskExecutor.executeTask({
       taskId: taskId,
       operation: 'handle-pr-comments',
-      execute: async () => {
+      execute: async (worktreeAcquisition) => {
         try {
+          if (!worktreeAcquisition) {
+            throw new Error('Worktree acquisition failed');
+          }
+
+          // Create git manager for the assigned worktree
+          const gitManager = new WorktreeGitManager(
+            this.db,
+            task.repository_path,
+            worktreeAcquisition.worktree.path,
+            this.openaiManager,
+            this.settings,
+            this.jiraManager
+          );
+
           // Update status to addressing-review
           this.db.updateTask(taskId, {
             status: 'addressing-review',
@@ -633,9 +729,8 @@ export class CoreEngine extends EventEmitter {
             this.db.addTaskLog({
               task_id: taskId,
               level: 'info',
-              message: `🔄 Switching to branch: ${task.branch_name}`,
+              message: `🔄 Switching to branch: ${task.branch_name} in worktree: ${worktreeAcquisition.worktree.path}`,
             });
-            const gitManager = this.getGitManager(task.repository_path);
             await gitManager.switchToBranch(task.branch_name, taskId);
           }
 
@@ -649,7 +744,7 @@ export class CoreEngine extends EventEmitter {
           const output = await this.codingManager.generateCode(
             task.coding_tool,
             `Original task: ${task.description}\n\nPR review comments to address:\n\n${concatenatedComments}\n\nAddress all the feedback above. Make all necessary code changes based on the review comments. Do not ask for clarification - analyze the available context and make the best decisions to resolve each comment. If a comment is ambiguous, choose the most logical interpretation based on the codebase patterns and the original task requirements.`,
-            { taskId, repositoryPath: task.repository_path }
+            { taskId, repositoryPath: worktreeAcquisition.worktree.path }
           );
 
           // Log the code generation output
@@ -666,7 +761,10 @@ export class CoreEngine extends EventEmitter {
           });
 
           // Apply changes and run checks
-          await this.runPrecommitChecks(taskId);
+          await this.runPrecommitChecks(
+            taskId,
+            worktreeAcquisition.worktree.path
+          );
 
           this.db.addTaskLog({
             task_id: taskId,
@@ -675,7 +773,6 @@ export class CoreEngine extends EventEmitter {
           });
 
           // Commit and push changes
-          const gitManager = this.getGitManager(task.repository_path);
           await gitManager.commitChanges(`Address PR feedback`, taskId);
           if (task.branch_name) {
             await gitManager.pushBranch(task.branch_name, taskId);
@@ -725,13 +822,18 @@ export class CoreEngine extends EventEmitter {
     this.emit('task-update', event);
   }
 
-  shutdown(): void {
+  async shutdown(): Promise<void> {
     console.log('🔄 Shutting down engine...');
 
     // Clear processing interval
     if (this.processingInterval) {
       clearInterval(this.processingInterval);
       this.processingInterval = undefined;
+    }
+
+    // Shutdown worktree manager
+    if (this.worktreeManager) {
+      await this.worktreeManager.shutdown();
     }
 
     // Remove all event listeners

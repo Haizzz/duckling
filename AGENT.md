@@ -43,6 +43,7 @@ duckling task cancel <taskId>
 ### Core Components
 - **Simple Dependency Injection**: Constructor injection pattern where dependencies are passed as parameters
 - **Core Engine**: Main orchestration logic with timeout-based processing and retry mechanisms
+- **Worktree Pool Management**: Concurrent task execution using git worktrees (max 3 concurrent tasks)
 - **Express API**: RESTful API with real-time updates via Server-Sent Events
 - **Frontend**: Plain HTML/CSS/JS single-page application with real-time updates
 - **CLI**: Command-line interface for basic operations
@@ -57,13 +58,15 @@ duckling task cancel <taskId>
 ### Key Files
 - `src/core/engine.ts` - Main business logic with dependency injection
 - `src/core/database.ts` - SQLite database manager
-- `src/core/git-manager.ts` - Git operations with intelligent commit message generation
+- `src/core/git-manager.ts` - Git operations with intelligent commit message generation (legacy)
+- `src/core/worktree-manager.ts` - Git worktree pool management for concurrent operations
+- `src/core/worktree-git-manager.ts` - Git operations within isolated worktrees
 - `src/core/github-cli-provider.ts` - GitHub CLI integration with PR and comment management
 - `src/core/openai-manager.ts` - OpenAI integration for commit messages and task summaries
 - `src/core/coding-manager.ts` - Coding assistant integration (Amp, OpenAI)
 - `src/core/precommit-manager.ts` - Precommit check execution and management
 - `src/core/settings-manager.ts` - Application settings management
-- `src/core/task-executor.ts` - Task execution queue to prevent overlapping operations
+- `src/core/task-executor.ts` - Concurrent task execution with worktree coordination
 - `src/api/server.ts` - Express.js server
 - `src/api/routes.ts` - API route handlers
 - `public/js/app.js` - Frontend application controller with EventSource
@@ -89,10 +92,16 @@ duckling task cancel <taskId>
 
 ## Processing Architecture
 
+### Concurrent Task Processing
+- **Worktree Pool**: 3 git worktrees created on startup for isolated task execution
+- **Concurrent Execution**: Up to 3 tasks can run simultaneously, each in its own worktree
+- **Queue Management**: Tasks queue for available worktrees when pool is full
+- **Automatic Cleanup**: Worktrees are cleaned and reset after task completion
+
 ### Task Processing Intervals
 - **Pending Tasks**: Processed every 1 minute using setTimeout
 - **Review Processing**: PR comments checked every 5 minutes using setTimeout
-- **No Overlaps**: Uses flags to prevent concurrent processing of same type
+- **Concurrent Scheduling**: Multiple tasks can start simultaneously up to worktree limit
 - **Self-Rescheduling**: Each timeout reschedules itself after completion
 
 ### Real-time Updates
