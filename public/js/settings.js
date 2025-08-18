@@ -75,6 +75,7 @@ class Settings {
 
     // Integration settings
     this.setSecureField('jira-api-key', settings.jiraApiKey);
+    document.getElementById('jira-base-url').value = settings.jiraBaseUrl || '';
     document.getElementById('jira-jql-query').value = settings.jiraJqlQuery || '';
 
     // Task configuration

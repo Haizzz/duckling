@@ -36,7 +36,6 @@ export interface JiraSearchResponse {
 
 export class JiraManager {
   private settings: SettingsManager;
-  private baseUrl = 'https://canva.atlassian.net';
 
   constructor(settings: SettingsManager) {
     this.settings = settings;
@@ -48,10 +47,11 @@ export class JiraManager {
   private isConfigured(): boolean {
     const apiKey = this.settings.get('jiraApiKey');
     const jql = this.settings.get('jiraJqlQuery');
+    const baseUrl = this.settings.get('jiraBaseUrl');
 
-    if (!apiKey || !jql) {
+    if (!apiKey || !jql || !baseUrl) {
       logger.info(
-        'Jira integration not configured - missing API key or JQL query'
+        'Jira integration not configured - missing API key, JQL query, or base URL'
       );
       return false;
     }
@@ -69,11 +69,12 @@ export class JiraManager {
 
     const apiKey = this.settings.get('jiraApiKey');
     const jql = this.settings.get('jiraJqlQuery');
+    const baseUrl = this.settings.get('jiraBaseUrl');
 
     try {
       return await withRetry(
         async () => {
-          const response = await fetch(`${this.baseUrl}/rest/api/3/search`, {
+          const response = await fetch(`${baseUrl}/rest/api/3/search`, {
             method: 'POST',
             headers: {
               Authorization: `Bearer ${apiKey}`,
@@ -132,32 +133,6 @@ export class JiraManager {
     } catch (error) {
       logger.error(`Failed to fetch Jira ticket: ${error}`);
       return null;
-    }
-  }
-
-  /**
-   * Test the Jira configuration by making a simple API call
-   */
-  async testConnection(): Promise<boolean> {
-    if (!this.isConfigured()) {
-      return false;
-    }
-
-    const apiKey = this.settings.get('jiraApiKey');
-
-    try {
-      const response = await fetch(`${this.baseUrl}/rest/api/3/myself`, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          Accept: 'application/json',
-        },
-      });
-
-      return response.ok;
-    } catch (error) {
-      logger.error(`Jira connection test failed: ${error}`);
-      return false;
     }
   }
 }

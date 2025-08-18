@@ -12,6 +12,7 @@ export interface SettingsDefaults {
   openaiApiKey: string;
   jiraApiKey: string;
   jiraJqlQuery: string;
+  jiraBaseUrl: string;
   customPrompt: string;
 }
 
@@ -26,10 +27,11 @@ export class SettingsManager {
     openaiApiKey: '',
     jiraApiKey: '',
     jiraJqlQuery: '',
+    jiraBaseUrl: '',
     customPrompt: DEFAULT_CODING_PROMPT,
   };
 
-  constructor(private db: DatabaseManager) {}
+  constructor(private db: DatabaseManager) { }
 
   get<K extends keyof SettingsDefaults>(key: K): SettingsDefaults[K] {
     const setting = this.db.getSetting(key);
