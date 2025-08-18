@@ -10,6 +10,7 @@ import { PrecommitManager } from './precommit-manager';
 import { OpenAIManager } from './openai-manager';
 import { GitManager } from './git-manager';
 import { GitHubCLIProvider } from './github-cli-provider';
+import { JiraManager } from './jira-manager';
 
 export class CoreEngine extends EventEmitter {
   private db: DatabaseManager;
@@ -18,6 +19,7 @@ export class CoreEngine extends EventEmitter {
   private precommitManager: PrecommitManager;
   private githubManager?: GitHubCLIProvider;
   private openaiManager: OpenAIManager;
+  private jiraManager: JiraManager;
   private isInitialized = false;
   private processingInterval?: NodeJS.Timeout;
   private isProcessing = false;
@@ -27,7 +29,8 @@ export class CoreEngine extends EventEmitter {
     settings: SettingsManager,
     codingManager: CodingManager,
     precommitManager: PrecommitManager,
-    openaiManager: OpenAIManager
+    openaiManager: OpenAIManager,
+    jiraManager: JiraManager
   ) {
     super();
     this.db = db;
@@ -35,6 +38,7 @@ export class CoreEngine extends EventEmitter {
     this.codingManager = codingManager;
     this.precommitManager = precommitManager;
     this.openaiManager = openaiManager;
+    this.jiraManager = jiraManager;
   }
 
   private getGitManager(repositoryPath: string): GitManager {
@@ -193,6 +197,15 @@ export class CoreEngine extends EventEmitter {
   }
 
   private async processPendingTasks(): Promise<void> {
+    // Check for new Jira tasks first and get the task list
+    try {
+      await this.jiraManager.getLatestTasksForProcessing((request) =>
+        this.createTask(request)
+      );
+    } catch (error) {
+      logger.warn(`Failed to check for latest Jira tasks: ${error}`);
+    }
+
     // Process pending and in_progress tasks (in case server was interrupted)
     const pendingTasks = this.db.getTasks({ status: 'pending' });
     const inProgressTasks = this.db.getTasks({ status: 'in-progress' });

@@ -342,7 +342,7 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
       const settingsObj = settings.getAll();
 
       // For password fields, return a special indicator if value exists
-      const secureFields = ['openaiApiKey', 'jiraApiToken'];
+      const secureFields = ['openaiApiKey', 'jiraApiKey'];
       const sanitizedSettings: Record<string, any> = {};
 
       for (const [key, value] of Object.entries(settingsObj)) {

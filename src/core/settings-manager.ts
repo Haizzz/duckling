@@ -10,7 +10,11 @@ export interface SettingsDefaults {
   commentPrefix: string;
   maxRetries: number;
   openaiApiKey: string;
-  jiraApiToken: string;
+  jiraApiKey: string;
+  jiraEmail: string;
+  jiraJqlQuery: string;
+  jiraBaseUrl: string;
+  jiraRepository: string;
   customPrompt: string;
 }
 
@@ -23,7 +27,11 @@ export class SettingsManager {
     commentPrefix: 'duckling',
     maxRetries: 3,
     openaiApiKey: '',
-    jiraApiToken: '',
+    jiraApiKey: '',
+    jiraEmail: '',
+    jiraJqlQuery: '',
+    jiraBaseUrl: '',
+    jiraRepository: '',
     customPrompt: DEFAULT_CODING_PROMPT,
   };
 
