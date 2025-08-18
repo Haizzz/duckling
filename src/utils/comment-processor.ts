@@ -18,16 +18,17 @@ export interface CommentData {
 export interface CommentProcessingOptions {
   commentPrefix: string;
   lastCommitTimestamp: string | null;
+  currentUser?: string | null;
 }
 
 /**
- * Filter comments based on prefix and timestamp
+ * Filter comments based on prefix, timestamp, and user
  */
 export function filterComments(
   comments: CommentData[],
   options: CommentProcessingOptions
 ): CommentData[] {
-  const { commentPrefix, lastCommitTimestamp } = options;
+  const { commentPrefix, lastCommitTimestamp, currentUser } = options;
   const lastCommitDate = lastCommitTimestamp
     ? new Date(lastCommitTimestamp)
     : null;
@@ -41,13 +42,17 @@ export function filterComments(
       ? commentDate > lastCommitDate
       : true;
 
+    // Skip comments from the current user (bot's own comments)
+    const isFromCurrentUser = currentUser && comment.user.login === currentUser;
+
     logger.info(
       `Comment by ${comment.user.login}, ` +
         `time ${commentDate}, commit time ${lastCommitDate || 'null'}, ` +
-        `starts with '${commentPrefix}': ${startsWithPrefix}`
+        `starts with '${commentPrefix}': ${startsWithPrefix}, ` +
+        `from current user (${currentUser}): ${isFromCurrentUser}`
     );
 
-    return startsWithPrefix && isNewerThanCommit;
+    return startsWithPrefix && isNewerThanCommit && !isFromCurrentUser;
   });
 }
 
