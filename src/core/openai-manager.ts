@@ -165,7 +165,7 @@ export class OpenAIManager {
 
     if (!this.openai) {
       // Fallback to simple generation if OpenAI not available
-      return `${jiraKey}${prefix} ${task.description.substring(0, 50)}${task.description.length > 50 ? '...' : ''}`;
+      return `${prefix} ${jiraKey}${task.description.substring(0, 50)}${task.description.length > 50 ? '...' : ''}`;
     }
 
     try {
@@ -175,7 +175,7 @@ export class OpenAIManager {
 
       // Clean up the result
       const cleanTitle = result.replace(/^["']|["']$/g, '').trim();
-      const fullTitle = `${jiraKey}${prefix} ${cleanTitle}`;
+      const fullTitle = `${prefix} ${jiraKey}${cleanTitle}`;
 
       if (fullTitle.length <= 100) {
         logger.info(`Generated PR title via OpenAI: ${fullTitle}`);
@@ -189,7 +189,7 @@ export class OpenAIManager {
 
     // Fallback to simple generation
     const availableLength = 80 - prefix.length - jiraKey.length;
-    return `${jiraKey}${prefix} ${task.description.substring(0, availableLength)}${task.description.length > availableLength ? '...' : ''}`;
+    return `${prefix} ${jiraKey}${task.description.substring(0, availableLength)}${task.description.length > availableLength ? '...' : ''}`;
   }
 
   async generatePRDescription(
