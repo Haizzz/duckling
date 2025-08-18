@@ -250,6 +250,9 @@ export class GitHubCLIProvider {
     try {
       const commentPrefix = this.settings.get('commentPrefix');
 
+      // Get current user to filter out their own comments
+      const currentUser = await this.getCurrentUser(repositoryPath);
+
       // Get all comment types (reviews, review comments, and PR comments)
       const { reviewComments, prComments } = await this.getAllCommentsSeparated(
         prNumber,
@@ -278,6 +281,7 @@ export class GitHubCLIProvider {
       return processAllComments(prCommentData, reviewCommentData, {
         commentPrefix,
         lastCommitTimestamp,
+        currentUser,
       });
     } catch (error) {
       logger.error(
@@ -393,6 +397,34 @@ export class GitHubCLIProvider {
       repositoryPath
     );
     return [...reviewComments, ...prComments];
+  }
+
+  async getCurrentUser(repositoryPath: string): Promise<string | null> {
+    await this.ensureInitialized(repositoryPath);
+
+    return await withRetry(
+      async () => {
+        try {
+          const result = await execCommand(
+            'gh',
+            ['api', 'user', '--jq', '.login'],
+            { cwd: repositoryPath }
+          );
+          if (result.exitCode !== 0) {
+            throw new Error(`GitHub CLI command failed: ${result.stderr}`);
+          }
+          return result.stdout.trim();
+        } catch (error) {
+          logger.warn(
+            'Could not get current user from GitHub CLI:',
+            String(error)
+          );
+          return null;
+        }
+      },
+      'Get current user from GitHub CLI',
+      2
+    );
   }
 
   async getPRStatus(
