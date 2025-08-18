@@ -47,7 +47,8 @@ export class CoreEngine extends EventEmitter {
         this.db,
         repositoryPath,
         this.openaiManager,
-        this.settings
+        this.settings,
+        this.jiraManager
       );
     } catch (error: any) {
       logger.error(`Failed to initialize GitManager: ${error.message}`);
@@ -64,7 +65,8 @@ export class CoreEngine extends EventEmitter {
       this.githubManager = new GitHubCLIProvider(
         this.db,
         this.openaiManager,
-        this.settings
+        this.settings,
+        this.jiraManager
       );
       return this.githubManager;
     } catch (error) {
@@ -498,8 +500,7 @@ export class CoreEngine extends EventEmitter {
       const githubManager = this.getGitHubManager();
       const pr = await githubManager.createPRFromTask(
         branchName,
-        task.description,
-        taskId,
+        task,
         task.repository_path
       );
 

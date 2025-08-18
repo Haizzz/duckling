@@ -11,11 +11,14 @@ import { processAllComments, CommentData } from '../utils/comment-processor';
 import { DatabaseManager } from './database';
 import { OpenAIManager } from './openai-manager';
 import { SettingsManager } from './settings-manager';
+import { JiraManager } from './jira-manager';
+import { Task } from '../types';
 
 export class GitHubCLIProvider {
   private db: DatabaseManager;
   private openaiManager: OpenAIManager;
   private settings: SettingsManager;
+  private jiraManager: JiraManager;
   private repoOwner: string = '';
   private repoName: string = '';
   private currentRepoPath: string = '';
@@ -23,11 +26,13 @@ export class GitHubCLIProvider {
   constructor(
     db: DatabaseManager,
     openaiManager: OpenAIManager,
-    settings: SettingsManager
+    settings: SettingsManager,
+    jiraManager: JiraManager
   ) {
     this.db = db;
     this.openaiManager = openaiManager;
     this.settings = settings;
+    this.jiraManager = jiraManager;
   }
 
   private async ensureInitialized(repositoryPath: string) {
@@ -71,14 +76,13 @@ export class GitHubCLIProvider {
 
   async createPRFromTask(
     branchName: string,
-    taskDescription: string,
-    taskId: number,
+    task: Task,
     repositoryPath: string
   ): Promise<{ number: number; url: string }> {
     await this.ensureInitialized(repositoryPath);
 
     this.db.addTaskLog({
-      task_id: taskId,
+      task_id: task.id,
       level: 'info',
       message: '🤖 Generating PR title and description...',
     });
@@ -91,19 +95,20 @@ export class GitHubCLIProvider {
 
     // Generate intelligent title and description using OpenAI with examples
     const title = await this.openaiManager.generatePRTitle(
-      taskDescription,
+      task,
       recentPRs,
-      prDiff
+      prDiff,
+      this.jiraManager
     );
     const description = await this.openaiManager.generatePRDescription(
-      taskDescription,
+      task.description,
       branchName,
       recentPRs,
       prDiff
     );
 
     this.db.addTaskLog({
-      task_id: taskId,
+      task_id: task.id,
       level: 'info',
       message: `📋 Generated PR title: "${title}"`,
     });
@@ -112,7 +117,7 @@ export class GitHubCLIProvider {
       branchName,
       title,
       description,
-      taskId,
+      task.id,
       repositoryPath
     );
   }

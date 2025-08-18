@@ -175,6 +175,22 @@ export class JiraManager {
   }
 
   /**
+   * Check if a task is created from a Jira ticket
+   */
+  isJiraTicket(task: { title: string; description: string }): boolean {
+    return task.description.includes('Jira Ticket: ');
+  }
+
+  /**
+   * Extract the Jira key from a task description
+   */
+  getJiraKey(task: { title: string; description: string }): string | null {
+    // Look for "Jira Ticket: KEY" pattern in description
+    const match = task.description.match(/Jira Ticket: ([A-Z]+-\d+)/);
+    return match ? match[1] : null;
+  }
+
+  /**
    * Get the latest tasks from Jira and create them as pending tasks if not already exists
    * Returns array of task IDs for newly created or existing tasks
    */
