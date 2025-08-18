@@ -147,34 +147,6 @@
           </div>
         </div>
 
-        <!-- Integration Settings -->
-        <div class="bg-white shadow rounded-lg">
-          <div class="px-6 py-4 border-b border-gray-200">
-            <h2 class="text-lg font-medium text-gray-900">Integration Settings</h2>
-            <p class="text-sm text-gray-500 mt-1">Configure external service integrations</p>
-          </div>
-          <div class="px-6 py-4 space-y-6">
-            <div>
-              <h3 class="text-sm font-medium text-gray-900 mb-3">Jira Integration</h3>
-              <p class="text-sm text-gray-600 mb-4">Configure Jira integration for automatic ticket assignment. Both fields must be specified to use this feature.</p>
-              <div class="space-y-4">
-                <div>
-                  <label for="jira-api-key" class="block text-sm font-medium text-gray-700">API Key</label>
-                  <input type="password" id="jira-api-key" name="jiraApiKey"
-                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
-                  <p class="text-xs text-gray-500 mt-1"><strong>Optional:</strong> Your Jira API token for authentication. Generate this from your Jira account settings.</p>
-                </div>
-                <div>
-                  <label for="jira-jql-query" class="block text-sm font-medium text-gray-700">JQL Query</label>
-                  <input type="text" id="jira-jql-query" name="jiraJqlQuery" placeholder="e.g., project = MYPROJECT AND status = 'To Do' AND assignee = currentUser()"
-                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
-                  <p class="text-xs text-gray-500 mt-1"><strong>Optional:</strong> JQL query to find tickets to implement. Duckling will fetch the latest matching ticket for automatic assignment.</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
         <!-- Task Configuration -->
         <div class="bg-white shadow rounded-lg">
           <div class="px-6 py-4 border-b border-gray-200">
@@ -229,6 +201,38 @@
             </div>
 
 
+          </div>
+        </div>
+
+        <!-- Integration Settings -->
+        <div class="bg-white shadow rounded-lg">
+          <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-lg font-medium text-gray-900">Integration Settings</h2>
+            <p class="text-sm text-gray-500 mt-1">Configure external service integrations</p>
+          </div>
+          <div class="px-6 py-4 space-y-6">
+            <div>
+              <h3 class="text-sm font-medium text-gray-900 mb-3">Jira Integration</h3>
+              <p class="text-sm text-gray-600 mb-4">Configure Jira integration for automatic ticket assignment. Both
+                fields must be specified to use this feature.</p>
+              <div class="space-y-4">
+                <div>
+                  <label for="jira-api-key" class="block text-sm font-medium text-gray-700">API Key</label>
+                  <input type="password" id="jira-api-key" name="jiraApiKey"
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
+                  <p class="text-xs text-gray-500 mt-1"><strong>Optional:</strong> Your Jira API token for
+                    authentication. Generate this from your Jira account settings.</p>
+                </div>
+                <div>
+                  <label for="jira-jql-query" class="block text-sm font-medium text-gray-700">JQL Query</label>
+                  <input type="text" id="jira-jql-query" name="jiraJqlQuery"
+                    placeholder="e.g., project = MYPROJECT AND status = 'To Do' AND assignee = currentUser()"
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
+                  <p class="text-xs text-gray-500 mt-1"><strong>Optional:</strong> JQL query to find tickets to
+                    implement. Duckling will fetch the latest matching ticket for automatic assignment.</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
