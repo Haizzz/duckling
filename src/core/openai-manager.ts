@@ -10,6 +10,8 @@ import {
 } from './prompts';
 import { DatabaseManager } from './database';
 import { SettingsManager } from './settings-manager';
+import { JiraManager } from './jira-manager';
+import { Task } from '../types';
 
 export class OpenAIManager {
   private db: DatabaseManager;
@@ -145,25 +147,35 @@ export class OpenAIManager {
   }
 
   async generatePRTitle(
-    taskDescription: string,
+    task: Task,
     recentPRs: Array<{ title: string; body: string; diff?: string }> = [],
-    prDiff: string = ''
+    prDiff: string = '',
+    jiraManager?: JiraManager
   ): Promise<string> {
     const prefix = this.settings.get('prTitlePrefix');
 
+    // Check if this is a Jira task and get the Jira key
+    let jiraKey = '';
+    if (jiraManager && jiraManager.isJiraTicket(task)) {
+      const extractedKey = jiraManager.getJiraKey(task);
+      if (extractedKey) {
+        jiraKey = `[${extractedKey}] `;
+      }
+    }
+
     if (!this.openai) {
       // Fallback to simple generation if OpenAI not available
-      return `${prefix} ${taskDescription.substring(0, 50)}${taskDescription.length > 50 ? '...' : ''}`;
+      return `${jiraKey}${prefix} ${task.description.substring(0, 50)}${task.description.length > 50 ? '...' : ''}`;
     }
 
     try {
-      const prompt = createPRTitlePrompt(taskDescription, recentPRs, prDiff);
+      const prompt = createPRTitlePrompt(task.description, recentPRs, prDiff);
 
       const result = await this.callOpenAI(prompt);
 
       // Clean up the result
       const cleanTitle = result.replace(/^["']|["']$/g, '').trim();
-      const fullTitle = `${prefix} ${cleanTitle}`;
+      const fullTitle = `${jiraKey}${prefix} ${cleanTitle}`;
 
       if (fullTitle.length <= 100) {
         logger.info(`Generated PR title via OpenAI: ${fullTitle}`);
@@ -176,7 +188,8 @@ export class OpenAIManager {
     }
 
     // Fallback to simple generation
-    return `${prefix} ${taskDescription.substring(0, 80 - prefix.length)}${taskDescription.length > 80 - prefix.length ? '...' : ''}`;
+    const availableLength = 80 - prefix.length - jiraKey.length;
+    return `${jiraKey}${prefix} ${task.description.substring(0, availableLength)}${task.description.length > availableLength ? '...' : ''}`;
   }
 
   async generatePRDescription(

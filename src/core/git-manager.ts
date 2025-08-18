@@ -7,23 +7,27 @@ import * as fs from 'fs';
 import { DatabaseManager } from './database';
 import { SettingsManager } from './settings-manager';
 import { OpenAIManager } from './openai-manager';
+import { JiraManager } from './jira-manager';
 
 export class GitManager {
   private git: SimpleGit;
   private db: DatabaseManager;
   private settings: SettingsManager;
   private openaiManager: OpenAIManager;
+  private jiraManager: JiraManager;
   private repoPath: string;
 
   constructor(
     db: DatabaseManager,
     repoPath: string,
     openaiManager: OpenAIManager,
-    settings: SettingsManager
+    settings: SettingsManager,
+    jiraManager: JiraManager
   ) {
     this.db = db;
     this.settings = settings;
     this.openaiManager = openaiManager;
+    this.jiraManager = jiraManager;
     this.repoPath = repoPath;
 
     // Validate git repository before initializing SimpleGit
@@ -74,7 +78,8 @@ export class GitManager {
       const githubManager = new GitHubCLIProvider(
         this.db,
         this.openaiManager,
-        this.settings
+        this.settings,
+        this.jiraManager
       );
       const defaultBranch = await githubManager.getDefaultBranch(this.repoPath);
 
