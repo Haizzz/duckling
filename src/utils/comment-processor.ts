@@ -42,7 +42,7 @@ export function filterComments(
       ? commentDate > lastCommitDate
       : true;
 
-    // Skip comments from the current user (bot's own comments)
+    // Only process comments from the current user (authorized user)
     const isFromCurrentUser = currentUser && comment.user.login === currentUser;
 
     logger.info(
@@ -52,7 +52,7 @@ export function filterComments(
         `from current user (${currentUser}): ${isFromCurrentUser}`
     );
 
-    return startsWithPrefix && isNewerThanCommit && !isFromCurrentUser;
+    return startsWithPrefix && isNewerThanCommit && isFromCurrentUser;
   });
 }
 
