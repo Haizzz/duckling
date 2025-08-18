@@ -196,9 +196,15 @@ export class CoreEngine extends EventEmitter {
     // Process pending and in_progress tasks (in case server was interrupted)
     const pendingTasks = this.db.getTasks({ status: 'pending' });
     const inProgressTasks = this.db.getTasks({ status: 'in-progress' });
-    const addressingReviewTasks = this.db.getTasks({ status: 'addressing-review' });
+    const addressingReviewTasks = this.db.getTasks({
+      status: 'addressing-review',
+    });
 
-    for (const task of [...pendingTasks, ...inProgressTasks, ...addressingReviewTasks]) {
+    for (const task of [
+      ...pendingTasks,
+      ...inProgressTasks,
+      ...addressingReviewTasks,
+    ]) {
       await this.processTask(task.id);
     }
   }
@@ -207,7 +213,7 @@ export class CoreEngine extends EventEmitter {
     const awaitingReviewTasks = this.db.getTasks({ status: 'awaiting-review' });
 
     // Single pass: for each task, check for new reviews, address them, and update status
-    for (const task of [...awaitingReviewTasks, ...addressingReviewTasks]) {
+    for (const task of [...awaitingReviewTasks]) {
       if (!task.pr_number || !task.branch_name) {
         continue;
       }
