@@ -196,17 +196,15 @@ export class CoreEngine extends EventEmitter {
     // Process pending and in_progress tasks (in case server was interrupted)
     const pendingTasks = this.db.getTasks({ status: 'pending' });
     const inProgressTasks = this.db.getTasks({ status: 'in-progress' });
+    const addressingReviewTasks = this.db.getTasks({ status: 'addressing-review' });
 
-    for (const task of [...pendingTasks, ...inProgressTasks]) {
+    for (const task of [...pendingTasks, ...inProgressTasks, ...addressingReviewTasks]) {
       await this.processTask(task.id);
     }
   }
 
   private async processReviews(): Promise<void> {
     const awaitingReviewTasks = this.db.getTasks({ status: 'awaiting-review' });
-    const addressingReviewTasks = this.db.getTasks({
-      status: 'addressing-review',
-    });
 
     // Single pass: for each task, check for new reviews, address them, and update status
     for (const task of [...awaitingReviewTasks, ...addressingReviewTasks]) {
