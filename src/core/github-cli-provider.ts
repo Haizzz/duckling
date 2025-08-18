@@ -19,6 +19,7 @@ export class GitHubCLIProvider {
   private repoOwner: string = '';
   private repoName: string = '';
   private currentRepoPath: string = '';
+  private cachedCurrentUser: string | null = null;
 
   constructor(
     db: DatabaseManager,
@@ -42,6 +43,34 @@ export class GitHubCLIProvider {
     } catch (error) {
       throw new Error(`Failed to get repository information: ${error}`);
     }
+  }
+
+  async getCurrentUser(repositoryPath?: string): Promise<string> {
+    // Return cached user if available
+    if (this.cachedCurrentUser) {
+      return this.cachedCurrentUser;
+    }
+
+    return await withRetry(
+      async () => {
+        const result = repositoryPath
+          ? await execCommand('gh', ['api', 'user', '--jq', '.login'], {
+              cwd: repositoryPath,
+            })
+          : await executeGitHubCLI('api user --jq .login');
+
+        if (repositoryPath && 'exitCode' in result && result.exitCode !== 0) {
+          throw new Error(`GitHub CLI command failed: ${result.stderr}`);
+        }
+
+        const username = result.stdout.trim();
+        this.cachedCurrentUser = username; // Cache the result
+        logger.info(`Current GitHub CLI user: ${username}`);
+        return username;
+      },
+      'Get current GitHub CLI user',
+      2
+    );
   }
 
   async getDefaultBranch(repositoryPath: string): Promise<string> {
@@ -250,6 +279,9 @@ export class GitHubCLIProvider {
     try {
       const commentPrefix = this.settings.get('commentPrefix');
 
+      // Get current authenticated user
+      const currentUser = await this.getCurrentUser(repositoryPath);
+
       // Get all comment types (reviews, review comments, and PR comments)
       const { reviewComments, prComments } = await this.getAllCommentsSeparated(
         prNumber,
@@ -278,6 +310,7 @@ export class GitHubCLIProvider {
       return processAllComments(prCommentData, reviewCommentData, {
         commentPrefix,
         lastCommitTimestamp,
+        currentUser,
       });
     } catch (error) {
       logger.error(
