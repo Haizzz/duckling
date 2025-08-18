@@ -239,7 +239,7 @@
                 <div>
                   <label for="jira-jql-query" class="block text-sm font-medium text-gray-700">JQL Query</label>
                   <input type="text" id="jira-jql-query" name="jiraJqlQuery"
-                    placeholder="e.g., project = MYPROJECT AND status = 'To Do' AND assignee = currentUser()"
+                    placeholder="assignee = &quot;youremail&quot; AND labels = &quot;duckling&quot; AND status = Ready ORDER BY created DESC"
                     class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
                   <p class="text-xs text-gray-500 mt-1"><strong>Optional:</strong> JQL query to find tickets to
                     implement. Duckling will fetch the latest matching ticket for automatic assignment.</p>
