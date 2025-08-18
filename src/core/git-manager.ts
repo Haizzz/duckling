@@ -247,33 +247,15 @@ export class GitManager {
           taskId.toString()
         );
 
-      // Discard all local changes and untracked files to ensure clean state
-      await this.git.reset(['--hard']);
-      await this.git.clean('f', ['-d']);
-
-      // Fetch the specific branch to ensure we have latest changes
+      // Fetch the specific branch first to ensure we have latest changes
       await this.git.fetch('origin', branchName);
+
+      // Reset hard to origin branch to discard any local changes
+      await this.git.reset(['--hard', `origin/${branchName}`]);
+      await this.git.clean('f', ['-d']);
 
       // Switch to the branch
       await this.git.checkout(branchName);
-
-      // Hard pull: fetch and reset to origin state to override any local changes
-      try {
-        await this.git.fetch('origin', branchName);
-        await this.git.reset(['--hard', `origin/${branchName}`]);
-        if (taskId)
-          logger.info(
-            `Hard pulled latest changes for branch: ${branchName}`,
-            taskId.toString()
-          );
-      } catch (error: any) {
-        // If hard pull fails (e.g., no upstream), that's okay for local branches
-        if (taskId)
-          logger.info(
-            `No upstream changes to hard pull for branch: ${branchName}`,
-            taskId.toString()
-          );
-      }
     }, 'Switch to branch');
   }
 
