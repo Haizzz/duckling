@@ -610,6 +610,17 @@ export class CoreEngine extends EventEmitter {
             message: `💬 PR review comments received:\n${concatenatedComments}`,
           });
 
+          // Switch to the task branch before generating fixes
+          if (task.branch_name) {
+            this.db.addTaskLog({
+              task_id: taskId,
+              level: 'info',
+              message: `🔄 Switching to branch: ${task.branch_name}`,
+            });
+            const gitManager = this.getGitManager(task.repository_path);
+            await gitManager.switchToBranch(task.branch_name, taskId);
+          }
+
           this.db.addTaskLog({
             task_id: taskId,
             level: 'info',
