@@ -74,9 +74,12 @@ class Settings {
     this.setSecureField('openai-api-key', settings.openaiApiKey);
 
     // Integration settings
+    document.getElementById('jira-email').value = settings.jiraEmail || '';
     this.setSecureField('jira-api-key', settings.jiraApiKey);
     document.getElementById('jira-base-url').value = settings.jiraBaseUrl || '';
     document.getElementById('jira-jql-query').value = settings.jiraJqlQuery || '';
+    // Jira repository will be set after repositories are loaded
+    this.selectedJiraRepository = settings.jiraRepository || '';
 
     // Task configuration
     document.getElementById('custom-prompt').value = settings.customPrompt || '';
@@ -118,12 +121,12 @@ class Settings {
         const result = await response.json();
         console.log('Settings save response:', result);
         let message = 'Settings saved successfully!'; // Default fallback
-        
+
         // Try to get message from server response
         if (result && result.data && result.data.message) {
           message = result.data.message;
         }
-        
+
         console.log('Toast message:', message);
         this.showSettingsSaveSuccess(message);
       } else {
@@ -371,6 +374,7 @@ class Settings {
     if (this.repositories.length === 0) {
       warningEl.classList.remove('hidden');
       container.innerHTML = '';
+      this.updateJiraRepositoryDropdown();
       return;
     }
 
@@ -389,6 +393,56 @@ class Settings {
         </button>
       </div>
     `).join('');
+
+    // Update the Jira repository dropdown
+    this.updateJiraRepositoryDropdown();
+  }
+
+  updateJiraRepositoryDropdown() {
+    const dropdown = document.getElementById('jira-repository');
+
+    // Clear existing options except the first one
+    dropdown.innerHTML = '<option value="">-- Select a repository --</option>';
+
+    // Add repository options
+    this.repositories.forEach(repo => {
+      const option = document.createElement('option');
+      option.value = repo.path;
+      option.textContent = `${repo.name} (${repo.path})`;
+      dropdown.appendChild(option);
+    });
+
+    // Set the selected value if we have one stored
+    if (this.selectedJiraRepository) {
+      dropdown.value = this.selectedJiraRepository;
+
+      // Check if the selected repository still exists
+      const repoExists = this.repositories.some(repo => repo.path === this.selectedJiraRepository);
+      if (!repoExists) {
+        // Repository was removed, clear the selection and save settings
+        this.selectedJiraRepository = '';
+        dropdown.value = '';
+        this.clearJiraRepositorySetting();
+      }
+    }
+  }
+
+  async clearJiraRepositorySetting() {
+    try {
+      const response = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jiraRepository: '' })
+      });
+
+      if (response.ok) {
+        console.log('Cleared Jira repository setting due to repository removal');
+      } else {
+        console.error('Failed to clear Jira repository setting');
+      }
+    } catch (error) {
+      console.error('Error clearing Jira repository setting:', error);
+    }
   }
 
   async addRepository() {
@@ -432,7 +486,15 @@ class Settings {
   }
 
   async removeRepository(repoId) {
-    if (!confirm('Are you sure you want to remove this repository? Existing tasks will not be deleted.')) {
+    // Find the repository being removed
+    const repoToRemove = this.repositories.find(repo => repo.id === repoId);
+
+    let confirmMessage = 'Are you sure you want to remove this repository? Existing tasks will not be deleted.';
+    if (repoToRemove && this.selectedJiraRepository === repoToRemove.path) {
+      confirmMessage += '\n\nThis repository is currently selected for Jira integration and will be disabled.';
+    }
+
+    if (!confirm(confirmMessage)) {
       return;
     }
 

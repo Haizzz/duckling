@@ -8,6 +8,7 @@ import { SettingsManager } from '../core/settings-manager';
 import { CodingManager } from '../core/coding-manager';
 import { PrecommitManager } from '../core/precommit-manager';
 import { OpenAIManager } from '../core/openai-manager';
+import { JiraManager } from '../core/jira-manager';
 import { CoreEngine } from '../core/engine';
 import * as readline from 'readline';
 
@@ -20,12 +21,14 @@ function createServices() {
   const codingManager = new CodingManager(settings);
   const precommitManager = new PrecommitManager(db);
   const openaiManager = new OpenAIManager(db, settings);
+  const jiraManager = new JiraManager(settings, db);
   const engine = new CoreEngine(
     db,
     settings,
     codingManager,
     precommitManager,
-    openaiManager
+    openaiManager,
+    jiraManager
   );
 
   return {

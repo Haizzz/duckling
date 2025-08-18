@@ -11,8 +11,10 @@ export interface SettingsDefaults {
   maxRetries: number;
   openaiApiKey: string;
   jiraApiKey: string;
+  jiraEmail: string;
   jiraJqlQuery: string;
   jiraBaseUrl: string;
+  jiraRepository: string;
   customPrompt: string;
 }
 
@@ -26,8 +28,10 @@ export class SettingsManager {
     maxRetries: 3,
     openaiApiKey: '',
     jiraApiKey: '',
+    jiraEmail: '',
     jiraJqlQuery: '',
     jiraBaseUrl: '',
+    jiraRepository: '',
     customPrompt: DEFAULT_CODING_PROMPT,
   };
 

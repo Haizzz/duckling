@@ -217,11 +217,17 @@
                 fields must be specified to use this feature.</p>
               <div class="space-y-4">
                 <div>
-                  <label for="jira-api-key" class="block text-sm font-medium text-gray-700">API Key</label>
+                  <label for="jira-email" class="block text-sm font-medium text-gray-700">Email</label>
+                  <input type="email" id="jira-email" name="jiraEmail"
+                    placeholder="your-email@company.com"
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
+                  <p class="text-xs text-gray-500 mt-1"><strong>Required for Jira integration:</strong> Your email address associated with your Jira account.</p>
+                </div>
+                <div>
+                  <label for="jira-api-key" class="block text-sm font-medium text-gray-700">API Token</label>
                   <input type="password" id="jira-api-key" name="jiraApiKey"
                     class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
-                  <p class="text-xs text-gray-500 mt-1"><strong>Optional:</strong> Your Jira API token for
-                    authentication. Generate this from your Jira account settings.</p>
+                  <p class="text-xs text-gray-500 mt-1"><strong>Required for Jira integration:</strong> Your personal Jira API token. Generate from Account Settings > Security > API tokens.</p>
                 </div>
                 <div>
                   <label for="jira-base-url" class="block text-sm font-medium text-gray-700">Base URL</label>
@@ -237,6 +243,14 @@
                     class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
                   <p class="text-xs text-gray-500 mt-1"><strong>Optional:</strong> JQL query to find tickets to
                     implement. Duckling will fetch the latest matching ticket for automatic assignment.</p>
+                </div>
+                <div>
+                  <label for="jira-repository" class="block text-sm font-medium text-gray-700">Repository</label>
+                  <select id="jira-repository" name="jiraRepository"
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
+                    <option value="">-- Select a repository --</option>
+                  </select>
+                  <p class="text-xs text-gray-500 mt-1"><strong>Required for Jira integration:</strong> Select the Git repository where Jira tasks should be created. You must add repositories above first.</p>
                 </div>
               </div>
             </div>

@@ -5,6 +5,7 @@ import { SettingsManager } from './core/settings-manager';
 import { CodingManager } from './core/coding-manager';
 import { PrecommitManager } from './core/precommit-manager';
 import { OpenAIManager } from './core/openai-manager';
+import { JiraManager } from './core/jira-manager';
 import { CoreEngine } from './core/engine';
 
 export async function startDuckling(port: number = 5050): Promise<void> {
@@ -16,6 +17,7 @@ export async function startDuckling(port: number = 5050): Promise<void> {
   const codingManager = new CodingManager(settings);
   const precommitManager = new PrecommitManager(db);
   const openaiManager = new OpenAIManager(db, settings);
+  const jiraManager = new JiraManager(settings, db);
 
   // Create engine with dependencies
   const engine = new CoreEngine(
@@ -23,7 +25,8 @@ export async function startDuckling(port: number = 5050): Promise<void> {
     settings,
     codingManager,
     precommitManager,
-    openaiManager
+    openaiManager,
+    jiraManager
   );
 
   const server = new APIServer(db, engine);
