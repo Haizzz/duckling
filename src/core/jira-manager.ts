@@ -171,7 +171,7 @@ export class JiraManager {
     }
 
     // For objects, just stringify to see the structure
-    return JSON.stringify(description, null, 2);
+    return JSON.stringify(description);
   }
 
   /**
