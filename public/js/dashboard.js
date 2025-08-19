@@ -473,7 +473,7 @@ class Dashboard {
         
         <!-- Task Spec -->
         <div class="mb-3">
-          <p class="text-sm text-gray-700 break-words whitespace-pre-wrap">${this.escapeHtml(task.description)}</p>
+          <p class="text-sm text-gray-700 break-all whitespace-pre-wrap">${this.escapeHtml(task.description)}</p>
         </div>
         
         

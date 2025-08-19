@@ -160,7 +160,7 @@ class TaskDetail {
           <div>
             <h3 class="text-lg font-medium text-gray-900 mb-3">Description</h3>
             <div class="bg-gray-50 rounded-lg p-4">
-              <p class="text-gray-700 whitespace-pre-wrap break-words">${this.escapeHtml(task.description)}</p>
+              <p class="text-gray-700 whitespace-pre-wrap break-all">${this.escapeHtml(task.description)}</p>
             </div>
           </div>
 
