@@ -41,16 +41,17 @@ duckling task cancel <taskId>
 ## Architecture
 
 ### Core Components
-- **Simple Dependency Injection**: Constructor injection pattern where dependencies are passed as parameters
-- **Core Engine**: Main orchestration logic with timeout-based processing and retry mechanisms
+- **Manual Dependency Injection**: Constructor injection pattern where dependencies are passed as parameters
+- **Core Engine**: Main orchestration logic with timeout-based processing and retry mechanisms  
 - **Express API**: RESTful API with real-time updates via Server-Sent Events
 - **Frontend**: Plain HTML/CSS/JS single-page application with real-time updates
 - **CLI**: Command-line interface for basic operations
 - **SQLite Database**: Local storage for tasks, logs, and settings
 
-### Simple Dependency Injection
+### Manual Dependency Injection
 - **Constructor Injection**: Dependencies are passed as constructor parameters, not created internally
-- **Direct Creation**: Dependencies are created directly in entry points and passed to services
+- **Direct Creation**: Dependencies are created directly in entry points (`src/index.ts`, `src/cli/index.ts`) and passed to services
+- **No DI Container**: Uses manual dependency wiring without any formal dependency injection framework
 - **Concrete Classes**: Uses concrete classes directly without interface abstractions
 - **Dependency Flow**: Dependencies flow from entry points down through constructor parameters
 
@@ -156,7 +157,7 @@ ls ~/.duckling/
 6. Update frontend in `public/js/`
 7. Add CLI commands if needed
 
-### Simple Dependency Injection Best Practices
+### Manual Dependency Injection Best Practices
 - **Constructor Injection**: Dependencies are passed as constructor parameters
 - **Direct Creation**: Create dependencies directly in entry points and pass them to services
 - **Dependency Flow**: Dependencies flow from entry points down through constructor parameters
@@ -192,8 +193,8 @@ ls ~/.duckling/
 ## Recent Improvements
 
 ### Architecture Simplifications
-- **Removed Factory Pattern**: Direct dependency creation in entry points instead of factory functions
-- **Simplified Dependencies**: CodingManager no longer requires DatabaseManager
+- **Manual Dependency Injection**: Direct dependency creation in entry points (`src/index.ts`, `src/cli/index.ts`) with manual wiring
+- **Factory Methods**: Git and GitHub managers created on-demand via factory methods within CoreEngine
 - **No Required Settings**: All configuration is now optional with helpful warnings
 - **Clean Authentication**: Amp assumes CLI authentication, OpenAI is optional
 

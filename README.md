@@ -59,28 +59,28 @@
 - 🤖 **Autonomous Development**: Automatically creates branches, implements features, and opens pull requests
 - 📊 **Real-time Monitoring**: Live dashboard with task progress and log streaming
 - 🔄 **PR Review Integration**: Monitors pull request comments and implements requested changes
-- 🛠️ **Flexible Tool Support**: Works with OpenAI, Amp, and Claude coding assistants
+- 🛠️ **Flexible Tool Support**: Works with OpenAI and Amp coding assistants
 - 🎯 **Quality Control**: Runs precommit checks (linting, testing, type checking) before committing
 - 📝 **Smart Commits**: AI-generated commit messages and PR descriptions
-- 🚀 **Dependency Injection**: Modern architecture with proper separation of concerns
+- 🚀 **Clean Architecture**: Constructor injection pattern with proper separation of concerns
 
 ## 🏗️ Architecture
 
 ### Core Components
 
 - **CoreEngine**: Central orchestrator managing task lifecycle with timeout-based processing
-- **DependencyContainer**: Singleton dependency injection container managing service instances
+- **Manual Dependency Injection**: Constructor injection pattern where dependencies are passed as parameters
 - **DatabaseManager**: SQLite-based persistence for tasks, logs, and settings
 - **APIServer**: Express.js REST API with Server-Sent Events for real-time updates
-- **Task Executors**: Queue-based task processing preventing overlapping operations
-- **Managers**: Specialized managers for Git, GitHub, coding tools, and precommit checks
+- **TaskExecutor**: Singleton task execution queue preventing overlapping operations
+- **Managers**: Specialized managers for Git, GitHub, coding tools, precommit checks, OpenAI, and Jira
 
 ### Key Design Patterns
 
-- **Dependency Injection**: Clean separation of concerns with interface-based design
-- **Factory Pattern**: Dynamic creation of Git and GitHub managers per repository
+- **Constructor Dependency Injection**: Dependencies are passed as constructor parameters in entry points
+- **Factory Methods**: Dynamic creation of Git and GitHub managers per repository within CoreEngine
+- **Singleton Pattern**: Used for utilities like TaskExecutor and Logger
 - **Observer Pattern**: Real-time updates via EventEmitter and Server-Sent Events
-- **Queue Pattern**: Task execution queue preventing concurrent operations
 - **Retry Pattern**: Automatic retry with exponential backoff for external API calls
 
 ## 📋 Task Lifecycle
@@ -244,26 +244,45 @@ duckling/
 │   ├── core/               # Core business logic
 │   │   ├── engine.ts       # Main orchestration engine
 │   │   ├── database.ts     # SQLite database manager
+│   │   ├── git-manager.ts  # Git operations
+│   │   ├── github-cli-provider.ts # GitHub CLI integration
+│   │   ├── coding-manager.ts # Coding assistant integration
+│   │   ├── openai-manager.ts # OpenAI integration
+│   │   ├── jira-manager.ts # Jira integration
+│   │   ├── precommit-manager.ts # Precommit checks
+│   │   ├── settings-manager.ts # Settings management
+│   │   └── task-executor.ts # Task execution queue
 │   ├── api/                # REST API server
 │   │   ├── server.ts       # Express server
 │   │   └── routes.ts       # API routes
 │   ├── cli/                # Command line interface
+│   │   └── index.ts        # CLI commands
 │   ├── utils/              # Utility functions
 │   └── types/              # Type definitions
 ├── public/                 # Web interface
 │   ├── index.html          # Main dashboard
 │   ├── settings.html       # Settings page
+│   ├── task-detail.html    # Task detail page
 │   └── js/                 # Frontend JavaScript
+│       ├── app.js          # Main app controller
+│       ├── dashboard.js    # Dashboard functionality
+│       ├── settings.js     # Settings page
+│       ├── task-detail.js  # Task detail page
+│       ├── api.js          # API utilities
+│       └── utils.js        # Frontend utilities
 ├── dist/                   # Built JavaScript
 ```
 
 ### Adding New Features
 
-2. **Update types** in `src/types/index.ts`
-3. **Implement core logic** in appropriate manager
-4. **Add API routes** in `src/api/routes.ts`
-5. **Update frontend** in `public/js/`
-6. **Run checks**: `pnpm run check`
+1. **Update types** in `src/types/index.ts`
+2. **Add database schema changes** in `src/core/database.ts`  
+3. **Implement core logic** in appropriate manager with constructor injection
+4. **Update entry points** to create new services with dependencies
+5. **Add API routes** in `src/api/routes.ts`
+6. **Update frontend** in `public/js/`
+7. **Add CLI commands** if needed
+8. **Run checks**: `pnpm run check`
 
 ### Testing
 
