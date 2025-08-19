@@ -153,10 +153,58 @@ export class JiraManager {
   }
 
   /**
-   * Format all fields as JSON dump
+   * Format all non-empty fields in a readable format
    */
   private formatAllFields(ticket: JiraTicket): string {
-    return `**Jira Ticket: ${ticket.key}**\n\n${JSON.stringify(ticket.allFields)}`;
+    const lines = [`**Jira Ticket: ${ticket.key}**\n`];
+
+    // Filter out empty/null values and format key-value pairs
+    const nonEmptyFields = Object.entries(ticket.allFields).filter(
+      ([, value]) => {
+        if (value === null || value === undefined || value === '') return false;
+        if (Array.isArray(value) && value.length === 0) return false;
+        if (
+          typeof value === 'object' &&
+          value !== null &&
+          Object.keys(value).length === 0
+        )
+          return false;
+        return true;
+      }
+    );
+
+    for (const [key, value] of nonEmptyFields) {
+      let formattedValue: string;
+
+      if (typeof value === 'string') {
+        formattedValue = value;
+      } else if (Array.isArray(value)) {
+        formattedValue = value
+          .map((item) =>
+            typeof item === 'object' && item !== null && item.displayName
+              ? item.displayName
+              : typeof item === 'object' && item !== null && item.name
+                ? item.name
+                : JSON.stringify(item)
+          )
+          .join(', ');
+      } else if (typeof value === 'object' && value !== null) {
+        // Extract displayName or name for common Jira objects
+        if (value.displayName) {
+          formattedValue = value.displayName;
+        } else if (value.name) {
+          formattedValue = value.name;
+        } else {
+          formattedValue = JSON.stringify(value);
+        }
+      } else {
+        formattedValue = String(value);
+      }
+
+      lines.push(`**${key}**: ${formattedValue}\n`);
+    }
+
+    return lines.join('\n');
   }
 
   /**
