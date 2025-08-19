@@ -92,7 +92,6 @@ export class APIServer {
   }
 
   async stop(): Promise<void> {
-    // First shutdown the engine
     await this.engine.shutdown();
 
     return new Promise((resolve, reject) => {
