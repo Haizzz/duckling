@@ -93,7 +93,7 @@ class TaskDetail {
         <!-- Header -->
         <div class="flex justify-between items-start mb-6">
           <div class="flex-1">
-            <h1 class="text-2xl font-bold text-gray-900 mb-2">${this.escapeHtml(summary)}</h1>
+            <h1 class="text-2xl font-bold text-gray-900 mb-2 break-all">${this.escapeHtml(summary)}</h1>
             <div class="flex items-center space-x-4">
               ${statusBadge}
             </div>
@@ -160,7 +160,7 @@ class TaskDetail {
           <div>
             <h3 class="text-lg font-medium text-gray-900 mb-3">Description</h3>
             <div class="bg-gray-50 rounded-lg p-4">
-              <p class="text-gray-700 whitespace-pre-wrap">${this.escapeHtml(task.description)}</p>
+              <p class="text-gray-700 whitespace-pre-wrap break-all">${this.escapeHtml(task.description)}</p>
             </div>
           </div>
 
@@ -525,10 +525,10 @@ class TaskDetail {
     const repository = this.repositories.find(repo => repo.path === repositoryPath);
     if (repository && repository.owner && repository.name) {
       const githubUrl = `https://github.com/${repository.owner}/${repository.name}/tree/${branchName}`;
-      return `<a href="${githubUrl}" target="_blank" class="text-blue-600 hover:text-blue-800 underline font-mono text-sm">${this.escapeHtml(branchName)}</a>`;
+      return `<a href="${githubUrl}" target="_blank" class="text-blue-600 hover:text-blue-800 underline font-mono text-sm break-all">${this.escapeHtml(branchName)}</a>`;
     }
     // Fallback to plain text if repository info is not available
-    return `<span class="font-mono text-sm">${this.escapeHtml(branchName)}</span>`;
+    return `<span class="font-mono text-sm break-all">${this.escapeHtml(branchName)}</span>`;
   }
 
   async loadRepositories() {
@@ -551,8 +551,8 @@ class TaskDetail {
 
     const repository = this.repositories.find(repo => repo.path === task.repository_path);
     const repositoryDisplay = repository ?
-      `${repository.name} <span class="text-gray-500">(${repository.owner})</span>` :
-      `<span class="font-mono text-sm">${this.escapeHtml(task.repository_path)}</span>`;
+      `<span class="break-all">${repository.name}</span> <span class="text-gray-500 break-all">(${repository.owner})</span>` :
+      `<span class="font-mono text-sm break-all">${this.escapeHtml(task.repository_path)}</span>`;
 
     return `
       <div class="flex justify-between">

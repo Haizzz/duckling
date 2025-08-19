@@ -435,7 +435,7 @@ class Dashboard {
     const statusBadge = this.getStatusBadge(task.status);
 
     const prLink = task.pr_url && task.pr_number ?
-      `<span class="text-blue-600 text-sm cursor-pointer underline break-words" onclick="window.open('${task.pr_url}', '_blank')">#${task.pr_number}</span>` :
+      `<span class="text-blue-600 text-sm cursor-pointer underline break-all" onclick="window.open('${task.pr_url}', '_blank')">#${task.pr_number}</span>` :
       '<span class="text-gray-400 text-sm">No PR yet</span>';
 
     const branchName = task.branch_name ?
@@ -445,8 +445,8 @@ class Dashboard {
     // Get repository info
     const repository = this.repositories.find(repo => repo.path === task.repository_path);
     const repositoryInfo = repository ?
-      `<span class="text-sm text-gray-600">${repository.name}</span>` :
-      `<span class="text-sm text-gray-500 font-mono">${this.escapeHtml(task.repository_path || 'Unknown')}</span>`;
+      `<span class="text-sm text-gray-600 break-all">${repository.name}</span>` :
+      `<span class="text-sm text-gray-500 font-mono break-all">${this.escapeHtml(task.repository_path || 'Unknown')}</span>`;
 
     // Generate a summary from the description (first 80 chars)
     const summary = task.summary || task.description.substring(0, 80) + (task.description.length > 80 ? '...' : '');
@@ -467,13 +467,13 @@ class Dashboard {
       <div class="task-card bg-white border border-gray-200 rounded-lg p-6 hover:shadow-sm transition-shadow ${borderClass}" data-task-id="${task.id}">
         <!-- Summary | Status -->
         <div class="flex justify-between items-start mb-4">
-          <a href="task-detail.html?id=${task.id}" class="text-lg font-medium text-gray-900 flex-1 mr-4 hover:text-blue-600 hover:underline">${this.escapeHtml(summary)}</a>
+          <a href="task-detail.html?id=${task.id}" class="text-lg font-medium text-gray-900 flex-1 mr-4 hover:text-blue-600 hover:underline break-all">${this.escapeHtml(summary)}</a>
           ${statusBadge}
         </div>
         
         <!-- Task Spec -->
         <div class="mb-3">
-          <p class="text-sm text-gray-700">${this.escapeHtml(task.description)}</p>
+          <p class="text-sm text-gray-700 break-all whitespace-pre-wrap">${this.escapeHtml(task.description)}</p>
         </div>
         
         
@@ -723,10 +723,10 @@ class Dashboard {
     const repository = this.repositories.find(repo => repo.path === repositoryPath);
     if (repository && repository.owner && repository.name) {
       const githubUrl = `https://github.com/${repository.owner}/${repository.name}/tree/${branchName}`;
-      return `<a href="${githubUrl}" target="_blank" class="text-blue-600 text-sm hover:text-blue-800 underline font-mono">${this.escapeHtml(branchName)}</a>`;
+      return `<a href="${githubUrl}" target="_blank" class="text-blue-600 text-sm hover:text-blue-800 underline font-mono break-all">${this.escapeHtml(branchName)}</a>`;
     }
     // Fallback to plain text if repository info is not available
-    return `<span class="text-sm text-gray-600 font-mono">${this.escapeHtml(branchName)}</span>`;
+    return `<span class="text-sm text-gray-600 font-mono break-all">${this.escapeHtml(branchName)}</span>`;
   }
 
   // Helper method to enable/disable task creation form
