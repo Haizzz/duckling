@@ -14,25 +14,14 @@ export interface JiraTicket {
   assignee?: string;
   created: string;
   updated: string;
+  allFields: Record<string, any>; // Store all available fields
 }
 
 export interface JiraSearchResponse {
   issues: Array<{
     id: string;
     key: string;
-    fields: {
-      summary: string;
-      description?: string;
-      status: {
-        name: string;
-      };
-      assignee?: {
-        displayName: string;
-        emailAddress: string;
-      };
-      created: string;
-      updated: string;
-    };
+    fields: Record<string, any>; // Accept all fields dynamically
   }>;
   total: number;
 }
@@ -103,7 +92,7 @@ export class JiraManager {
             jql: jql,
             maxResults: maxResults.toString(),
             startAt: '0',
-            fields: 'summary,description,status,assignee,created,updated',
+            fields: '*all', // Fetch all available fields
           });
 
           const response = await fetch(
@@ -134,12 +123,13 @@ export class JiraManager {
           const tickets: JiraTicket[] = data.issues.map((issue) => ({
             id: issue.id,
             key: issue.key,
-            summary: issue.fields.summary,
+            summary: issue.fields.summary || '',
             description: this.extractDescriptionText(issue.fields.description),
-            status: issue.fields.status.name,
+            status: issue.fields.status?.name || '',
             assignee: issue.fields.assignee?.displayName,
-            created: issue.fields.created,
-            updated: issue.fields.updated,
+            created: issue.fields.created || '',
+            updated: issue.fields.updated || '',
+            allFields: issue.fields, // Store all fields for comprehensive formatting
           }));
 
           logger.info(
@@ -172,6 +162,166 @@ export class JiraManager {
 
     // For objects, just stringify to see the structure
     return JSON.stringify(description);
+  }
+
+  /**
+   * Format all non-empty fields into a comprehensive task description
+   */
+  private formatAllFields(ticket: JiraTicket): string {
+    const sections: string[] = [];
+
+    // Start with the primary information
+    sections.push(`**Jira Ticket: ${ticket.key}**`);
+    sections.push(`**Summary:** ${ticket.summary}`);
+
+    // Add description if present
+    if (ticket.description.trim()) {
+      sections.push(`**Description:**\n${ticket.description}`);
+    }
+
+    // Add core fields
+    sections.push(`**Status:** ${ticket.status}`);
+
+    if (ticket.assignee) {
+      sections.push(`**Assignee:** ${ticket.assignee}`);
+    }
+
+    sections.push(`**Created:** ${new Date(ticket.created).toLocaleString()}`);
+    sections.push(`**Updated:** ${new Date(ticket.updated).toLocaleString()}`);
+
+    // Add all other non-empty fields
+    const excludeFields = new Set([
+      'summary',
+      'description',
+      'status',
+      'assignee',
+      'created',
+      'updated',
+      'id',
+      'key',
+      'self',
+      'expand',
+      'renderedFields',
+      'names',
+      'schema',
+    ]);
+
+    const additionalFields: string[] = [];
+
+    for (const [fieldName, fieldValue] of Object.entries(ticket.allFields)) {
+      if (excludeFields.has(fieldName)) {
+        continue;
+      }
+
+      const formattedValue = this.formatFieldValue(fieldValue);
+      if (formattedValue.trim()) {
+        const displayName = this.getFieldDisplayName(fieldName);
+        additionalFields.push(`**${displayName}:** ${formattedValue}`);
+      }
+    }
+
+    if (additionalFields.length > 0) {
+      sections.push(`\n**Additional Fields:**`);
+      sections.push(...additionalFields);
+    }
+
+    return sections.join('\n\n');
+  }
+
+  /**
+   * Format a field value for display
+   */
+  private formatFieldValue(value: any): string {
+    if (!value) {
+      return '';
+    }
+
+    if (typeof value === 'string') {
+      return value;
+    }
+
+    if (typeof value === 'number' || typeof value === 'boolean') {
+      return String(value);
+    }
+
+    if (Array.isArray(value)) {
+      if (value.length === 0) {
+        return '';
+      }
+      return value
+        .map((item) => {
+          if (typeof item === 'object' && item !== null) {
+            return (
+              item.name ||
+              item.displayName ||
+              item.value ||
+              JSON.stringify(item)
+            );
+          }
+          return String(item);
+        })
+        .join(', ');
+    }
+
+    if (typeof value === 'object' && value !== null) {
+      // Handle common Jira object types
+      if (value.name) {
+        return value.name;
+      }
+      if (value.displayName) {
+        return value.displayName;
+      }
+      if (value.value) {
+        return value.value;
+      }
+      // For complex objects, provide a condensed representation
+      const keys = Object.keys(value);
+      if (keys.length <= 3) {
+        return JSON.stringify(value);
+      } else {
+        return `Object with ${keys.length} properties`;
+      }
+    }
+
+    return String(value);
+  }
+
+  /**
+   * Get a human-readable display name for a field
+   */
+  private getFieldDisplayName(fieldName: string): string {
+    const displayNameMap: Record<string, string> = {
+      priority: 'Priority',
+      reporter: 'Reporter',
+      issuetype: 'Issue Type',
+      project: 'Project',
+      fixVersions: 'Fix Versions',
+      affectedVersions: 'Affected Versions',
+      components: 'Components',
+      labels: 'Labels',
+      environment: 'Environment',
+      duedate: 'Due Date',
+      resolution: 'Resolution',
+      resolutiondate: 'Resolution Date',
+      watches: 'Watchers',
+      workratio: 'Work Ratio',
+      timespent: 'Time Spent',
+      timeoriginalestimate: 'Original Estimate',
+      timeestimate: 'Remaining Estimate',
+      aggregatetimespent: 'Total Time Spent',
+      aggregatetimeoriginalestimate: 'Total Original Estimate',
+      aggregatetimeestimate: 'Total Remaining Estimate',
+    };
+
+    // Check if it's a custom field
+    if (fieldName.startsWith('customfield_')) {
+      return `Custom Field (${fieldName})`;
+    }
+
+    return (
+      displayNameMap[fieldName] ||
+      fieldName.charAt(0).toUpperCase() + fieldName.slice(1)
+    );
   }
 
   /**
@@ -231,7 +381,7 @@ export class JiraManager {
         // Create a new task request from the Jira ticket
         const createTaskRequest: CreateTaskRequest = {
           title: `${jiraTicket.key}: ${jiraTicket.summary}`.slice(0, 100),
-          description: `Jira Ticket: ${jiraTicket.key}\nSummary: ${jiraTicket.summary}\n\n${jiraTicket.description}`,
+          description: this.formatAllFields(jiraTicket),
           codingTool: this.settings.get('defaultCodingTool'),
           repositoryPath,
         };
