@@ -6,10 +6,11 @@ class Settings {
     this.init();
   }
 
-  init() {
+  async init() {
     this.bindEvents();
-    this.loadSettings();
-    this.loadRepositories();
+    // Load settings and repositories sequentially to avoid race conditions
+    await this.loadSettings();
+    await this.loadRepositories();
   }
 
   bindEvents() {
@@ -78,7 +79,7 @@ class Settings {
     this.setSecureField('jira-api-key', settings.jiraApiKey);
     document.getElementById('jira-base-url').value = settings.jiraBaseUrl || '';
     document.getElementById('jira-jql-query').value = settings.jiraJqlQuery || '';
-    // Jira repository will be set after repositories are loaded
+    // Store Jira repository setting
     this.selectedJiraRepository = settings.jiraRepository || '';
 
     // Task configuration
@@ -95,6 +96,9 @@ class Settings {
 
     // Load precommit checks
     this.loadPrecommitChecks();
+    
+    // The Jira repository dropdown will be updated when repositories are loaded
+    // in the sequential loading process
   }
 
   async saveSettings() {
