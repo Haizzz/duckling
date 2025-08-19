@@ -86,7 +86,7 @@ export class JiraManager {
             jql: jql,
             maxResults: maxResults.toString(),
             startAt: '0',
-            fields: '*all', // Fetch all available fields
+            fields: '*all',
           });
 
           const response = await fetch(
@@ -156,7 +156,7 @@ export class JiraManager {
    * Format all fields as JSON dump
    */
   private formatAllFields(ticket: JiraTicket): string {
-    return `**Jira Ticket: ${ticket.key}**\n\n${JSON.stringify(ticket.allFields, null, 2)}`;
+    return `**Jira Ticket: ${ticket.key}**\n\n${JSON.stringify(ticket.allFields)}`;
   }
 
   /**
