@@ -14,6 +14,14 @@ export interface JiraTicket {
   assignee?: string;
   created: string;
   updated: string;
+  priority?: string;
+  issueType?: string;
+  reporter?: string;
+  labels?: string[];
+  components?: string[];
+  fixVersions?: string[];
+  duedate?: string;
+  additionalFields?: { [key: string]: any };
 }
 
 export interface JiraSearchResponse {
@@ -32,6 +40,25 @@ export interface JiraSearchResponse {
       };
       created: string;
       updated: string;
+      priority?: {
+        name: string;
+      };
+      issuetype?: {
+        name: string;
+      };
+      reporter?: {
+        displayName: string;
+        emailAddress: string;
+      };
+      labels?: string[];
+      components?: Array<{
+        name: string;
+      }>;
+      fixVersions?: Array<{
+        name: string;
+      }>;
+      duedate?: string;
+      [key: string]: any; // Allow for any additional custom fields
     };
   }>;
   total: number;
@@ -103,7 +130,8 @@ export class JiraManager {
             jql: jql,
             maxResults: maxResults.toString(),
             startAt: '0',
-            fields: 'summary,description,status,assignee,created,updated',
+            fields:
+              'summary,description,status,assignee,created,updated,priority,issuetype,reporter,labels,components,fixVersions,duedate,*all',
           });
 
           const response = await fetch(
@@ -140,6 +168,14 @@ export class JiraManager {
             assignee: issue.fields.assignee?.displayName,
             created: issue.fields.created,
             updated: issue.fields.updated,
+            priority: issue.fields.priority?.name,
+            issueType: issue.fields.issuetype?.name,
+            reporter: issue.fields.reporter?.displayName,
+            labels: issue.fields.labels || [],
+            components: issue.fields.components?.map((c) => c.name) || [],
+            fixVersions: issue.fields.fixVersions?.map((v) => v.name) || [],
+            duedate: issue.fields.duedate,
+            additionalFields: this.extractAdditionalFields(issue.fields),
           }));
 
           logger.info(
@@ -172,6 +208,120 @@ export class JiraManager {
 
     // For objects, just stringify to see the structure
     return JSON.stringify(description);
+  }
+
+  /**
+   * Extract additional custom fields from Jira response
+   * Excludes standard fields we already handle
+   */
+  private extractAdditionalFields(fields: any): { [key: string]: any } {
+    const standardFields = new Set([
+      'summary',
+      'description',
+      'status',
+      'assignee',
+      'created',
+      'updated',
+      'priority',
+      'issuetype',
+      'reporter',
+      'labels',
+      'components',
+      'fixVersions',
+      'duedate',
+    ]);
+
+    const additionalFields: { [key: string]: any } = {};
+
+    for (const [key, value] of Object.entries(fields)) {
+      if (
+        !standardFields.has(key) &&
+        value !== null &&
+        value !== undefined &&
+        value !== ''
+      ) {
+        // Skip empty arrays
+        if (Array.isArray(value) && value.length === 0) {
+          continue;
+        }
+        additionalFields[key] = value;
+      }
+    }
+
+    return additionalFields;
+  }
+
+  /**
+   * Format a comprehensive task description including all non-empty Jira fields
+   */
+  private formatTaskDescription(ticket: JiraTicket): string {
+    let description = `Jira Ticket: ${ticket.key}\nSummary: ${ticket.summary}\n\n`;
+
+    // Add description if present
+    if (ticket.description) {
+      description += `Description:\n${ticket.description}\n\n`;
+    }
+
+    // Add all non-empty standard fields
+    const fields = [
+      { label: 'Status', value: ticket.status },
+      { label: 'Issue Type', value: ticket.issueType },
+      { label: 'Priority', value: ticket.priority },
+      { label: 'Assignee', value: ticket.assignee },
+      { label: 'Reporter', value: ticket.reporter },
+      { label: 'Due Date', value: ticket.duedate },
+    ];
+
+    const nonEmptyFields = fields.filter((field) => field.value);
+    if (nonEmptyFields.length > 0) {
+      description += 'Details:\n';
+      nonEmptyFields.forEach((field) => {
+        description += `• ${field.label}: ${field.value}\n`;
+      });
+      description += '\n';
+    }
+
+    // Add arrays if they have values
+    if (ticket.labels && ticket.labels.length > 0) {
+      description += `Labels: ${ticket.labels.join(', ')}\n`;
+    }
+
+    if (ticket.components && ticket.components.length > 0) {
+      description += `Components: ${ticket.components.join(', ')}\n`;
+    }
+
+    if (ticket.fixVersions && ticket.fixVersions.length > 0) {
+      description += `Fix Versions: ${ticket.fixVersions.join(', ')}\n`;
+    }
+
+    // Add custom fields if present
+    if (
+      ticket.additionalFields &&
+      Object.keys(ticket.additionalFields).length > 0
+    ) {
+      description += '\nCustom Fields:\n';
+      Object.entries(ticket.additionalFields).forEach(([key, value]) => {
+        // Format the field name (remove customfield_ prefix and make readable)
+        const fieldName = key.startsWith('customfield_')
+          ? key.replace('customfield_', 'Custom Field ')
+          : key.charAt(0).toUpperCase() + key.slice(1);
+
+        let formattedValue = value;
+        if (typeof value === 'object') {
+          formattedValue = JSON.stringify(value);
+        }
+
+        description += `• ${fieldName}: ${formattedValue}\n`;
+      });
+    }
+
+    // Add timestamps at the end
+    description += `\nCreated: ${ticket.created}`;
+    if (ticket.updated !== ticket.created) {
+      description += `\nLast Updated: ${ticket.updated}`;
+    }
+
+    return description;
   }
 
   /**
@@ -231,7 +381,7 @@ export class JiraManager {
         // Create a new task request from the Jira ticket
         const createTaskRequest: CreateTaskRequest = {
           title: `${jiraTicket.key}: ${jiraTicket.summary}`.slice(0, 100),
-          description: `Jira Ticket: ${jiraTicket.key}\nSummary: ${jiraTicket.summary}\n\n${jiraTicket.description}`,
+          description: this.formatTaskDescription(jiraTicket),
           codingTool: this.settings.get('defaultCodingTool'),
           repositoryPath,
         };
