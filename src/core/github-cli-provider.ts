@@ -332,8 +332,19 @@ export class GitHubCLIProvider {
     // 1. Get PR reviews (review bodies)
     const reviews = await this.getPRReviews(prNumber, repositoryPath);
 
+    // Filter out pending reviews and process only submitted ones
+    const submittedReviews = reviews.filter(
+      (review) => review.state !== 'PENDING'
+    );
+
+    if (reviews.length > submittedReviews.length) {
+      logger.info(
+        `Filtered out ${reviews.length - submittedReviews.length} pending review(s)`
+      );
+    }
+
     // Add review body comments and get their associated review comments
-    for (const review of reviews) {
+    for (const review of submittedReviews) {
       // Add the review body comment
       if (review.body && review.body.trim()) {
         reviewComments.push({
