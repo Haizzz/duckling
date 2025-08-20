@@ -103,7 +103,7 @@ export class JiraManager {
             jql: jql,
             maxResults: maxResults.toString(),
             startAt: '0',
-            fields: 'summary,description,status,assignee,created,updated',
+            fields: '*all',
           });
 
           const response = await fetch(
@@ -131,16 +131,22 @@ export class JiraManager {
             return [];
           }
 
-          const tickets: JiraTicket[] = data.issues.map((issue) => ({
-            id: issue.id,
-            key: issue.key,
-            summary: issue.fields.summary,
-            description: this.extractDescriptionText(issue.fields.description),
-            status: issue.fields.status.name,
-            assignee: issue.fields.assignee?.displayName,
-            created: issue.fields.created,
-            updated: issue.fields.updated,
-          }));
+          const tickets: JiraTicket[] = data.issues.map((issue) => {
+            // Remove empty fields from the entire issue data (excluding summary which we keep separate)
+            const cleanedFields = this.removeEmptyFields(issue.fields);
+            const { summary, ...fieldsWithoutSummary } = cleanedFields || {};
+
+            return {
+              id: issue.id,
+              key: issue.key,
+              summary: summary || '',
+              description: JSON.stringify(fieldsWithoutSummary, null, 2),
+              status: issue.fields.status?.name || '',
+              assignee: issue.fields.assignee?.displayName || '',
+              created: issue.fields.created || '',
+              updated: issue.fields.updated || '',
+            };
+          });
 
           logger.info(
             `Retrieved ${tickets.length} Jira ticket(s): ${tickets.map((t) => t.key).join(', ')}`
@@ -172,6 +178,48 @@ export class JiraManager {
 
     // For objects, just stringify to see the structure
     return JSON.stringify(description);
+  }
+
+  /**
+   * Remove empty fields (null, undefined, empty strings, empty arrays, empty objects) from an object
+   */
+  private removeEmptyFields(obj: any): any {
+    if (obj === null || obj === undefined) {
+      return null;
+    }
+
+    if (Array.isArray(obj)) {
+      const filtered = obj
+        .map((item) => this.removeEmptyFields(item))
+        .filter((item) => item !== null);
+      return filtered.length > 0 ? filtered : null;
+    }
+
+    if (typeof obj === 'object') {
+      const filtered: any = {};
+      for (const [key, value] of Object.entries(obj)) {
+        const cleanValue = this.removeEmptyFields(value);
+        if (
+          cleanValue !== null &&
+          cleanValue !== undefined &&
+          cleanValue !== '' &&
+          !(Array.isArray(cleanValue) && cleanValue.length === 0) &&
+          !(
+            typeof cleanValue === 'object' &&
+            Object.keys(cleanValue).length === 0
+          )
+        ) {
+          filtered[key] = cleanValue;
+        }
+      }
+      return Object.keys(filtered).length > 0 ? filtered : null;
+    }
+
+    if (typeof obj === 'string' && obj.trim() === '') {
+      return null;
+    }
+
+    return obj;
   }
 
   /**
@@ -231,7 +279,7 @@ export class JiraManager {
         // Create a new task request from the Jira ticket
         const createTaskRequest: CreateTaskRequest = {
           title: `${jiraTicket.key}: ${jiraTicket.summary}`.slice(0, 100),
-          description: `Jira Ticket: ${jiraTicket.key}\nSummary: ${jiraTicket.summary}\n\n${jiraTicket.description}`,
+          description: `Jira Ticket: ${jiraTicket.key}\nSummary: ${jiraTicket.summary}\n\nAll Jira Fields:\n${jiraTicket.description}`,
           codingTool: this.settings.get('defaultCodingTool'),
           repositoryPath,
         };
