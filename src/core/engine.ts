@@ -308,6 +308,7 @@ export class CoreEngine extends EventEmitter {
 
           // Step 1: Create branch
           const generatedBranchName = await withTaskLogMessages(
+            this.db,
             {
               taskId,
               startMessage: '🌿 Generating branch name...',
@@ -330,6 +331,7 @@ export class CoreEngine extends EventEmitter {
           );
 
           const branchName = await withTaskLogMessages(
+            this.db,
             {
               taskId,
               startMessage: '🔄 Creating and checking out branch...',
@@ -358,6 +360,7 @@ export class CoreEngine extends EventEmitter {
           this.emitTaskUpdate(taskId, 'in-progress');
 
           await withTaskLogMessages(
+            this.db,
             {
               taskId,
               startMessage: `💻 Starting code generation with ${task.coding_tool}...`,
@@ -387,6 +390,7 @@ export class CoreEngine extends EventEmitter {
           this.emitTaskUpdate(taskId, 'in-progress');
 
           await withTaskLogMessages(
+            this.db,
             {
               taskId,
               startMessage: '🔍 Starting precommit checks...',
@@ -403,6 +407,7 @@ export class CoreEngine extends EventEmitter {
           this.emitTaskUpdate(taskId, 'in-progress');
 
           await withTaskLogMessages(
+            this.db,
             {
               taskId,
               startMessage: '📝 Committing changes...',
@@ -415,6 +420,7 @@ export class CoreEngine extends EventEmitter {
           );
 
           await withTaskLogMessages(
+            this.db,
             {
               taskId,
               startMessage: '🚀 Pushing branch to remote...',
@@ -439,6 +445,7 @@ export class CoreEngine extends EventEmitter {
           this.emitTaskUpdate(taskId, 'in-progress');
 
           await withTaskLogMessages(
+            this.db,
             {
               taskId,
               startMessage: '🔄 Creating pull request...',
