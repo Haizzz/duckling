@@ -1,5 +1,5 @@
 /**
- * GitHub API Provider - Implements GitHub operations using GitHub Apps API
+ * GitHub API Provider - Implements GitHub operations using direct GitHub API calls with Apps authentication
  */
 
 import { validateAndGetRepoInfo } from '../utils/git-utils';
@@ -12,18 +12,11 @@ import { OpenAIManager } from './openai-manager';
 import { SettingsManager } from './settings-manager';
 import { JiraManager } from './jira-manager';
 import { Task } from '../types';
-
-interface GitHubAppConfig {
-  appId: string;
-  installationId: string;
-  privateKey: string; // PEM format private key
-}
-
-interface GitHubAPIResponse<T = any> {
-  data: T;
-  status: number;
-  headers: Record<string, string>;
-}
+import {
+  GitHubAppConfig,
+  validateGitHubAppConfig,
+  generateGitHubAppJWT,
+} from '../utils/github-api-utils';
 
 export class GitHubAPIProvider {
   private db: DatabaseManager;
@@ -33,8 +26,8 @@ export class GitHubAPIProvider {
   private repoOwner: string = '';
   private repoName: string = '';
   private currentRepoPath: string = '';
-  private appConfig: GitHubAppConfig;
-  private accessToken: string | null = null;
+  private githubConfig: GitHubAppConfig;
+  private accessToken: string = '';
   private tokenExpiry: number = 0;
 
   constructor(
@@ -42,13 +35,18 @@ export class GitHubAPIProvider {
     openaiManager: OpenAIManager,
     settings: SettingsManager,
     jiraManager: JiraManager,
-    appConfig: GitHubAppConfig
+    githubConfig: GitHubAppConfig
   ) {
     this.db = db;
     this.openaiManager = openaiManager;
     this.settings = settings;
     this.jiraManager = jiraManager;
-    this.appConfig = appConfig;
+    this.githubConfig = githubConfig;
+
+    // Validate GitHub App config
+    if (!validateGitHubAppConfig(githubConfig)) {
+      throw new Error('Invalid GitHub App configuration');
+    }
   }
 
   private async ensureInitialized(repositoryPath: string) {
@@ -65,53 +63,25 @@ export class GitHubAPIProvider {
     }
   }
 
-  private async generateJWT(): Promise<string> {
-    // GitHub App JWT generation using crypto
-    const crypto = await import('crypto');
-
-    const now = Math.floor(Date.now() / 1000);
-    const payload = {
-      iat: now - 10, // Issued 10 seconds in the past to allow for clock drift
-      exp: now + 60 * 10, // JWT expires in 10 minutes
-      iss: this.appConfig.appId,
-    };
-
-    const header = {
-      alg: 'RS256',
-      typ: 'JWT',
-    };
-
-    const encodedHeader = Buffer.from(JSON.stringify(header)).toString(
-      'base64url'
-    );
-    const encodedPayload = Buffer.from(JSON.stringify(payload)).toString(
-      'base64url'
-    );
-
-    const signingInput = `${encodedHeader}.${encodedPayload}`;
-
-    const signature = crypto
-      .createSign('RSA-SHA256')
-      .update(signingInput)
-      .sign(this.appConfig.privateKey, 'base64url');
-
-    return `${signingInput}.${signature}`;
-  }
-
   private async getAccessToken(): Promise<string> {
     // Check if we have a valid token
-    if (this.accessToken && Date.now() < this.tokenExpiry) {
+    if (
+      this.accessToken &&
+      this.tokenExpiry > 0 &&
+      Date.now() < this.tokenExpiry
+    ) {
       return this.accessToken;
     }
 
-    // Generate new installation access token
-    const jwt = await this.generateJWT();
+    // Generate new JWT
+    const jwt = await generateGitHubAppJWT(
+      this.githubConfig.appId,
+      this.githubConfig.privateKey
+    );
 
-    const response = await this.makeAPIRequest<{
-      token: string;
-      expires_at: string;
-    }>(
-      `https://api.github.com/app/installations/${this.appConfig.installationId}/access_tokens`,
+    // Get installation access token
+    const response = await fetch(
+      `https://api.github.com/app/installations/${this.githubConfig.installationId}/access_tokens`,
       {
         method: 'POST',
         headers: {
@@ -122,66 +92,57 @@ export class GitHubAPIProvider {
       }
     );
 
-    if (response.status !== 201) {
+    if (!response.ok) {
       throw new Error(
-        `Failed to get installation access token: ${response.status}`
+        `Failed to get GitHub installation access token: ${response.status} ${response.statusText}`
       );
     }
 
-    this.accessToken = response.data.token;
-    // Token typically expires in 1 hour, we'll refresh 5 minutes early
-    this.tokenExpiry = Date.now() + 55 * 60 * 1000;
+    const tokenData = (await response.json()) as {
+      token: string;
+      expires_at: string;
+    };
+    this.accessToken = tokenData.token;
+    // Set expiry to 5 minutes before actual expiry for safety
+    this.tokenExpiry = Date.parse(tokenData.expires_at) - 5 * 60 * 1000;
 
     return this.accessToken;
   }
 
-  private async makeAPIRequest<T = any>(
-    url: string,
-    options: RequestInit = {}
-  ): Promise<GitHubAPIResponse<T>> {
-    // For JWT generation, we don't want to call getAccessToken recursively
-    const isJWTRequest = url.includes('/access_tokens');
-    let token = '';
+  private async apiRequest<T>(
+    method: string,
+    endpoint: string,
+    data?: any
+  ): Promise<T> {
+    const token = await this.getAccessToken();
+    const url = endpoint.startsWith('https://')
+      ? endpoint
+      : `https://api.github.com${endpoint}`;
 
-    if (!isJWTRequest) {
-      token = await this.getAccessToken();
-    }
-
-    const defaultHeaders = {
+    const headers: Record<string, string> = {
+      Authorization: `token ${token}`,
       Accept: 'application/vnd.github.v3+json',
       'User-Agent': 'Duckling-GitHub-App/1.0',
-      'Content-Type': 'application/json',
     };
 
-    if (!isJWTRequest) {
-      (defaultHeaders as any)['Authorization'] = `token ${token}`;
+    if (data) {
+      headers['Content-Type'] = 'application/json';
     }
 
     const response = await fetch(url, {
-      ...options,
-      headers: {
-        ...defaultHeaders,
-        ...options.headers,
-      },
+      method,
+      headers,
+      body: data ? JSON.stringify(data) : undefined,
     });
 
-    let data: T;
-    try {
-      data = (await response.json()) as T;
-    } catch (error) {
-      data = (await response.text()) as T;
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `GitHub API request failed: ${response.status} ${response.statusText} - ${errorText}`
+      );
     }
 
-    const headers: Record<string, string> = {};
-    response.headers.forEach((value, key) => {
-      headers[key] = value;
-    });
-
-    return {
-      data,
-      status: response.status,
-      headers,
-    };
+    return response.json() as Promise<T>;
   }
 
   async getDefaultBranch(repositoryPath: string): Promise<string> {
@@ -189,15 +150,11 @@ export class GitHubAPIProvider {
 
     return await withRetry(async () => {
       try {
-        const response = await this.makeAPIRequest(
-          `https://api.github.com/repos/${this.repoOwner}/${this.repoName}`
+        const repoData = await this.apiRequest<any>(
+          'GET',
+          `/repos/${this.repoOwner}/${this.repoName}`
         );
-
-        if (response.status !== 200) {
-          throw new Error(`GitHub API request failed: ${response.status}`);
-        }
-
-        return response.data.default_branch || 'main';
+        return repoData.default_branch;
       } catch (error) {
         logger.warn(
           'Could not get default branch from GitHub API, falling back to "main"',
@@ -282,11 +239,11 @@ export class GitHubAPIProvider {
           this.db.addTaskLog({
             task_id: taskId,
             level: 'info',
-            message: `✅ Found existing PR #${existingPR.number}: ${existingPR.url}`,
+            message: `✅ Found existing PR #${existingPR.number}: ${existingPR.html_url}`,
           });
           return {
             number: existingPR.number,
-            url: existingPR.url,
+            url: existingPR.html_url,
           };
         }
 
@@ -300,39 +257,28 @@ export class GitHubAPIProvider {
         });
 
         // Create new PR using GitHub API
-        const response = await this.makeAPIRequest(
-          `https://api.github.com/repos/${this.repoOwner}/${this.repoName}/pulls`,
+        const prData = await this.apiRequest<any>(
+          'POST',
+          `/repos/${this.repoOwner}/${this.repoName}/pulls`,
           {
-            method: 'POST',
-            body: JSON.stringify({
-              title,
-              body: description,
-              head: branchName,
-              base: defaultBranch,
-            }),
+            title,
+            body: description,
+            head: branchName,
+            base: defaultBranch,
           }
         );
-
-        if (response.status !== 201) {
-          throw new Error(
-            `GitHub API request failed: ${response.status} - ${JSON.stringify(response.data)}`
-          );
-        }
-
-        const prNumber = response.data.number;
-        const prUrl = response.data.html_url;
 
         this.db.addTaskLog({
           task_id: taskId,
           level: 'info',
-          message: `✅ PR created successfully: #${prNumber} - ${prUrl}`,
+          message: `✅ PR created successfully: #${prData.number} - ${prData.html_url}`,
         });
 
-        this.logPREvent(taskId, `PR created: #${prNumber}`);
+        this.logPREvent(taskId, `PR created: #${prData.number}`);
 
         return {
-          number: prNumber,
-          url: prUrl,
+          number: prData.number,
+          url: prData.html_url,
         };
       },
       'Create PR via GitHub API',
@@ -349,22 +295,11 @@ export class GitHubAPIProvider {
     }
 
     try {
-      const response = await this.makeAPIRequest(
-        `https://api.github.com/repos/${this.repoOwner}/${this.repoName}/pulls?head=${this.repoOwner}:${branchName}&state=open`
+      const prs = await this.apiRequest<any[]>(
+        'GET',
+        `/repos/${this.repoOwner}/${this.repoName}/pulls?head=${this.repoOwner}:${branchName}&state=open`
       );
-
-      if (response.status !== 200) {
-        throw new Error(`GitHub API request failed: ${response.status}`);
-      }
-
-      const prs = response.data;
-      return prs.length > 0
-        ? {
-            number: prs[0].number,
-            url: prs[0].html_url,
-            title: prs[0].title,
-          }
-        : null;
+      return prs.length > 0 ? prs[0] : null;
     } catch (error) {
       logger.debug('Failed to find PR by branch:', String(error));
       return null;
@@ -426,15 +361,10 @@ export class GitHubAPIProvider {
       async () => {
         await this.ensureInitialized(repositoryPath);
 
-        const response = await this.makeAPIRequest(
-          `https://api.github.com/repos/${this.repoOwner}/${this.repoName}/pulls/${prNumber}/reviews`
+        return await this.apiRequest<any[]>(
+          'GET',
+          `/repos/${this.repoOwner}/${this.repoName}/pulls/${prNumber}/reviews`
         );
-
-        if (response.status !== 200) {
-          throw new Error(`GitHub API request failed: ${response.status}`);
-        }
-
-        return response.data;
       },
       'Get PR reviews via GitHub API',
       2
@@ -477,41 +407,37 @@ export class GitHubAPIProvider {
 
       if (review.id) {
         // 2. Get all review comments (line-by-line comments attached to reviews)
-        const reviewCommentsResponse = await this.makeAPIRequest(
-          `https://api.github.com/repos/${this.repoOwner}/${this.repoName}/pulls/${prNumber}/reviews/${review.id}/comments`
+        const reviewLineComments = await this.apiRequest<any[]>(
+          'GET',
+          `/repos/${this.repoOwner}/${this.repoName}/pulls/${prNumber}/reviews/${review.id}/comments`
         );
 
-        if (reviewCommentsResponse.status === 200) {
-          const reviewLineComments = reviewCommentsResponse.data;
-          reviewComments.push(
-            ...reviewLineComments.map((comment: any) => ({
-              user: { login: comment.user.login },
-              body: comment.body,
-              created_at: comment.created_at,
-              path: comment.path,
-              line: comment.line,
-              diff_hunk: comment.diff_hunk,
-            }))
-          );
-        }
+        reviewComments.push(
+          ...reviewLineComments.map((comment: any) => ({
+            user: { login: comment.user.login },
+            body: comment.body,
+            created_at: comment.created_at,
+            path: comment.path,
+            line: comment.line,
+            diff_hunk: comment.diff_hunk,
+          }))
+        );
       }
     }
 
     // 3. Get individual PR comments (not attached to reviews)
-    const prCommentsResponse = await this.makeAPIRequest(
-      `https://api.github.com/repos/${this.repoOwner}/${this.repoName}/issues/${prNumber}/comments`
+    const prCommentsData = await this.apiRequest<any[]>(
+      'GET',
+      `/repos/${this.repoOwner}/${this.repoName}/issues/${prNumber}/comments`
     );
 
-    if (prCommentsResponse.status === 200) {
-      const prCommentsData = prCommentsResponse.data;
-      prComments.push(
-        ...prCommentsData.map((comment: any) => ({
-          user: { login: comment.user.login },
-          body: comment.body,
-          created_at: comment.created_at,
-        }))
-      );
-    }
+    prComments.push(
+      ...prCommentsData.map((comment: any) => ({
+        user: { login: comment.user.login },
+        body: comment.body,
+        created_at: comment.created_at,
+      }))
+    );
 
     return { reviewComments, prComments };
   }
@@ -533,15 +459,8 @@ export class GitHubAPIProvider {
     return await withRetry(
       async () => {
         try {
-          const response = await this.makeAPIRequest(
-            'https://api.github.com/user'
-          );
-
-          if (response.status !== 200) {
-            throw new Error(`GitHub API request failed: ${response.status}`);
-          }
-
-          return response.data.login;
+          const userData = await this.apiRequest<any>('GET', '/user');
+          return userData.login;
         } catch (error) {
           logger.warn(
             'Could not get current user from GitHub API:',
@@ -567,24 +486,20 @@ export class GitHubAPIProvider {
 
     return await withRetry(
       async () => {
-        const response = await this.makeAPIRequest(
-          `https://api.github.com/repos/${this.repoOwner}/${this.repoName}/pulls/${prNumber}`
+        const prData = await this.apiRequest<any>(
+          'GET',
+          `/repos/${this.repoOwner}/${this.repoName}/pulls/${prNumber}`
         );
 
-        if (response.status !== 200) {
-          throw new Error(`GitHub API request failed: ${response.status}`);
-        }
-
-        const data = response.data;
         return {
-          state: data.state || 'UNKNOWN',
+          state: prData.state || 'UNKNOWN',
           mergeable:
-            data.mergeable === true
+            prData.mergeable === true
               ? true
-              : data.mergeable === false
+              : prData.mergeable === false
                 ? false
                 : null,
-          merged: data.merged_at !== null && data.merged_at !== undefined,
+          merged: prData.merged_at !== null && prData.merged_at !== undefined,
         };
       },
       'Get PR status via GitHub API',
@@ -600,49 +515,36 @@ export class GitHubAPIProvider {
     try {
       const prTitlePrefix = this.settings.get('prTitlePrefix');
 
-      // Get recent PRs using GraphQL API
-      const graphqlQuery = `
-        query { 
-          viewer { 
-            pullRequests(first: 5, states: [OPEN, CLOSED, MERGED], orderBy: {field: CREATED_AT, direction: DESC}) { 
-              nodes { 
-                number 
-                title 
-                body 
-                author { 
-                  login 
-                } 
-              } 
-            } 
-          } 
-        }`;
-
-      const response = await this.makeAPIRequest(
-        'https://api.github.com/graphql',
-        {
-          method: 'POST',
-          body: JSON.stringify({ query: graphqlQuery }),
-        }
-      );
-
-      if (response.status !== 200) {
-        logger.warn(`Could not fetch recent PRs: ${response.status}`);
+      // Get current user login
+      const currentUserLogin = await this.getCurrentUser(repositoryPath);
+      if (!currentUserLogin) {
+        logger.warn('Could not get current user login for recent PRs');
         return [];
       }
 
-      // Filter out PRs created by this tool (those with the prefix)
-      const allPRs = response.data.data.viewer.pullRequests.nodes;
-      const recentPRs = allPRs.filter(
-        (pr: any) => !pr.title.startsWith(prTitlePrefix)
+      // Get recent PRs by the current user using GitHub API
+      const prs = await this.apiRequest<any[]>(
+        'GET',
+        `/repos/${this.repoOwner}/${this.repoName}/pulls?state=all&sort=created&direction=desc&per_page=10`
       );
+
+      // Filter PRs by current user and exclude tool-generated ones
+      const userPRs = prs
+        .filter(
+          (pr: any) =>
+            pr.user.login === currentUserLogin &&
+            !pr.title.startsWith(prTitlePrefix)
+        )
+        .slice(0, 5); // Take first 5
 
       // For each PR, try to get the diff as well
       const prsWithDiff = await Promise.all(
-        recentPRs.map(async (pr: any) => {
+        userPRs.map(async (pr: any) => {
           try {
+            // Use git command to get diff since GitHub API doesn't provide diff directly
             const diffResult = await execCommand(
               'git',
-              ['show', `--format=`, `origin/pr-${pr.number}`],
+              ['show', `${pr.head.sha}^..${pr.head.sha}`, '--format='],
               { cwd: repositoryPath }
             );
 
