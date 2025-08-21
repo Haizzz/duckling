@@ -244,13 +244,12 @@ export class GitManager {
     return status.current || 'main';
   }
 
-  async switchToBranch(branchName: string, taskId?: number): Promise<void> {
+  async switchToBranch(branchName: string, taskId: number): Promise<void> {
     return await withRetry(async () => {
-      if (taskId)
-        logger.info(
-          `Fetching and switching to branch: ${branchName}`,
-          taskId.toString()
-        );
+      logger.info(
+        `Fetching and switching to branch: ${branchName}`,
+        taskId.toString()
+      );
 
       // Fetch the specific branch first to ensure we have latest changes
       await this.git.fetch('origin', branchName);
