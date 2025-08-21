@@ -1,6 +1,6 @@
 import { db } from '../core/database';
 
-export interface TaskLoggingOptions {
+interface TaskLoggingOptions {
   taskId: number;
   startMessage: string;
   completeMessage: string;

@@ -1,13 +1,13 @@
 import { EventEmitter } from 'events';
 import { logger } from '../utils/logger';
 
-export interface TaskOperation {
+interface TaskOperation {
   taskId: number;
   operation: string;
   execute: () => Promise<void>;
 }
 
-export class TaskExecutor extends EventEmitter {
+class TaskExecutor extends EventEmitter {
   private static instance: TaskExecutor;
   private currentOperation: TaskOperation | null = null;
   private operationQueue: TaskOperation[] = [];

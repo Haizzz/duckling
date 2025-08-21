@@ -15,7 +15,7 @@ export interface CommentData {
   submitted_at?: string;
 }
 
-export interface CommentProcessingOptions {
+interface CommentProcessingOptions {
   commentPrefix: string;
   lastCommitTimestamp: string | null;
   currentUser?: string | null;
@@ -24,7 +24,7 @@ export interface CommentProcessingOptions {
 /**
  * Filter comments based on prefix, timestamp, and user
  */
-export function filterComments(
+function filterComments(
   comments: CommentData[],
   options: CommentProcessingOptions
 ): CommentData[] {
@@ -59,7 +59,7 @@ export function filterComments(
 /**
  * Format PR comments for display
  */
-export function formatPRComments(comments: CommentData[]): string[] {
+function formatPRComments(comments: CommentData[]): string[] {
   return comments.map((comment) => {
     const commentString = `Comment by ${comment.user.login}:\n${comment.body}\n`;
     return commentString.trim();
@@ -69,7 +69,7 @@ export function formatPRComments(comments: CommentData[]): string[] {
 /**
  * Format review comments for display (includes both review body and line comments)
  */
-export function formatReviewComments(comments: CommentData[]): string[] {
+function formatReviewComments(comments: CommentData[]): string[] {
   return comments.map((comment) => {
     let commentString = `Review by ${comment.user.login}`;
     if (comment.state) {

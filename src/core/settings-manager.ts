@@ -2,7 +2,7 @@ import { CodingTool } from '../types';
 import { DatabaseManager } from './database';
 import { DEFAULT_CODING_PROMPT } from './prompts';
 
-export interface SettingsDefaults {
+interface SettingsDefaults {
   defaultCodingTool: CodingTool;
   branchPrefix: string;
   prTitlePrefix: string;
