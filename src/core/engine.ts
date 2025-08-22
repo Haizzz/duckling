@@ -211,8 +211,13 @@ export class CoreEngine extends EventEmitter {
     // Process pending and in_progress tasks (in case server was interrupted)
     const pendingTasks = this.db.getTasks({ status: 'pending' });
     const inProgressTasks = this.db.getTasks({ status: 'in-progress' });
+    const awaitingReviewTasks = this.db.getTasks({ status: 'awaiting-review' });
 
-    for (const task of [...pendingTasks, ...inProgressTasks]) {
+    for (const task of [
+      ...pendingTasks,
+      ...inProgressTasks,
+      ...awaitingReviewTasks,
+    ]) {
       await this.processTask(task.id);
     }
   }

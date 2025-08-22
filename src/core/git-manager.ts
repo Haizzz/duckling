@@ -55,7 +55,12 @@ export class GitManager {
       async () => {
         // Get the timestamp of the last commit
         logger.info(`Getting last commit timestamp for branch: ${branchName}`);
-        const log = await this.git.log(['-1', '--format=%cI']);
+        await this.git.fetch('origin', branchName);
+        const log = await this.git.log([
+          '-1',
+          '--format=%cI',
+          `origin/${branchName}`,
+        ]);
 
         if (log.latest) {
           // it's parsed wrong
