@@ -1,6 +1,6 @@
-import { db } from '../core/database';
+import { DatabaseManager } from '../core/database';
 
-export interface TaskLoggingOptions {
+interface TaskLoggingOptions {
   taskId: number;
   startMessage: string;
   completeMessage: string;
@@ -12,6 +12,7 @@ export interface TaskLoggingOptions {
  * around a main action to reduce verbosity in task execution code
  */
 export async function withTaskLogMessages<T>(
+  db: DatabaseManager,
   options: TaskLoggingOptions,
   action: () => Promise<T>
 ): Promise<T> {

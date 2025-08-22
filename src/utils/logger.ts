@@ -1,8 +1,9 @@
 import fs from 'fs';
 import path from 'path';
-import { LOGS_DIR, LogLevel } from './constants';
+import { LOGS_DIR } from './constants';
+import { LogLevel } from '../types';
 
-export class Logger {
+class Logger {
   private static instance: Logger;
 
   constructor() {

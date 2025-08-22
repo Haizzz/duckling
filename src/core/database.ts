@@ -363,5 +363,3 @@ export class DatabaseManager {
     this.db.close();
   }
 }
-
-export const db = new DatabaseManager();

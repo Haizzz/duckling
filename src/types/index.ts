@@ -58,23 +58,6 @@ export interface Repository {
   created_at: string;
 }
 
-export interface DucklingSettings {
-  // API Keys - GitHub CLI used instead of token
-  openai_api_key?: string;
-  amp_api_key?: string;
-
-  // General settings
-  default_coding_tool: CodingTool;
-  branch_prefix: string;
-  pr_prefix: string;
-  commit_suffix: string;
-  max_retries: number;
-  custom_prompt?: string;
-
-  // GitHub settings
-  poll_interval_seconds: number;
-}
-
 export interface TaskUpdateEvent {
   taskId: number;
   status: TaskStatus;

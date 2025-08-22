@@ -5,7 +5,7 @@ import { DatabaseManager } from './database';
 import { CreateTaskRequest } from '../types';
 import { existsSync } from 'fs';
 
-export interface JiraTicket {
+interface JiraTicket {
   id: string;
   key: string;
   summary: string;
@@ -16,7 +16,7 @@ export interface JiraTicket {
   updated: string;
 }
 
-export interface JiraSearchResponse {
+interface JiraSearchResponse {
   issues: Array<{
     id: string;
     key: string;
