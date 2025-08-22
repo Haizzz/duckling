@@ -199,6 +199,12 @@
               <p class="text-xs text-gray-500 mt-1">Maximum number of retry attempts when tasks fail due to transient
                 errors</p>
             </div>
+            <div>
+              <label for="max-worktrees-per-repo" class="block text-sm font-medium text-gray-700">Max Worktrees Per Repository</label>
+              <input type="number" id="max-worktrees-per-repo" name="maxWorktreesPerRepo" value="3" min="1" max="10" step="1"
+                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
+              <p class="text-xs text-gray-500 mt-1">Maximum number of parallel tasks per repository (each task uses its own isolated worktree)</p>
+            </div>
 
 
           </div>

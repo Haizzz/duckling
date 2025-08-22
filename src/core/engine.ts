@@ -191,8 +191,10 @@ export class CoreEngine extends EventEmitter {
 
       this.isProcessing = true;
       try {
-        await this.processReviews();
-        await this.processPendingTasks();
+        const reviewPromises = await this.processReviews();
+        const taskPromises = await this.processPendingTasks();
+        // Execute all promises in parallel
+        await Promise.all([...reviewPromises, ...taskPromises]);
       } catch (error) {
         logger.error(`Error in processing cycle: ${error}`);
       } finally {
@@ -201,7 +203,7 @@ export class CoreEngine extends EventEmitter {
     }, 60000); // 1 minute
   }
 
-  private async processPendingTasks(): Promise<void> {
+  private async processPendingTasks(): Promise<Promise<void>[]> {
     // Check for new Jira tasks first and get the task list
     try {
       await this.jiraManager.getLatestTasksForProcessing((request) =>
@@ -216,75 +218,89 @@ export class CoreEngine extends EventEmitter {
     const inProgressTasks = this.db.getTasks({ status: 'in-progress' });
     const awaitingReviewTasks = this.db.getTasks({ status: 'awaiting-review' });
 
+    const promises: Promise<void>[] = [];
     for (const task of [
       ...pendingTasks,
       ...inProgressTasks,
       ...awaitingReviewTasks,
     ]) {
-      await this.processTask(task.id);
+      promises.push(this.processTask(task.id));
     }
+
+    return promises;
   }
 
-  private async processReviews(): Promise<void> {
+  private async processReviews(): Promise<Promise<void>[]> {
     const awaitingReviewTasks = this.db.getTasks({ status: 'awaiting-review' });
+    const promises: Promise<void>[] = [];
 
     // Single pass: for each task, check for new reviews, address them, and update status
     for (const task of [...awaitingReviewTasks]) {
       if (!task.pr_number || !task.branch_name) {
         continue;
       }
-      const gitManager = this.getGitManager(task.repository_path);
-      const worktreeAcquired = await gitManager.acquireWorktreeForTask(task.id);
-      if (!worktreeAcquired) {
-        // No worktree available, skip this task for now and retry in next cycle
-        continue;
-      }
 
-      try {
-        await gitManager.switchToBranch(task.branch_name, task.id);
-        const result = await this.collectPRComments(task.id, task.pr_number);
-
-        // Handle status updates first (completed/cancelled)
-        if (result.statusUpdate) {
-          if (result.statusUpdate === 'completed') {
-            this.db.updateTask(task.id, {
-              status: 'completed',
-              current_stage: 'completed',
-              completed_at: new Date().toISOString(),
-            });
-            this.emitTaskUpdate(task.id, 'completed');
-          } else if (result.statusUpdate === 'cancelled') {
-            this.db.updateTask(task.id, {
-              status: 'cancelled',
-              current_stage: 'cancelled',
-            });
-            this.emitTaskUpdate(task.id, 'cancelled');
-          }
-          continue; // Skip comment processing if task is completed/cancelled
+      // Create a promise for each task review processing
+      const promise = (async () => {
+        const gitManager = this.getGitManager(task.repository_path);
+        const workingDirectory = await gitManager.acquireWorktreeForTask(
+          task.id
+        );
+        if (!workingDirectory) {
+          // No worktree available, skip this task for now and retry in next cycle
+          return;
         }
 
-        // If there are new comments, concatenate them and address all at once
-        if (result.comments.length > 0) {
-          const concatenatedComments = result.comments.join('\n\n---\n\n');
+        try {
+          await gitManager.switchToBranch(task.branch_name!, task.id);
+          const result = await this.collectPRComments(task.id, task.pr_number!);
 
+          // Handle status updates first (completed/cancelled)
+          if (result.statusUpdate) {
+            if (result.statusUpdate === 'completed') {
+              this.db.updateTask(task.id, {
+                status: 'completed',
+                current_stage: 'completed',
+                completed_at: new Date().toISOString(),
+              });
+              this.emitTaskUpdate(task.id, 'completed');
+            } else if (result.statusUpdate === 'cancelled') {
+              this.db.updateTask(task.id, {
+                status: 'cancelled',
+                current_stage: 'cancelled',
+              });
+              this.emitTaskUpdate(task.id, 'cancelled');
+            }
+            return; // Skip comment processing if task is completed/cancelled
+          }
+
+          // If there are new comments, concatenate them and address all at once
+          if (result.comments.length > 0) {
+            const concatenatedComments = result.comments.join('\n\n---\n\n');
+
+            this.db.addTaskLog({
+              task_id: task.id,
+              level: 'info',
+              message: `💬 Processing ${result.comments.length} PR review comment(s)...`,
+            });
+
+            await this.handleAllPRComments(task.id, concatenatedComments);
+          }
+        } catch (error: any) {
           this.db.addTaskLog({
             task_id: task.id,
-            level: 'info',
-            message: `💬 Processing ${result.comments.length} PR review comment(s)...`,
+            level: 'error',
+            message: `❌ Error processing reviews: ${error.message}`,
           });
-
-          await this.handleAllPRComments(task.id, concatenatedComments);
+        } finally {
+          await gitManager.releaseWorktree(task.id);
         }
-      } catch (error: any) {
-        this.db.addTaskLog({
-          task_id: task.id,
-          level: 'error',
-          message: `❌ Error processing reviews: ${error.message}`,
-        });
-      } finally {
-        await gitManager.releaseWorktree(task.id);
-      }
+      })();
+
+      promises.push(promise);
     }
+
+    return promises;
   }
 
   private async processTask(taskId: number): Promise<void> {
@@ -294,16 +310,10 @@ export class CoreEngine extends EventEmitter {
       throw new Error('Task not found');
     }
 
-    // Get git manager for the task's repository
     const gitManager = this.getGitManager(task.repository_path);
-    const worktreeAcquired = await gitManager.acquireWorktreeForTask(taskId);
-    if (!worktreeAcquired) {
-      // No worktree allocated for task, skip processing
-      return;
-    }
-    const workingDirectory = gitManager.getWorkingDirectory(taskId);
+    const workingDirectory = await gitManager.acquireWorktreeForTask(taskId);
     if (!workingDirectory) {
-      throw new Error(`Working directory not found for task ${taskId}`);
+      return;
     }
 
     // Use task executor to ensure only one task operation at a time
@@ -316,7 +326,7 @@ export class CoreEngine extends EventEmitter {
           this.db.addTaskLog({
             task_id: taskId,
             level: 'info',
-            message: `🏠 Working on repository: ${task.repository_path}`,
+            message: `🏠 Working on repository: ${task.repository_path}, worktree: ${workingDirectory}`,
           });
           // Update status to in progress
           this.db.addTaskLog({

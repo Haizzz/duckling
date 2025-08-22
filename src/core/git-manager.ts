@@ -10,38 +10,45 @@ import { OpenAIManager } from './openai-manager';
 import { JiraManager } from './jira-manager';
 
 interface WorktreeAllocation {
-  id: number;
   path: string;
   taskId: number | undefined;
 }
-
-const MAX_WORKTREES_PER_REPO = 3;
 
 class WorktreeManager {
   private static instances: Map<string, WorktreeManager> = new Map();
   private allocations: WorktreeAllocation[] = [];
   private repoPath: string;
   private db: DatabaseManager;
+  private settings: SettingsManager;
 
-  private constructor(repoPath: string, db: DatabaseManager) {
+  private constructor(
+    repoPath: string,
+    db: DatabaseManager,
+    settings: SettingsManager
+  ) {
     this.repoPath = repoPath;
     this.db = db;
+    this.settings = settings;
 
-    // Pre-allocate all worktree allocation objects
-    for (let i = 1; i <= MAX_WORKTREES_PER_REPO; i++) {
+    // Pre-allocate all worktree allocation objects based on settings
+    const maxWorktrees = this.settings.get('maxWorktreesPerRepo');
+    for (let i = 1; i <= maxWorktrees; i++) {
       this.allocations.push({
-        id: i,
         path: this.getWorktreePath(i),
         taskId: undefined,
       });
     }
   }
 
-  static getInstance(repoPath: string, db: DatabaseManager): WorktreeManager {
+  static getInstance(
+    repoPath: string,
+    db: DatabaseManager,
+    settings: SettingsManager
+  ): WorktreeManager {
     if (!WorktreeManager.instances.has(repoPath)) {
       WorktreeManager.instances.set(
         repoPath,
-        new WorktreeManager(repoPath, db)
+        new WorktreeManager(repoPath, db, settings)
       );
     }
     return WorktreeManager.instances.get(repoPath)!;
@@ -53,31 +60,36 @@ class WorktreeManager {
     return path.join(parentDir, `duckling-${repoName}-${worktreeId}`);
   }
 
-  async acquireWorktree(
-    taskId: number,
-    repoPath: string
-  ): Promise<string | undefined> {
+  async acquireWorktree(taskId: number): Promise<string | undefined> {
     const allocation = this.allocations.find((a) => a.taskId === undefined);
 
     if (!allocation) {
       this.db.addTaskLog({
         task_id: taskId,
         level: 'info',
-        message: `🌳 Maximum worktrees (${MAX_WORKTREES_PER_REPO}) reached for repository. Please wait for other tasks to complete.`,
+        message: `🌳 Maximum worktrees (${this.settings.get('maxWorktreesPerRepo')}) reached for repository. Please wait for other tasks to complete.`,
       });
       return undefined;
     }
 
     allocation.taskId = taskId;
+    this.db.updateTask(taskId, {
+      status: 'in-progress',
+      current_stage: 'acquiring_worktree',
+    });
 
     this.db.addTaskLog({
       task_id: taskId,
       level: 'info',
-      message: `🌳 Allocated worktree ${allocation.id} (${path.basename(allocation.path)}) for task ${taskId}`,
+      message: `🌳 Allocated worktree ${path.basename(allocation.path)} for task ${taskId}`,
     });
 
-    // Lazily create worktree directory if it doesn't exist
-    if (!fs.existsSync(allocation.path)) {
+    // Lazily create worktree if it doesn't exist
+    const mainGit = simpleGit(this.repoPath);
+    const worktreeList = await mainGit.raw(['worktree', 'list', '--porcelain']);
+    const worktreeExists = worktreeList.includes(`worktree ${allocation.path}`);
+
+    if (!worktreeExists) {
       this.db.addTaskLog({
         task_id: taskId,
         level: 'info',
@@ -85,7 +97,6 @@ class WorktreeManager {
       });
 
       // Create worktree with detached HEAD using main git instance
-      const mainGit = simpleGit(repoPath);
       await mainGit.raw([
         'worktree',
         'add',
@@ -106,7 +117,7 @@ class WorktreeManager {
       this.db.addTaskLog({
         task_id: taskId,
         level: 'info',
-        message: `🌳 Released worktree ${allocation.id} (${path.basename(allocation.path)})`,
+        message: `🌳 Released worktree ${path.basename(allocation.path)}`,
       });
     }
   }
@@ -118,27 +129,6 @@ class WorktreeManager {
     }
 
     return allocation.path;
-  }
-
-  async acquireWorktreeForTask(taskId: number): Promise<boolean> {
-    // Just find and reserve an available worktree slot
-    const allocation = this.allocations.find((a) => a.taskId === undefined);
-    if (allocation) {
-      allocation.taskId = taskId;
-      this.db.addTaskLog({
-        task_id: taskId,
-        level: 'info',
-        message: `🌳 Reserved worktree ${allocation.id} (${path.basename(allocation.path)}) for task ${taskId}`,
-      });
-      return true;
-    }
-
-    this.db.addTaskLog({
-      task_id: taskId,
-      level: 'info',
-      message: `🌳 Maximum worktrees (${MAX_WORKTREES_PER_REPO}) reached for repository. Please wait for other tasks to complete.`,
-    });
-    return false;
   }
 }
 
@@ -165,7 +155,7 @@ export class GitManager {
     this.repoPath = repoPath;
     this.validateGitRepo();
     this.mainGit = simpleGit(repoPath);
-    this.worktreeManager = WorktreeManager.getInstance(repoPath, db);
+    this.worktreeManager = WorktreeManager.getInstance(repoPath, db, settings);
   }
 
   private getWorktreeGit(taskId: number) {
@@ -186,8 +176,8 @@ export class GitManager {
     }
   }
 
-  async acquireWorktreeForTask(taskId: number): Promise<boolean> {
-    return await this.worktreeManager.acquireWorktreeForTask(taskId);
+  async acquireWorktreeForTask(taskId: number): Promise<string | undefined> {
+    return await this.worktreeManager.acquireWorktree(taskId);
   }
 
   async releaseWorktree(taskId: number): Promise<void> {

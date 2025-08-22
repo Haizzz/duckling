@@ -9,6 +9,7 @@ interface SettingsDefaults {
   commitSuffix: string;
   commentPrefix: string;
   maxRetries: number;
+  maxWorktreesPerRepo: number;
   openaiApiKey: string;
   jiraApiKey: string;
   jiraEmail: string;
@@ -26,6 +27,7 @@ export class SettingsManager {
     commitSuffix: ' [quack]',
     commentPrefix: 'duckling',
     maxRetries: 3,
+    maxWorktreesPerRepo: 3,
     openaiApiKey: '',
     jiraApiKey: '',
     jiraEmail: '',
