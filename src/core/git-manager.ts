@@ -74,7 +74,6 @@ class WorktreeManager {
 
     allocation.taskId = taskId;
     this.db.updateTask(taskId, {
-      status: 'in-progress',
       current_stage: 'acquiring_worktree',
     });
 
@@ -111,15 +110,31 @@ class WorktreeManager {
 
   async releaseWorktree(taskId: number): Promise<void> {
     const allocation = this.allocations.find((a) => a.taskId === taskId);
-    if (allocation) {
-      allocation.taskId = undefined;
+    // Skip if task was not found (possible if task was skipped by maximum worktrees reached)
+    if (!allocation || allocation.taskId === undefined) {
+      return;
+    }
 
+    // Detach HEAD to avoid conflicts with other worktrees
+    try {
+      const worktreeGit = simpleGit(allocation.path);
+      await worktreeGit.raw(['checkout', '--detach']);
+    } catch (error) {
+      // Log warning but don't fail the release
       this.db.addTaskLog({
         task_id: taskId,
-        level: 'info',
-        message: `🌳 Released worktree ${path.basename(allocation.path)}`,
+        level: 'warn',
+        message: `⚠️ Failed to detach HEAD in worktree ${path.basename(allocation.path)}: ${error}`,
       });
     }
+
+    allocation.taskId = undefined;
+
+    this.db.addTaskLog({
+      task_id: taskId,
+      level: 'info',
+      message: `🌳 Released worktree ${path.basename(allocation.path)}`,
+    });
   }
 
   getWorkingDirectory(taskId: number): string {
@@ -193,7 +208,11 @@ export class GitManager {
       async () => {
         logger.info(`Getting last commit timestamp for branch: ${branchName}`);
         await this.mainGit.fetch('origin', branchName);
-        const log = await this.mainGit.log(['-1', '--format=%cI']);
+        const log = await this.mainGit.log([
+          '-1',
+          '--format=%cI',
+          `origin/${branchName}`,
+        ]);
 
         if (log.latest) {
           return log.latest.hash;
