@@ -400,6 +400,26 @@ export class GitManager {
         message: `🔄 Switching to branch '${branchName}'...`,
       });
 
+      // Check if main repo is on the same branch and detach if so
+      try {
+        const currentBranch = await this.mainGit.branch();
+        if (currentBranch.current === branchName) {
+          this.db.addTaskLog({
+            task_id: taskId,
+            level: 'info',
+            message: `🔄 Detaching main repo HEAD to avoid branch conflict with '${branchName}'`,
+          });
+          await this.mainGit.raw(['checkout', '--detach']);
+        }
+      } catch (error) {
+        // Log warning but continue - this is not critical
+        this.db.addTaskLog({
+          task_id: taskId,
+          level: 'warn',
+          message: `⚠️ Failed to check/detach main repo branch: ${error}`,
+        });
+      }
+
       const worktreeGit = this.getWorktreeGit(taskId);
       await worktreeGit.fetch('origin', branchName);
       await worktreeGit.checkout(branchName);
