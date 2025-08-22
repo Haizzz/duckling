@@ -1,4 +1,4 @@
-import { simpleGit, SimpleGit } from 'simple-git';
+import { simpleGit } from 'simple-git';
 import { withRetry } from '../utils/retry';
 import { logger } from '../utils/logger';
 import { GitHubCLIProvider } from './github-cli-provider';
@@ -9,13 +9,147 @@ import { SettingsManager } from './settings-manager';
 import { OpenAIManager } from './openai-manager';
 import { JiraManager } from './jira-manager';
 
+interface WorktreeAllocation {
+  id: number;
+  path: string;
+  taskId: number | undefined;
+}
+
+const MAX_WORKTREES_PER_REPO = 3;
+
+class WorktreeManager {
+  private static instances: Map<string, WorktreeManager> = new Map();
+  private allocations: WorktreeAllocation[] = [];
+  private repoPath: string;
+  private db: DatabaseManager;
+
+  private constructor(repoPath: string, db: DatabaseManager) {
+    this.repoPath = repoPath;
+    this.db = db;
+
+    // Pre-allocate all worktree allocation objects
+    for (let i = 1; i <= MAX_WORKTREES_PER_REPO; i++) {
+      this.allocations.push({
+        id: i,
+        path: this.getWorktreePath(i),
+        taskId: undefined,
+      });
+    }
+  }
+
+  static getInstance(repoPath: string, db: DatabaseManager): WorktreeManager {
+    if (!WorktreeManager.instances.has(repoPath)) {
+      WorktreeManager.instances.set(
+        repoPath,
+        new WorktreeManager(repoPath, db)
+      );
+    }
+    return WorktreeManager.instances.get(repoPath)!;
+  }
+
+  private getWorktreePath(worktreeId: number): string {
+    const repoName = path.basename(this.repoPath);
+    const parentDir = path.dirname(this.repoPath);
+    return path.join(parentDir, `duckling-${repoName}-${worktreeId}`);
+  }
+
+  async acquireWorktree(
+    taskId: number,
+    repoPath: string
+  ): Promise<string | undefined> {
+    const allocation = this.allocations.find((a) => a.taskId === undefined);
+
+    if (!allocation) {
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'info',
+        message: `🌳 Maximum worktrees (${MAX_WORKTREES_PER_REPO}) reached for repository. Please wait for other tasks to complete.`,
+      });
+      return undefined;
+    }
+
+    allocation.taskId = taskId;
+
+    this.db.addTaskLog({
+      task_id: taskId,
+      level: 'info',
+      message: `🌳 Allocated worktree ${allocation.id} (${path.basename(allocation.path)}) for task ${taskId}`,
+    });
+
+    // Lazily create worktree directory if it doesn't exist
+    if (!fs.existsSync(allocation.path)) {
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'info',
+        message: `🌳 Creating worktree directory: ${path.basename(allocation.path)}`,
+      });
+
+      // Create worktree with detached HEAD using main git instance
+      const mainGit = simpleGit(repoPath);
+      await mainGit.raw([
+        'worktree',
+        'add',
+        '--detach',
+        allocation.path,
+        'HEAD',
+      ]);
+    }
+
+    return allocation.path;
+  }
+
+  async releaseWorktree(taskId: number): Promise<void> {
+    const allocation = this.allocations.find((a) => a.taskId === taskId);
+    if (allocation) {
+      allocation.taskId = undefined;
+
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'info',
+        message: `🌳 Released worktree ${allocation.id} (${path.basename(allocation.path)})`,
+      });
+    }
+  }
+
+  getWorkingDirectory(taskId: number): string {
+    const allocation = this.allocations.find((a) => a.taskId === taskId);
+    if (!allocation) {
+      throw new Error(`No worktree allocated for task ${taskId}`);
+    }
+
+    return allocation.path;
+  }
+
+  async acquireWorktreeForTask(taskId: number): Promise<boolean> {
+    // Just find and reserve an available worktree slot
+    const allocation = this.allocations.find((a) => a.taskId === undefined);
+    if (allocation) {
+      allocation.taskId = taskId;
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'info',
+        message: `🌳 Reserved worktree ${allocation.id} (${path.basename(allocation.path)}) for task ${taskId}`,
+      });
+      return true;
+    }
+
+    this.db.addTaskLog({
+      task_id: taskId,
+      level: 'info',
+      message: `🌳 Maximum worktrees (${MAX_WORKTREES_PER_REPO}) reached for repository. Please wait for other tasks to complete.`,
+    });
+    return false;
+  }
+}
+
 export class GitManager {
-  private git: SimpleGit;
   private db: DatabaseManager;
   private settings: SettingsManager;
   private openaiManager: OpenAIManager;
   private jiraManager: JiraManager;
   private repoPath: string;
+  private mainGit: ReturnType<typeof simpleGit>;
+  private worktreeManager: WorktreeManager;
 
   constructor(
     db: DatabaseManager,
@@ -29,19 +163,21 @@ export class GitManager {
     this.openaiManager = openaiManager;
     this.jiraManager = jiraManager;
     this.repoPath = repoPath;
-
-    // Validate git repository before initializing SimpleGit
     this.validateGitRepo();
-    this.git = simpleGit(repoPath);
+    this.mainGit = simpleGit(repoPath);
+    this.worktreeManager = WorktreeManager.getInstance(repoPath, db);
+  }
+
+  private getWorktreeGit(taskId: number) {
+    const wtPath = this.worktreeManager.getWorkingDirectory(taskId);
+    return simpleGit(wtPath);
   }
 
   private validateGitRepo(): void {
-    // Check if directory exists
     if (!fs.existsSync(this.repoPath)) {
       throw new Error(`Repository path does not exist: ${this.repoPath}`);
     }
 
-    // Check if directory is a git repository
     const gitDir = path.join(this.repoPath, '.git');
     if (!fs.existsSync(gitDir)) {
       throw new Error(
@@ -50,20 +186,26 @@ export class GitManager {
     }
   }
 
+  async acquireWorktreeForTask(taskId: number): Promise<boolean> {
+    return await this.worktreeManager.acquireWorktreeForTask(taskId);
+  }
+
+  async releaseWorktree(taskId: number): Promise<void> {
+    await this.worktreeManager.releaseWorktree(taskId);
+  }
+
+  getWorkingDirectory(taskId: number): string {
+    return this.worktreeManager.getWorkingDirectory(taskId);
+  }
+
   async getLastCommitTimestamp(branchName: string): Promise<string> {
     return await withRetry(
       async () => {
-        // Get the timestamp of the last commit
         logger.info(`Getting last commit timestamp for branch: ${branchName}`);
-        await this.git.fetch('origin', branchName);
-        const log = await this.git.log([
-          '-1',
-          '--format=%cI',
-          `origin/${branchName}`,
-        ]);
+        await this.mainGit.fetch('origin', branchName);
+        const log = await this.mainGit.log(['-1', '--format=%cI']);
 
         if (log.latest) {
-          // it's parsed wrong
           return log.latest.hash;
         }
 
@@ -93,28 +235,6 @@ export class GitManager {
         taskId.toString()
       );
 
-      this.db.addTaskLog({
-        task_id: taskId,
-        level: 'info',
-        message: `📥 Fetching latest changes from ${defaultBranch}...`,
-      });
-
-      // First, get latest changes for the default branch
-      this.db.addTaskLog({
-        task_id: taskId,
-        level: 'info',
-        message: `🔄 Switching to ${defaultBranch} and pulling latest...`,
-      });
-
-      // Discard any local changes and untracked files, then switch to base branch
-      await this.git.reset(['--hard']);
-      await this.git.clean('f', ['-d']);
-      await this.git.checkout(defaultBranch);
-
-      // Hard pull: fetch and reset to origin state to override any local changes
-      await this.git.fetch('origin', defaultBranch);
-      await this.git.reset(['--hard', `origin/${defaultBranch}`]);
-
       // Generate unique branch name
       let branchName = `${branchPrefix}${generatedBranchName}`;
       let counter = 1;
@@ -141,14 +261,26 @@ export class GitManager {
       this.db.addTaskLog({
         task_id: taskId,
         level: 'info',
-        message: `🌱 Creating and checking out new branch: ${branchName}`,
+        message: `🌱 Creating new branch: ${branchName}`,
       });
 
-      // Create and checkout the new branch
-      await this.git.checkoutLocalBranch(branchName);
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'info',
+        message: `📥 Fetching latest changes from ${defaultBranch} in worktree...`,
+      });
+
+      // Use local git instance for this worktree (no race conditions)
+      const worktreePath = this.worktreeManager.getWorkingDirectory(taskId);
+      const worktreeGit = simpleGit(worktreePath);
+      await worktreeGit.fetch('origin', defaultBranch);
+      await worktreeGit.reset(['--hard', `origin/${defaultBranch}`]);
+
+      // Create and checkout the new branch in the worktree
+      await worktreeGit.checkoutLocalBranch(branchName);
 
       logger.info(
-        `Created and switched to branch: ${branchName}`,
+        `Created branch and switched to worktree: ${branchName}`,
         taskId.toString()
       );
       return branchName;
@@ -157,7 +289,8 @@ export class GitManager {
 
   async branchExists(branchName: string): Promise<boolean> {
     try {
-      const branches = await this.git.branchLocal();
+      // Check branch existence in main repo to avoid conflicts
+      const branches = await this.mainGit.branchLocal();
       return branches.all.includes(branchName);
     } catch (error) {
       return false;
@@ -166,6 +299,8 @@ export class GitManager {
 
   async commitChanges(taskDescription: string, taskId: number): Promise<void> {
     return await withRetry(async () => {
+      const git = this.getWorktreeGit(taskId);
+
       this.db.addTaskLog({
         task_id: taskId,
         level: 'info',
@@ -173,7 +308,7 @@ export class GitManager {
       });
 
       // Add all changes
-      await this.git.add('.');
+      await git.add('.');
 
       this.db.addTaskLog({
         task_id: taskId,
@@ -182,7 +317,7 @@ export class GitManager {
       });
 
       // Check if there are changes to commit
-      const status = await this.git.status();
+      const status = await git.status();
       if (status.files.length === 0) {
         this.db.addTaskLog({
           task_id: taskId,
@@ -225,7 +360,7 @@ export class GitManager {
       });
 
       // Commit changes
-      await this.git.commit(finalMessage);
+      await git.commit(finalMessage);
 
       logger.info(`Committed changes: ${finalMessage}`, taskId.toString());
     }, 'Commit changes');
@@ -239,79 +374,35 @@ export class GitManager {
         message: `🚀 Pushing branch '${branchName}' to origin...`,
       });
 
-      await this.git.push('origin', branchName);
+      await this.getWorktreeGit(taskId).push('origin', branchName);
       logger.info(`Pushed branch: ${branchName}`, taskId.toString());
     }, 'Push branch');
   }
 
-  async getCurrentBranch(): Promise<string> {
-    const status = await this.git.status();
-    return status.current || 'main';
-  }
-
-  async switchToBranch(branchName: string, taskId: number): Promise<void> {
+  async switchToBranch(branchName: string, taskId: number): Promise<boolean> {
     return await withRetry(async () => {
       logger.info(
-        `Fetching and switching to branch: ${branchName}`,
+        `Switching to worktree for branch: ${branchName}`,
         taskId.toString()
       );
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'info',
+        message: `🔄 Switching to branch '${branchName}'...`,
+      });
 
-      // Fetch the specific branch first to ensure we have latest changes
-      await this.git.fetch('origin', branchName);
+      const worktreeGit = this.getWorktreeGit(taskId);
+      await worktreeGit.fetch('origin', branchName);
+      await worktreeGit.checkout(branchName);
+      await worktreeGit.reset(['--hard', `origin/${branchName}`]);
 
-      // Reset hard to origin branch to discard any local changes
-      await this.git.reset(['--hard', `origin/${branchName}`]);
-      await this.git.clean('f', ['-d']);
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'info',
+        message: `✅ Successfully switched to branch '${branchName}' in worktree`,
+      });
 
-      // Switch to the branch
-      await this.git.checkout(branchName);
+      return true;
     }, 'Switch to branch');
-  }
-
-  // Note: Branch deletion is not allowed per requirements
-
-  async fetchBranch(branchName: string, taskId?: number): Promise<void> {
-    return await withRetry(async () => {
-      if (taskId)
-        logger.info(
-          `Fetching latest changes for branch: ${branchName}`,
-          taskId.toString()
-        );
-      await this.git.fetch('origin', branchName);
-    }, `Fetch branch ${branchName}`);
-  }
-
-  async getChangedFiles(): Promise<string[]> {
-    const status = await this.git.status();
-    return [
-      ...status.created,
-      ...status.modified,
-      ...status.deleted,
-      ...status.renamed.map((r) => r.to || r.from),
-    ];
-  }
-
-  async getDiff(branchName?: string): Promise<string> {
-    if (branchName) {
-      return await this.git.diff([`origin/main...${branchName}`]);
-    } else {
-      return await this.git.diff();
-    }
-  }
-
-  async pullLatest(
-    branchName: string = 'main',
-    taskId?: number
-  ): Promise<void> {
-    return await withRetry(async () => {
-      // Hard pull: fetch and reset to origin state to override any local changes
-      await this.git.fetch('origin', branchName);
-      await this.git.reset(['--hard', `origin/${branchName}`]);
-      if (taskId)
-        logger.info(
-          `Hard pulled latest changes from ${branchName}`,
-          taskId.toString()
-        );
-    }, 'Hard pull latest changes');
   }
 }
