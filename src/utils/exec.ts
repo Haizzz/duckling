@@ -2,7 +2,7 @@ import { execa } from 'execa';
 import type { Options as ExecaOptions } from 'execa';
 import { logger } from './logger';
 
-interface ExecResult {
+export interface ExecResult {
   stdout: string;
   stderr: string;
   exitCode: number;

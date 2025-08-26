@@ -1,7 +1,7 @@
 import { simpleGit } from 'simple-git';
 import { logger } from './logger';
 
-interface GitRepoInfo {
+export interface GitRepoInfo {
   repoPath: string;
   remoteUrl: string;
   owner: string;
