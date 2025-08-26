@@ -20,6 +20,7 @@ export class CoreEngine extends EventEmitter {
   private githubManager?: GitHubCLIProvider;
   private openaiManager: OpenAIManager;
   private jiraManager: JiraManager;
+  private gitManagers = new Map<string, GitManager>();
   private isInitialized = false;
   private processingInterval?: NodeJS.Timeout;
   private isProcessing = false;
@@ -42,14 +43,20 @@ export class CoreEngine extends EventEmitter {
   }
 
   private getGitManager(repositoryPath: string): GitManager {
+    if (this.gitManagers.has(repositoryPath)) {
+      return this.gitManagers.get(repositoryPath)!;
+    }
+
     try {
-      return new GitManager(
+      const gitManager = new GitManager(
         this.db,
         repositoryPath,
         this.openaiManager,
         this.settings,
         this.jiraManager
       );
+      this.gitManagers.set(repositoryPath, gitManager);
+      return gitManager;
     } catch (error: any) {
       logger.error(`Failed to initialize GitManager: ${error.message}`);
       throw new Error(`Git repository validation failed: ${error.message}`);
