@@ -199,7 +199,14 @@
               <p class="text-xs text-gray-500 mt-1">Maximum number of retry attempts when tasks fail due to transient
                 errors</p>
             </div>
-
+            <div>
+              <label class="flex items-center">
+                <input type="checkbox" id="skip-username-check" name="skipUsernameCheck" 
+                  class="mr-2 rounded border-gray-300 focus:outline-none focus:ring-gray-400 focus:border-gray-400">
+                <span class="text-sm font-medium text-gray-700">Skip Username Check</span>
+              </label>
+              <p class="text-xs text-gray-500 mt-1">When enabled, Duckling will process comments from any user, not just the authenticated user. This allows team members to interact with Duckling.<br><strong>Security Warning:</strong> By letting others interact with Duckling, they can technically directly interact with your development environment. Carefully consider who should be able to do this.</p>
+            </div>
 
           </div>
         </div>

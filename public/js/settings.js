@@ -89,6 +89,7 @@ class Settings {
     document.getElementById('commit-suffix').value = settings.commitSuffix || ' [quack]';
     document.getElementById('comment-prefix').value = settings.commentPrefix || 'duckling';
     document.getElementById('max-retries').value = settings.maxRetries || 3;
+    document.getElementById('skip-username-check').checked = settings.skipUsernameCheck || false;
 
 
     // Show configuration status
@@ -96,7 +97,7 @@ class Settings {
 
     // Load precommit checks
     this.loadPrecommitChecks();
-    
+
     // The Jira repository dropdown will be updated when repositories are loaded
     // in the sequential loading process
   }
@@ -110,9 +111,11 @@ class Settings {
       settings[key] = value;
     }
 
+    // Convert bool
+    settings.skipUsernameCheck = settings.skipUsernameCheck === 'on';
+
     // Convert numeric fields
     settings.maxRetries = parseInt(settings.maxRetries);
-
 
     try {
       const response = await fetch('/api/settings', {

@@ -254,6 +254,7 @@ export class GitHubCLIProvider {
   ): Promise<string[]> {
     try {
       const commentPrefix = this.settings.get('commentPrefix');
+      const skipUsernameCheck = this.settings.get('skipUsernameCheck');
 
       // Get current user to filter out their own comments
       const currentUser = await this.getCurrentUser(repositoryPath);
@@ -287,6 +288,7 @@ export class GitHubCLIProvider {
         commentPrefix,
         lastCommitTimestamp,
         currentUser,
+        skipUsernameCheck,
       });
     } catch (error) {
       logger.error(
