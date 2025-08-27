@@ -111,7 +111,6 @@ class Settings {
       settings[key] = value;
     }
 
-    // Handle checkbox fields that may not be present in FormData if unchecked
     settings.skipUsernameCheck = formData.has('skipUsernameCheck');
 
     // Convert numeric fields
