@@ -89,6 +89,7 @@ class Settings {
     document.getElementById('commit-suffix').value = settings.commitSuffix || ' [quack]';
     document.getElementById('comment-prefix').value = settings.commentPrefix || 'duckling';
     document.getElementById('max-retries').value = settings.maxRetries || 3;
+    document.getElementById('skip-username-check').checked = settings.skipUsernameCheck || false;
 
 
     // Show configuration status
@@ -109,6 +110,9 @@ class Settings {
     for (const [key, value] of formData.entries()) {
       settings[key] = value;
     }
+
+    // Handle checkbox fields that may not be present in FormData if unchecked
+    settings.skipUsernameCheck = formData.has('skipUsernameCheck');
 
     // Convert numeric fields
     settings.maxRetries = parseInt(settings.maxRetries);

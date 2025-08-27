@@ -19,6 +19,7 @@ interface CommentProcessingOptions {
   commentPrefix: string;
   lastCommitTimestamp: string | null;
   currentUser?: string | null;
+  skipUsernameCheck?: boolean;
 }
 
 /**
@@ -28,7 +29,8 @@ function filterComments(
   comments: CommentData[],
   options: CommentProcessingOptions
 ): CommentData[] {
-  const { commentPrefix, lastCommitTimestamp, currentUser } = options;
+  const { commentPrefix, lastCommitTimestamp, currentUser, skipUsernameCheck } =
+    options;
   const lastCommitDate = lastCommitTimestamp
     ? new Date(lastCommitTimestamp)
     : null;
@@ -42,14 +44,17 @@ function filterComments(
       ? commentDate > lastCommitDate
       : true;
 
-    // Only process comments from the current user (authorized user)
-    const isFromCurrentUser = currentUser && comment.user.login === currentUser;
+    // Check username only if skipUsernameCheck is false
+    const isFromCurrentUser = skipUsernameCheck
+      ? true
+      : currentUser && comment.user.login === currentUser;
 
     logger.info(
       `Comment by ${comment.user.login}, ` +
         `time ${commentDate}, commit time ${lastCommitDate || 'null'}, ` +
         `starts with '${commentPrefix}': ${startsWithPrefix}, ` +
-        `from current user (${currentUser}): ${isFromCurrentUser}`
+        `from current user (${currentUser}): ${isFromCurrentUser}, ` +
+        `skip username check: ${skipUsernameCheck}`
     );
 
     return startsWithPrefix && isNewerThanCommit && isFromCurrentUser;

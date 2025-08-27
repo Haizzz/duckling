@@ -16,6 +16,7 @@ interface SettingsDefaults {
   jiraBaseUrl: string;
   jiraRepository: string;
   customPrompt: string;
+  skipUsernameCheck: boolean;
 }
 
 export class SettingsManager {
@@ -33,6 +34,7 @@ export class SettingsManager {
     jiraBaseUrl: '',
     jiraRepository: '',
     customPrompt: DEFAULT_CODING_PROMPT,
+    skipUsernameCheck: false,
   };
 
   constructor(private db: DatabaseManager) {}
@@ -43,6 +45,10 @@ export class SettingsManager {
       // Handle number conversion
       if (typeof SettingsManager.DEFAULTS[key] === 'number') {
         return parseInt(setting.value) as SettingsDefaults[K];
+      }
+      // Handle boolean conversion
+      if (typeof SettingsManager.DEFAULTS[key] === 'boolean') {
+        return (setting.value === 'true') as SettingsDefaults[K];
       }
       return setting.value as SettingsDefaults[K];
     }
