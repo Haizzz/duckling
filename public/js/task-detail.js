@@ -263,8 +263,8 @@ class TaskDetail {
           // Append new logs to existing ones
           this.appendLogs(result.data);
         } else {
-          // Full refresh - cache all logs
-          this.logs = result.data;
+          // Full refresh - cache all logs (reverse for chronological order)
+          this.logs = result.data.reverse();
           this.renderLogs(this.logs);
         }
 
@@ -317,7 +317,8 @@ class TaskDetail {
     if (newLogs.length === 0) return;
 
     const container = document.getElementById('task-logs');
-    this.logs = [...this.logs, ...newLogs];
+    // Reverse new logs to maintain chronological order (newest logs come from API in DESC order)
+    this.logs = [...this.logs, ...newLogs.reverse()];
 
     // Only append new logs instead of re-rendering everything
     const newLogsHTML = newLogs.map(log => `
