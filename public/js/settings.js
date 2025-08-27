@@ -111,7 +111,8 @@ class Settings {
       settings[key] = value;
     }
 
-    settings.skipUsernameCheck = formData.has('skipUsernameCheck');
+    // Handle checkbox fields - parse the actual value instead of just checking presence
+    settings.skipUsernameCheck = formData.get('skipUsernameCheck') === 'on';
 
     // Convert numeric fields
     settings.maxRetries = parseInt(settings.maxRetries);
