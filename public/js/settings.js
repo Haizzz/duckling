@@ -97,7 +97,7 @@ class Settings {
 
     // Load precommit checks
     this.loadPrecommitChecks();
-    
+
     // The Jira repository dropdown will be updated when repositories are loaded
     // in the sequential loading process
   }
@@ -111,12 +111,11 @@ class Settings {
       settings[key] = value;
     }
 
-    // Handle checkbox fields - parse the actual value instead of just checking presence
-    settings.skipUsernameCheck = formData.get('skipUsernameCheck') === 'on';
+    // Convert bool
+    settings.skipUsernameCheck = settings.skipUsernameCheck === 'on';
 
     // Convert numeric fields
     settings.maxRetries = parseInt(settings.maxRetries);
-
 
     try {
       const response = await fetch('/api/settings', {
