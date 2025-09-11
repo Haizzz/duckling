@@ -35,6 +35,8 @@ interface JiraSearchResponse {
     };
   }>;
   total: number;
+  isLast: boolean;
+  nextPageToken?: string;
 }
 
 export class JiraManager {
@@ -81,9 +83,9 @@ export class JiraManager {
   }
 
   /**
-   * Get the latest tickets from JQL query
+   * Get the latest tickets from JQL query with pagination support
    */
-  async getLatestTickets(maxResults: number = 5): Promise<JiraTicket[]> {
+  async getLatestTickets(pageSize: number = 10): Promise<JiraTicket[]> {
     if (!this.isConfigured()) {
       return [];
     }
@@ -99,53 +101,77 @@ export class JiraManager {
           const authString = Buffer.from(`${email}:${apiKey}`).toString(
             'base64'
           );
-          const params = new URLSearchParams({
-            jql: jql,
-            maxResults: maxResults.toString(),
-            startAt: '0',
-            fields: 'summary,description,status,assignee,created,updated',
-          });
 
-          const response = await fetch(
-            `${baseUrl}/rest/api/3/search/jql?${params}`,
-            {
-              method: 'GET',
-              headers: {
-                Authorization: `Basic ${authString}`,
-                Accept: 'application/json',
-              },
+          const allTickets: JiraTicket[] = [];
+          let nextPageToken: string | undefined;
+
+          do {
+            const params = new URLSearchParams({
+              jql: jql,
+              maxResults: pageSize.toString(),
+              fields: 'summary,description,status,assignee,created,updated',
+            });
+
+            if (nextPageToken) {
+              params.set('nextPageToken', nextPageToken);
             }
-          );
 
-          if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(
-              `Jira API error: ${response.status} ${response.statusText} - ${errorText}`
+            const response = await fetch(
+              `${baseUrl}/rest/api/3/search/jql?${params}`,
+              {
+                method: 'GET',
+                headers: {
+                  Authorization: `Basic ${authString}`,
+                  Accept: 'application/json',
+                },
+              }
             );
-          }
 
-          const data = (await response.json()) as JiraSearchResponse;
+            if (!response.ok) {
+              const errorText = await response.text();
+              throw new Error(
+                `Jira API error: ${response.status} ${response.statusText} - ${errorText}`
+              );
+            }
 
-          if (data.issues.length === 0) {
+            const data = (await response.json()) as JiraSearchResponse;
+
+            if (data.issues.length === 0) {
+              break;
+            }
+
+            const pageTickets: JiraTicket[] = data.issues.map((issue) => ({
+              id: issue.id,
+              key: issue.key,
+              summary: issue.fields.summary,
+              description: this.extractDescriptionText(
+                issue.fields.description
+              ),
+              status: issue.fields.status.name,
+              assignee: issue.fields.assignee?.displayName,
+              created: issue.fields.created,
+              updated: issue.fields.updated,
+            }));
+
+            allTickets.push(...pageTickets);
+
+            logger.info(
+              `Retrieved page with ${data.issues.length} tickets (${allTickets.length}/${data.total} total)`
+            );
+
+            // Set next page token for next iteration, or undefined if this is the last page
+            nextPageToken = data.isLast ? undefined : data.nextPageToken;
+          } while (nextPageToken);
+
+          if (allTickets.length === 0) {
             logger.info('No tickets found matching the JQL query');
             return [];
           }
 
-          const tickets: JiraTicket[] = data.issues.map((issue) => ({
-            id: issue.id,
-            key: issue.key,
-            summary: issue.fields.summary,
-            description: this.extractDescriptionText(issue.fields.description),
-            status: issue.fields.status.name,
-            assignee: issue.fields.assignee?.displayName,
-            created: issue.fields.created,
-            updated: issue.fields.updated,
-          }));
-
           logger.info(
-            `Retrieved ${tickets.length} Jira ticket(s): ${tickets.map((t) => t.key).join(', ')}`
+            `Retrieved ${allTickets.length} Jira ticket(s): ${allTickets.map((t) => t.key).join(', ')}`
           );
-          return tickets;
+          return allTickets;
         },
         'Jira API call',
         2
@@ -160,7 +186,7 @@ export class JiraManager {
    * Extract text content from Jira description field
    * Just JSON stringify it for now to see the structure
    */
-  private extractDescriptionText(description: any): string {
+  private extractDescriptionText(description: unknown): string {
     if (!description) {
       return '';
     }
@@ -198,7 +224,7 @@ export class JiraManager {
     createTaskCallback: (request: CreateTaskRequest) => Promise<number>
   ): Promise<number[]> {
     try {
-      const jiraTickets = await this.getLatestTickets(5);
+      const jiraTickets = await this.getLatestTickets();
       if (jiraTickets.length === 0) {
         return [];
       }
