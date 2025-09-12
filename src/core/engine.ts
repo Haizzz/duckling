@@ -168,22 +168,15 @@ export class CoreEngine extends EventEmitter {
         try {
           const updatedTicket = await this.jiraManager.getTicketByKey(jiraKey);
           if (updatedTicket) {
-            // Update the task with the latest Jira ticket information
-            const updatedTitle =
-              `${updatedTicket.key}: ${updatedTicket.summary}`.slice(0, 100);
             const updatedDescription = `Jira Ticket: ${updatedTicket.key}\nSummary: ${updatedTicket.summary}\n\n${updatedTicket.description}`;
-
             this.db.updateTask(taskId, {
-              title: updatedTitle,
               description: updatedDescription,
             });
-
             this.db.addTaskLog({
               task_id: taskId,
               level: 'info',
               message: `Updated task with latest Jira ticket information. Status: ${updatedTicket.status}, Updated: ${updatedTicket.updated}`,
             });
-
             logger.info(
               `Updated task ${taskId} with latest Jira ticket ${jiraKey} information`
             );
