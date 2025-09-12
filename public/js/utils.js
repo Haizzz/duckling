@@ -99,7 +99,8 @@ window.Utils = {
   },
 
   // Status badge generation (shared across dashboard and task detail)
-  getStatusBadge(status, task) {
+  getStatusBadge(task) {
+    const { status } = task;
     const badges = {
       'pending': 'bg-gray-100 text-gray-800',
       'in-progress': 'bg-yellow-100 text-yellow-800',
@@ -114,7 +115,7 @@ window.Utils = {
     const displayStatus = status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase());
 
     // Add Jira icon if task is from Jira
-    const jiraIcon = task && this.isJiraTask(task) ? this.getJiraIcon() : '';
+    const jiraIcon = this.isJiraTask(task) ? this.getJiraIcon() : '';
 
     return `<span class="px-2 py-1 text-xs font-medium rounded-full ${badgeClass} flex items-center">${jiraIcon}${displayStatus}</span>`;
   },

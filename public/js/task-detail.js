@@ -69,7 +69,7 @@ class TaskDetail {
     const createdDate = Utils.formatLocalDateTime(task.created_at);
     const updatedDate = Utils.formatLocalDateTime(task.updated_at);
 
-    const statusBadge = Utils.getStatusBadge(task.status, task);
+    const statusBadge = Utils.getStatusBadge(task);
     const stageBadge = this.getStageBadge(task.current_stage);
 
     const summary = task.summary || task.description.substring(0, 80) + (task.description.length > 80 ? '...' : '');

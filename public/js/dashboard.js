@@ -432,7 +432,7 @@ class Dashboard {
     const createdDate = Utils.formatLocalDateTime(task.created_at);
     const updatedDate = Utils.formatLocalDateTime(task.updated_at);
 
-    const statusBadge = Utils.getStatusBadge(task.status, task);
+    const statusBadge = Utils.getStatusBadge(task);
 
     const prLink = task.pr_url && task.pr_number ?
       `<span class="text-blue-600 text-sm cursor-pointer underline break-all" onclick="window.open('${task.pr_url}', '_blank')">#${task.pr_number}</span>` :
