@@ -69,7 +69,7 @@ class TaskDetail {
     const createdDate = Utils.formatLocalDateTime(task.created_at);
     const updatedDate = Utils.formatLocalDateTime(task.updated_at);
 
-    const statusBadge = this.getStatusBadge(task.status);
+    const statusBadge = this.getStatusBadge(task.status, task);
     const stageBadge = this.getStageBadge(task.current_stage);
 
     const summary = task.summary || task.description.substring(0, 80) + (task.description.length > 80 ? '...' : '');
@@ -480,8 +480,8 @@ class TaskDetail {
     }
   }
 
-  getStatusBadge(status) {
-    return Utils.getStatusBadge(status);
+  getStatusBadge(status, task) {
+    return Utils.getStatusBadge(status, task);
   }
 
   getStageBadge(stage) {

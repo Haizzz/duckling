@@ -88,8 +88,20 @@ window.Utils = {
     }, 3000);
   },
 
+  // Check if task is from Jira integration
+  isJiraTask(task) {
+    return task && task.description && task.description.includes('Jira Ticket: ');
+  },
+
+  // Get Jira icon SVG - Using a "task" or "ticket" style icon to represent Jira tickets
+  getJiraIcon() {
+    return `<svg class="h-4 w-4 text-blue-600 mr-1 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 6v.75m0 3v.75m0 3v.75m0 3V18m-9-5.25h5.25M7.5 15h3M3.375 5.25c-.621 0-1.125.504-1.125 1.125v3.026a2.999 2.999 0 0 1 0 5.198v3.026c0 .621.504 1.125 1.125 1.125h17.25c.621 0 1.125-.504 1.125-1.125v-3.026a2.999 2.999 0 0 1 0-5.198V6.375c0-.621-.504-1.125-1.125-1.125H3.375Z"/>
+    </svg>`;
+  },
+
   // Status badge generation (shared across dashboard and task detail)
-  getStatusBadge(status) {
+  getStatusBadge(status, task = null) {
     const badges = {
       'pending': 'bg-gray-100 text-gray-800',
       'in-progress': 'bg-yellow-100 text-yellow-800',
@@ -103,7 +115,10 @@ window.Utils = {
     const badgeClass = badges[status] || 'bg-gray-100 text-gray-800';
     const displayStatus = status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase());
 
-    return `<span class="px-2 py-1 text-xs font-medium rounded-full ${badgeClass}">${displayStatus}</span>`;
+    // Add Jira icon if task is from Jira
+    const jiraIcon = task && this.isJiraTask(task) ? this.getJiraIcon() : '';
+
+    return `<span class="px-2 py-1 text-xs font-medium rounded-full ${badgeClass} flex items-center">${jiraIcon}${displayStatus}</span>`;
   },
 
   // Stage badge generation (shared utility)
