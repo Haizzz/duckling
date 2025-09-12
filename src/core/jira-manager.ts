@@ -17,26 +17,28 @@ interface JiraTicket {
 }
 
 interface JiraSearchResponse {
-  issues: Array<{
-    id: string;
-    key: string;
-    fields: {
-      summary: string;
-      description?: string;
-      status: {
-        name: string;
-      };
-      assignee?: {
-        displayName: string;
-        emailAddress: string;
-      };
-      created: string;
-      updated: string;
-    };
-  }>;
+  issues: Array<JiraIssueData>;
   total: number;
   isLast: boolean;
   nextPageToken?: string;
+}
+
+interface JiraIssueData {
+  id: string;
+  key: string;
+  fields: {
+    summary: string;
+    description?: string;
+    status: {
+      name: string;
+    };
+    assignee?: {
+      displayName: string;
+      emailAddress: string;
+    };
+    created: string;
+    updated: string;
+  };
 }
 
 export class JiraManager {
@@ -80,6 +82,72 @@ export class JiraManager {
     }
 
     return true;
+  }
+
+  /**
+   * Get a single Jira ticket by its key
+   */
+  async getTicketByKey(key: string): Promise<JiraTicket | null> {
+    if (!this.isConfigured()) {
+      return null;
+    }
+
+    const apiKey = this.settings.get('jiraApiKey');
+    const email = this.settings.get('jiraEmail');
+    const baseUrl = this.settings.get('jiraBaseUrl');
+
+    try {
+      return await withRetry(
+        async () => {
+          const authString = Buffer.from(`${email}:${apiKey}`).toString(
+            'base64'
+          );
+
+          const response = await fetch(
+            `${baseUrl}/rest/api/3/issue/${key}?fields=summary,description,status,assignee,created,updated`,
+            {
+              method: 'GET',
+              headers: {
+                Authorization: `Basic ${authString}`,
+                Accept: 'application/json',
+              },
+            }
+          );
+
+          if (!response.ok) {
+            if (response.status === 404) {
+              logger.warn(`Jira ticket ${key} not found`);
+              return null;
+            }
+            const errorText = await response.text();
+            throw new Error(
+              `Jira API error: ${response.status} ${response.statusText} - ${errorText}`
+            );
+          }
+
+          const issue = (await response.json()) as JiraIssueData;
+
+          const ticket: JiraTicket = {
+            id: issue.id,
+            key: issue.key,
+            summary: issue.fields.summary,
+            description: this.extractDescriptionText(issue.fields.description),
+            status: issue.fields.status.name,
+            assignee: issue.fields.assignee?.displayName,
+            created: issue.fields.created,
+            updated: issue.fields.updated,
+          };
+
+          logger.info(`Retrieved Jira ticket ${key}: ${ticket.summary}`);
+          return ticket;
+        },
+        'Jira API call for single ticket',
+        2
+      );
+    } catch (error) {
+      logger.error(`Failed to fetch Jira ticket ${key}: ${error}`);
+      return null;
+    }
   }
 
   /**
