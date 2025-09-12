@@ -66,21 +66,20 @@ window.Utils = {
   showToast(message, type = 'info') {
     console.log('showToast called with message:', JSON.stringify(message), 'type:', type);
     const toast = document.createElement('div');
-    toast.className = `fixed top-4 right-4 px-4 py-2 rounded-md shadow-lg z-50 ${
-      type === 'success' ? 'bg-green-600 text-white' :
+    toast.className = `fixed top-4 right-4 px-4 py-2 rounded-md shadow-lg z-50 ${type === 'success' ? 'bg-green-600 text-white' :
       type === 'error' ? 'bg-red-600 text-white' :
-      type === 'warning' ? 'bg-yellow-600 text-white' :
-      'bg-blue-600 text-white'
-    }`;
+        type === 'warning' ? 'bg-yellow-600 text-white' :
+          'bg-blue-600 text-white'
+      }`;
     toast.textContent = message;
-    
+
     // Add transition styles
     toast.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
     toast.style.opacity = '1';
     toast.style.transform = 'translateX(0)';
-    
+
     document.body.appendChild(toast);
-    
+
     setTimeout(() => {
       toast.style.opacity = '0';
       toast.style.transform = 'translateX(100%)';
@@ -88,8 +87,19 @@ window.Utils = {
     }, 3000);
   },
 
+  // Check if task is from Jira integration
+  isJiraTask(task) {
+    return task && task.description && task.description.includes('Jira Ticket: ');
+  },
+
+  // Get Jira icon PNG - Using a PNG file for Jira tickets
+  getJiraIcon() {
+    return `<img src="assets/jira-icon.svg" alt="Jira" class="h-4 w-4 mr-1 flex-shrink-0" />`;
+  },
+
   // Status badge generation (shared across dashboard and task detail)
-  getStatusBadge(status) {
+  getStatusBadge(task) {
+    const { status } = task;
     const badges = {
       'pending': 'bg-gray-100 text-gray-800',
       'in-progress': 'bg-yellow-100 text-yellow-800',
@@ -103,7 +113,10 @@ window.Utils = {
     const badgeClass = badges[status] || 'bg-gray-100 text-gray-800';
     const displayStatus = status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase());
 
-    return `<span class="px-2 py-1 text-xs font-medium rounded-full ${badgeClass}">${displayStatus}</span>`;
+    // Add Jira icon if task is from Jira
+    const jiraIcon = this.isJiraTask(task) ? this.getJiraIcon() : '';
+
+    return `<span class="py-1 flex items-center">${jiraIcon}</span><span class="px-2 py-1 text-xs font-medium rounded-full ${badgeClass} flex items-center">${displayStatus}</span>`;
   },
 
   // Stage badge generation (shared utility)
@@ -143,7 +156,7 @@ window.Utils = {
   // Shared task action utilities
   async performTaskAction(taskId, action, options = {}) {
     const { confirmMessage, hideDropdown } = options;
-    
+
     // Show confirmation if required
     if (confirmMessage && !confirm(confirmMessage)) {
       return;
@@ -160,10 +173,10 @@ window.Utils = {
         if (hideDropdown) {
           hideDropdown();
         }
-        
+
         // Show success toast
         this.showToast(`Task ${action} successful`, 'success');
-        
+
         return true;
       } else {
         const result = await response.json();
