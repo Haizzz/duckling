@@ -201,6 +201,80 @@ export class JiraManager {
   }
 
   /**
+   * Fetch a single ticket by Jira key
+   */
+  async getTicketByKey(key: string): Promise<JiraTicket | null> {
+    if (!this.isConfigured()) {
+      return null;
+    }
+
+    const apiKey = this.settings.get('jiraApiKey');
+    const email = this.settings.get('jiraEmail');
+    const baseUrl = this.settings.get('jiraBaseUrl');
+
+    try {
+      return await withRetry(
+        async () => {
+          const authString = Buffer.from(`${email}:${apiKey}`).toString(
+            'base64'
+          );
+
+          const response = await fetch(
+            `${baseUrl}/rest/api/3/issue/${key}?fields=summary,description,status,assignee,created,updated`,
+            {
+              method: 'GET',
+              headers: {
+                Authorization: `Basic ${authString}`,
+                Accept: 'application/json',
+              },
+            }
+          );
+
+          if (!response.ok) {
+            if (response.status === 404) {
+              logger.warn(`Jira ticket ${key} not found`);
+              return null;
+            }
+            const errorText = await response.text();
+            throw new Error(
+              `Jira API error: ${response.status} ${response.statusText} - ${errorText}`
+            );
+          }
+
+          const issue = (await response.json()) as {
+            id: string;
+            key: string;
+            fields: {
+              summary: string;
+              description?: string;
+              status: { name: string };
+              assignee?: { displayName: string; emailAddress: string };
+              created: string;
+              updated: string;
+            };
+          };
+
+          return {
+            id: issue.id,
+            key: issue.key,
+            summary: issue.fields.summary,
+            description: this.extractDescriptionText(issue.fields.description),
+            status: issue.fields.status.name,
+            assignee: issue.fields.assignee?.displayName,
+            created: issue.fields.created,
+            updated: issue.fields.updated,
+          };
+        },
+        `Jira API call for ticket ${key}`,
+        2
+      );
+    } catch (error) {
+      logger.error(`Failed to fetch Jira ticket ${key}: ${error}`);
+      return null;
+    }
+  }
+
+  /**
    * Check if a task is created from a Jira ticket
    */
   isJiraTicket(task: { title: string; description: string }): boolean {
