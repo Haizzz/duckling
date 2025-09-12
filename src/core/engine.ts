@@ -155,6 +155,48 @@ export class CoreEngine extends EventEmitter {
       throw new Error('Can only retry failed or cancelled tasks');
     }
 
+    // Check if this is a Jira ticket and refetch if needed
+    if (this.jiraManager.isJiraTicket(task)) {
+      const jiraKey = this.jiraManager.getJiraKey(task);
+      if (jiraKey) {
+        this.db.addTaskLog({
+          task_id: taskId,
+          level: 'info',
+          message: `Refetching Jira ticket ${jiraKey} before retry...`,
+        });
+
+        try {
+          const updatedTicket = await this.jiraManager.getTicketByKey(jiraKey);
+          if (updatedTicket) {
+            const updatedDescription = `Jira Ticket: ${updatedTicket.key}\nSummary: ${updatedTicket.summary}\n\n${updatedTicket.description}`;
+            this.db.updateTask(taskId, {
+              description: updatedDescription,
+            });
+            this.db.addTaskLog({
+              task_id: taskId,
+              level: 'info',
+              message: `Updated task with latest Jira ticket information. Status: ${updatedTicket.status}, Updated: ${updatedTicket.updated}`,
+            });
+            logger.info(
+              `Updated task ${taskId} with latest Jira ticket ${jiraKey} information`
+            );
+          } else {
+            this.db.addTaskLog({
+              task_id: taskId,
+              level: 'warn',
+              message: `Could not refetch Jira ticket ${jiraKey} - proceeding with retry using existing information`,
+            });
+          }
+        } catch (error) {
+          this.db.addTaskLog({
+            task_id: taskId,
+            level: 'warn',
+            message: `Failed to refetch Jira ticket ${jiraKey}: ${error} - proceeding with retry using existing information`,
+          });
+        }
+      }
+    }
+
     // Reset task to pending state and clear completion timestamp
     this.db.updateTask(taskId, {
       status: 'pending',

@@ -39,6 +39,19 @@ interface JiraSearchResponse {
   nextPageToken?: string;
 }
 
+interface JiraIssueResponse {
+  id: string;
+  key: string;
+  fields: {
+    summary: string;
+    description?: string;
+    status: { name: string };
+    assignee?: { displayName: string; emailAddress: string };
+    created: string;
+    updated: string;
+  };
+}
+
 export class JiraManager {
   private settings: SettingsManager;
   private db: DatabaseManager;
@@ -83,6 +96,48 @@ export class JiraManager {
   }
 
   /**
+   * Make an authenticated Jira API request with retry logic
+   */
+  private async makeJiraApiRequest<T>(opts: {
+    url: string;
+    options?: RequestInit;
+    operationName?: string;
+  }): Promise<T> {
+    const { url, options = {}, operationName = 'Jira API call' } = opts;
+
+    const apiKey = this.settings.get('jiraApiKey');
+    const email = this.settings.get('jiraEmail');
+    const baseUrl = this.settings.get('jiraBaseUrl');
+
+    const authString = Buffer.from(`${email}:${apiKey}`).toString('base64');
+
+    return await withRetry(
+      async () => {
+        const response = await fetch(`${baseUrl}${url}`, {
+          method: 'GET',
+          ...options,
+          headers: {
+            Authorization: `Basic ${authString}`,
+            Accept: 'application/json',
+            ...options.headers,
+          },
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(
+            `Jira API error: ${response.status} ${response.statusText} - ${errorText}`
+          );
+        }
+
+        return (await response.json()) as T;
+      },
+      operationName,
+      2
+    );
+  }
+
+  /**
    * Get the latest tickets from JQL query with pagination support
    */
   async getLatestTickets(pageSize: number = 10): Promise<JiraTicket[]> {
@@ -90,92 +145,62 @@ export class JiraManager {
       return [];
     }
 
-    const apiKey = this.settings.get('jiraApiKey');
-    const email = this.settings.get('jiraEmail');
     const jql = this.settings.get('jiraJqlQuery');
-    const baseUrl = this.settings.get('jiraBaseUrl');
 
     try {
-      return await withRetry(
-        async () => {
-          const authString = Buffer.from(`${email}:${apiKey}`).toString(
-            'base64'
-          );
+      const allTickets: JiraTicket[] = [];
+      let nextPageToken: string | undefined;
 
-          const allTickets: JiraTicket[] = [];
-          let nextPageToken: string | undefined;
+      do {
+        const params = new URLSearchParams({
+          jql: jql,
+          maxResults: pageSize.toString(),
+          fields: 'summary,description,status,assignee,created,updated',
+        });
 
-          do {
-            const params = new URLSearchParams({
-              jql: jql,
-              maxResults: pageSize.toString(),
-              fields: 'summary,description,status,assignee,created,updated',
-            });
+        if (nextPageToken) {
+          params.set('nextPageToken', nextPageToken);
+        }
 
-            if (nextPageToken) {
-              params.set('nextPageToken', nextPageToken);
-            }
+        const data = await this.makeJiraApiRequest<JiraSearchResponse>({
+          url: `/rest/api/3/search/jql?${params}`,
+          operationName: 'Jira search tickets',
+        });
 
-            const response = await fetch(
-              `${baseUrl}/rest/api/3/search/jql?${params}`,
-              {
-                method: 'GET',
-                headers: {
-                  Authorization: `Basic ${authString}`,
-                  Accept: 'application/json',
-                },
-              }
-            );
+        if (data.issues.length === 0) {
+          break;
+        }
 
-            if (!response.ok) {
-              const errorText = await response.text();
-              throw new Error(
-                `Jira API error: ${response.status} ${response.statusText} - ${errorText}`
-              );
-            }
+        const pageTickets: JiraTicket[] = data.issues.map((issue) => ({
+          id: issue.id,
+          key: issue.key,
+          summary: issue.fields.summary,
+          description: this.extractDescriptionText(issue.fields.description),
+          status: issue.fields.status.name,
+          assignee: issue.fields.assignee?.displayName,
+          created: issue.fields.created,
+          updated: issue.fields.updated,
+        }));
 
-            const data = (await response.json()) as JiraSearchResponse;
+        allTickets.push(...pageTickets);
 
-            if (data.issues.length === 0) {
-              break;
-            }
+        logger.info(
+          `Retrieved page with ${data.issues.length} tickets (${allTickets.length}/${data.total} total)`
+        );
 
-            const pageTickets: JiraTicket[] = data.issues.map((issue) => ({
-              id: issue.id,
-              key: issue.key,
-              summary: issue.fields.summary,
-              description: this.extractDescriptionText(
-                issue.fields.description
-              ),
-              status: issue.fields.status.name,
-              assignee: issue.fields.assignee?.displayName,
-              created: issue.fields.created,
-              updated: issue.fields.updated,
-            }));
+        // Set next page token for next iteration, or undefined if this is the last page
+        nextPageToken = data.isLast ? undefined : data.nextPageToken;
+      } while (nextPageToken);
 
-            allTickets.push(...pageTickets);
+      if (allTickets.length === 0) {
+        logger.info('No tickets found matching the JQL query');
+        return [];
+      }
 
-            logger.info(
-              `Retrieved page with ${data.issues.length} tickets (${allTickets.length}/${data.total} total)`
-            );
-
-            // Set next page token for next iteration, or undefined if this is the last page
-            nextPageToken = data.isLast ? undefined : data.nextPageToken;
-          } while (nextPageToken);
-
-          if (allTickets.length === 0) {
-            logger.info('No tickets found matching the JQL query');
-            return [];
-          }
-
-          logger.info(
-            `Retrieved ${allTickets.length} Jira ticket(s): ${allTickets.map((t) => t.key).join(', ')}`
-          );
-          return allTickets;
-        },
-        'Jira API call',
-        2
+      logger.info(
+        `Retrieved ${allTickets.length} Jira ticket(s): ${allTickets.map((t) => t.key).join(', ')}`
       );
+      return allTickets;
     } catch (error) {
       logger.error(`Failed to fetch Jira tickets: ${error}`);
       return [];
@@ -198,6 +223,46 @@ export class JiraManager {
 
     // For objects, just stringify to see the structure
     return JSON.stringify(description);
+  }
+
+  /**
+   * Fetch a single ticket by Jira key
+   */
+  async getTicketByKey(key: string): Promise<JiraTicket | null> {
+    if (!this.isConfigured()) {
+      return null;
+    }
+
+    try {
+      // Handle 404 specifically for ticket not found
+      try {
+        const issue = await this.makeJiraApiRequest<JiraIssueResponse>({
+          url: `/rest/api/3/issue/${key}?fields=summary,description,status,assignee,created,updated`,
+          operationName: `Jira API call for ticket ${key}`,
+        });
+
+        return {
+          id: issue.id,
+          key: issue.key,
+          summary: issue.fields.summary,
+          description: this.extractDescriptionText(issue.fields.description),
+          status: issue.fields.status.name,
+          assignee: issue.fields.assignee?.displayName,
+          created: issue.fields.created,
+          updated: issue.fields.updated,
+        };
+      } catch (apiError: unknown) {
+        // Check if it's a 404 error
+        if (apiError instanceof Error && apiError.message.includes('404')) {
+          logger.warn(`Jira ticket ${key} not found`);
+          return null;
+        }
+        throw apiError;
+      }
+    } catch (error) {
+      logger.error(`Failed to fetch Jira ticket ${key}: ${error}`);
+      return null;
+    }
   }
 
   /**
