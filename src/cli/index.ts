@@ -10,6 +10,7 @@ import { PrecommitManager } from '../core/precommit-manager';
 import { OpenAIManager } from '../core/openai-manager';
 import { JiraManager } from '../core/jira-manager';
 import { CoreEngine } from '../core/engine';
+import { SystemdManager } from '../core/systemd-manager';
 import * as readline from 'readline';
 
 const program = new Command();
@@ -288,6 +289,128 @@ taskCmd
     }
   });
 
+// Service command group
+const serviceCmd = program
+  .command('service')
+  .description('Manage systemd service');
+
+// Install service command
+serviceCmd
+  .command('install')
+  .description('Install Duckling as a systemd service with auto-start')
+  .option('-p, --port <port>', 'Port to run the service on', '5050')
+  .action(async (options) => {
+    try {
+      const systemd = new SystemdManager();
+      const port = parseInt(options.port);
+
+      console.log('🚀 Installing Duckling as systemd service...\n');
+
+      await systemd.installService({ port });
+    } catch (error: any) {
+      console.error('❌ Failed to install service:', error.message);
+      process.exit(1);
+    }
+  });
+
+// Uninstall service command
+serviceCmd
+  .command('uninstall')
+  .description('Remove the systemd service')
+  .action(async () => {
+    try {
+      const systemd = new SystemdManager();
+
+      console.log('🗑️  Uninstalling Duckling systemd service...\n');
+
+      await systemd.uninstallService();
+    } catch (error: any) {
+      console.error('❌ Failed to uninstall service:', error.message);
+      process.exit(1);
+    }
+  });
+
+// Service status command
+serviceCmd
+  .command('status')
+  .description('Show systemd service status')
+  .action(async () => {
+    try {
+      const systemd = new SystemdManager();
+
+      console.log('🔧 Duckling Service Status\n');
+
+      const status = await systemd.getServiceStatus();
+
+      console.log(`Installed: ${status.installed ? '✅ Yes' : '❌ No'}`);
+
+      if (status.installed) {
+        console.log(`Active: ${status.active ? '✅ Running' : '❌ Stopped'}`);
+        console.log(
+          `Enabled: ${status.enabled ? '✅ Auto-start enabled' : '❌ Auto-start disabled'}`
+        );
+
+        if (status.status) {
+          console.log('\n📋 Detailed Status:');
+          console.log(status.status);
+        }
+
+        console.log('\n🔧 Management Commands:');
+        console.log('  Start:   systemctl --user start duckling');
+        console.log('  Stop:    systemctl --user stop duckling');
+        console.log('  Restart: systemctl --user restart duckling');
+        console.log('  Logs:    journalctl --user -u duckling -f');
+      } else {
+        console.log('\n💡 Install the service with: duckling service install');
+      }
+    } catch (error: any) {
+      console.error('❌ Failed to get service status:', error.message);
+      process.exit(1);
+    }
+  });
+
+// Start service command
+serviceCmd
+  .command('start')
+  .description('Start the systemd service')
+  .action(async () => {
+    try {
+      const systemd = new SystemdManager();
+      await systemd.startService();
+    } catch (error: any) {
+      console.error('❌ Failed to start service:', error.message);
+      process.exit(1);
+    }
+  });
+
+// Stop service command
+serviceCmd
+  .command('stop')
+  .description('Stop the systemd service')
+  .action(async () => {
+    try {
+      const systemd = new SystemdManager();
+      await systemd.stopService();
+    } catch (error: any) {
+      console.error('❌ Failed to stop service:', error.message);
+      process.exit(1);
+    }
+  });
+
+// Restart service command
+serviceCmd
+  .command('restart')
+  .description('Restart the systemd service')
+  .action(async () => {
+    try {
+      const systemd = new SystemdManager();
+      await systemd.restartService();
+    } catch (error: any) {
+      console.error('❌ Failed to restart service:', error.message);
+      process.exit(1);
+    }
+  });
+
 // Status command - show system status
 program
   .command('status')
@@ -327,6 +450,29 @@ program
         console.log(`   Awaiting Review: ${awaitingReviewTasks.length}`);
         console.log(`   Completed: ${completedTasks.length}`);
         console.log(`   Failed: ${failedTasks.length}`);
+
+        // Show systemd service status
+        try {
+          const systemd = new SystemdManager();
+          const serviceStatus = await systemd.getServiceStatus();
+
+          console.log('\n🔧 Service Status:');
+          console.log(
+            `   Installed: ${serviceStatus.installed ? '✅ Yes' : '❌ No'}`
+          );
+          if (serviceStatus.installed) {
+            console.log(
+              `   Active: ${serviceStatus.active ? '✅ Running' : '❌ Stopped'}`
+            );
+            console.log(
+              `   Auto-start: ${serviceStatus.enabled ? '✅ Enabled' : '❌ Disabled'}`
+            );
+          }
+        } catch {
+          console.log(
+            '\n🔧 Service Status: ❓ Unavailable (systemd not supported)'
+          );
+        }
       } else {
         console.log(
           '\n💡 Run "duckling start" and visit http://localhost:5050 to complete setup.'

@@ -36,6 +36,16 @@ duckling task list
 
 # Cancel a task
 duckling task cancel <taskId>
+
+# Install as systemd service (Linux only)
+duckling service install
+
+# Manage systemd service
+duckling service status
+duckling service start
+duckling service stop
+duckling service restart
+duckling service uninstall
 ```
 
 ## Architecture
