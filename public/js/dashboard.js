@@ -363,14 +363,15 @@ class Dashboard {
     if (this.isLoading || !this.hasMoreCompleted) return;
 
     this.isLoading = true;
-    this.completedPage++;
+    this.updateLoadMoreButton();
 
     try {
+      this.completedPage++;
       await this.loadCompletedTasks();
       this.renderTasks();
-      this.updateLoadMoreButton();
     } finally {
       this.isLoading = false;
+      this.updateLoadMoreButton();
     }
   }
 
