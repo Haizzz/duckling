@@ -83,13 +83,13 @@ class Settings {
     this.selectedJiraRepository = settings.jiraRepository || '';
 
     // Task configuration
-    document.getElementById('custom-prompt').value = settings.customPrompt || '';
-    document.getElementById('branch-prefix').value = settings.branchPrefix || 'duckling-';
-    document.getElementById('pr-title-prefix').value = settings.prTitlePrefix || '[DUCKLING]';
-    document.getElementById('commit-suffix').value = settings.commitSuffix || ' [quack]';
-    document.getElementById('comment-prefix').value = settings.commentPrefix || 'duckling';
-    document.getElementById('max-retries').value = settings.maxRetries || 3;
-    document.getElementById('skip-username-check').checked = settings.skipUsernameCheck || false;
+    document.getElementById('custom-prompt').value = settings.customPrompt ?? '';
+    document.getElementById('branch-prefix').value = settings.branchPrefix ?? 'duckling-';
+    document.getElementById('pr-title-prefix').value = settings.prTitlePrefix ?? '[DUCKLING]';
+    document.getElementById('commit-suffix').value = settings.commitSuffix ?? ' [quack]';
+    document.getElementById('comment-prefix').value = settings.commentPrefix ?? 'duckling';
+    document.getElementById('max-retries').value = settings.maxRetries ?? 3;
+    document.getElementById('skip-username-check').checked = settings.skipUsernameCheck ?? false;
 
 
     // Show configuration status
