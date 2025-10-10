@@ -302,7 +302,12 @@ export class CoreEngine extends EventEmitter {
             message: `💬 Processing ${result.comments.length} PR review comment(s)...`,
           });
 
-          await this.handleAllPRComments(task.id, concatenatedComments);
+          await this.handleAllPRComments(
+            task.id,
+            concatenatedComments,
+            result.commentIds,
+            task.pr_number
+          );
         }
       } catch (error: any) {
         this.db.addTaskLog({
@@ -589,12 +594,13 @@ export class CoreEngine extends EventEmitter {
     prNumber: number
   ): Promise<{
     comments: string[];
+    commentIds: number[];
     statusUpdate?: 'completed' | 'cancelled';
   }> {
     logger.info(`Collecting PR comments for task: ${taskId} ${prNumber}`);
     const task = this.db.getTask(taskId);
     if (!task || task.status !== 'awaiting-review') {
-      return { comments: [] }; // Task completed or cancelled
+      return { comments: [], commentIds: [] }; // Task completed or cancelled
     }
 
     const githubManager = this.getGitHubManager();
@@ -619,12 +625,77 @@ export class CoreEngine extends EventEmitter {
       }
     }
 
-    // Poll for new comments since last commit
-    const newComments = await githubManager.pollForComments(
-      prNumber,
-      lastCommitTimestamp,
+    // Get all comments with IDs for potential resolution
+    const commentPrefix = this.settings.get('commentPrefix');
+    const skipUsernameCheck = this.settings.get('skipUsernameCheck');
+    const currentUser = await githubManager.getCurrentUser(
       task.repository_path
     );
+
+    const { reviewComments, prComments } =
+      await githubManager.getAllCommentsSeparated(
+        prNumber,
+        task.repository_path
+      );
+
+    // Filter comments that match our criteria
+    const lastCommitDate = lastCommitTimestamp
+      ? new Date(lastCommitTimestamp)
+      : null;
+    const commentIds: number[] = [];
+    const comments: string[] = [];
+
+    // Process review comments
+    for (const comment of reviewComments) {
+      const startsWithPrefix = comment.body?.trim().startsWith(commentPrefix);
+      const commentDate = new Date(comment.created_at || '');
+      const isNewerThanCommit = lastCommitDate
+        ? commentDate > lastCommitDate
+        : true;
+      const isFromCurrentUser = skipUsernameCheck
+        ? true
+        : currentUser && comment.user.login === currentUser;
+
+      if (startsWithPrefix && isNewerThanCommit && isFromCurrentUser) {
+        if (comment.id) {
+          commentIds.push(comment.id);
+        }
+        let commentString = `Review by ${comment.user.login}`;
+        if (comment.state) {
+          commentString += ` (${comment.state})`;
+        }
+        commentString += ':\n';
+        if (comment.path) commentString += `File: ${comment.path}\n`;
+        if (comment.line !== undefined)
+          commentString += `Line: ${comment.line}\n`;
+        if (comment.diff_hunk)
+          commentString += `Context: ${comment.diff_hunk}\n`;
+        if (comment.body && comment.body.trim()) {
+          commentString += `${comment.body}\n`;
+        }
+        comments.push(commentString.trim());
+      }
+    }
+
+    // Process PR comments
+    for (const comment of prComments) {
+      const startsWithPrefix = comment.body?.trim().startsWith(commentPrefix);
+      const commentDate = new Date(comment.created_at || '');
+      const isNewerThanCommit = lastCommitDate
+        ? commentDate > lastCommitDate
+        : true;
+      const isFromCurrentUser = skipUsernameCheck
+        ? true
+        : currentUser && comment.user.login === currentUser;
+
+      if (startsWithPrefix && isNewerThanCommit && isFromCurrentUser) {
+        if (comment.id) {
+          commentIds.push(comment.id);
+        }
+        const commentString = `Comment by ${comment.user.login}:\n${comment.body}\n`;
+        comments.push(commentString.trim());
+      }
+    }
 
     // Check PR status
     const prStatus = await githubManager.getPRStatus(
@@ -639,12 +710,14 @@ export class CoreEngine extends EventEmitter {
       statusUpdate = 'cancelled';
     }
 
-    return { comments: newComments, statusUpdate };
+    return { comments, commentIds, statusUpdate };
   }
 
   private async handleAllPRComments(
     taskId: number,
-    concatenatedComments: string
+    concatenatedComments: string,
+    commentIds: number[],
+    prNumber?: number
   ): Promise<void> {
     logger.info(`Handling concatenated PR comments for task: ${taskId}`);
     const task = this.db.getTask(taskId);
@@ -728,6 +801,23 @@ export class CoreEngine extends EventEmitter {
             level: 'info',
             message: '✅ All PR feedback addressed and changes pushed',
           });
+
+          // Resolve the comments after successfully addressing them
+          if (prNumber && commentIds.length > 0) {
+            this.db.addTaskLog({
+              task_id: taskId,
+              level: 'info',
+              message: `🔄 Resolving ${commentIds.length} review comment(s)...`,
+            });
+
+            const githubManager = this.getGitHubManager();
+            await githubManager.resolveReviewComments(
+              prNumber,
+              commentIds,
+              task.repository_path,
+              taskId
+            );
+          }
 
           // Update status back to awaiting-review
           this.db.updateTask(taskId, {

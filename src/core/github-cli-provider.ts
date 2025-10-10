@@ -350,6 +350,7 @@ export class GitHubCLIProvider {
       // Add the review body comment
       if (review.body && review.body.trim()) {
         reviewComments.push({
+          id: review.id,
           user: { login: review.user.login },
           body: review.body,
           created_at: review.submitted_at,
@@ -371,6 +372,7 @@ export class GitHubCLIProvider {
           const reviewLineComments = JSON.parse(reviewCommentsResult.stdout);
           reviewComments.push(
             ...reviewLineComments.map((comment: any) => ({
+              id: comment.id,
               user: { login: comment.user.login },
               body: comment.body,
               created_at: comment.created_at,
@@ -396,6 +398,7 @@ export class GitHubCLIProvider {
       const prCommentsData = JSON.parse(prCommentsResult.stdout);
       prComments.push(
         ...prCommentsData.map((comment: any) => ({
+          id: comment.id,
           user: { login: comment.user.login },
           body: comment.body,
           created_at: comment.created_at,
@@ -578,6 +581,70 @@ export class GitHubCLIProvider {
     } catch (error) {
       logger.warn(`Failed to get branch diff: ${error}`);
       return '';
+    }
+  }
+
+  async resolveReviewComments(
+    prNumber: number,
+    commentIds: number[],
+    repositoryPath: string,
+    taskId?: number
+  ): Promise<void> {
+    await this.ensureInitialized(repositoryPath);
+
+    if (commentIds.length === 0) {
+      return;
+    }
+
+    const successfulResolves: number[] = [];
+    const failedResolves: number[] = [];
+
+    for (const commentId of commentIds) {
+      try {
+        await withRetry(
+          async () => {
+            const result = await execCommand(
+              'gh',
+              [
+                'api',
+                '-X',
+                'PATCH',
+                `/repos/${this.repoOwner}/${this.repoName}/pulls/comments/${commentId}`,
+                '-f',
+                'subject_type=line',
+              ],
+              { cwd: repositoryPath }
+            );
+
+            if (result.exitCode !== 0) {
+              throw new Error(`GitHub CLI command failed: ${result.stderr}`);
+            }
+
+            successfulResolves.push(commentId);
+          },
+          `Resolve review comment ${commentId}`,
+          2
+        );
+      } catch (error) {
+        logger.warn(`Failed to resolve review comment ${commentId}: ${error}`);
+        failedResolves.push(commentId);
+      }
+    }
+
+    if (taskId && successfulResolves.length > 0) {
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'info',
+        message: `✅ Resolved ${successfulResolves.length} review comment(s)`,
+      });
+    }
+
+    if (taskId && failedResolves.length > 0) {
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'warn',
+        message: `⚠️ Could not resolve ${failedResolves.length} review comment(s) - they may need manual resolution`,
+      });
     }
   }
 

@@ -5,6 +5,7 @@
 import { logger } from './logger';
 
 export interface CommentData {
+  id?: number;
   user: { login: string };
   body: string;
   created_at: string;
