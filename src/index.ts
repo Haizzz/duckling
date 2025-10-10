@@ -14,7 +14,7 @@ export async function startDuckling(port: number = 5050): Promise<void> {
   // Create dependencies
   const db = new DatabaseManager();
   const settings = new SettingsManager(db);
-  const codingManager = new CodingManager(settings);
+  const codingManager = new CodingManager(settings, db);
   const precommitManager = new PrecommitManager(db);
   const openaiManager = new OpenAIManager(db, settings);
   const jiraManager = new JiraManager(settings, db);

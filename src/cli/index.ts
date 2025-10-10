@@ -18,7 +18,7 @@ const program = new Command();
 function createServices() {
   const db = new DatabaseManager();
   const settings = new SettingsManager(db);
-  const codingManager = new CodingManager(settings);
+  const codingManager = new CodingManager(settings, db);
   const precommitManager = new PrecommitManager(db);
   const openaiManager = new OpenAIManager(db, settings);
   const jiraManager = new JiraManager(settings, db);

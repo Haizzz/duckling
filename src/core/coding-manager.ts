@@ -6,6 +6,7 @@ import {
 } from '../utils/exec';
 import { createCodingPrompt } from './prompts';
 import { SettingsManager } from './settings-manager';
+import { DatabaseManager } from './database';
 
 interface CodingContext {
   taskId: number;
@@ -14,9 +15,11 @@ interface CodingContext {
 
 export class CodingManager {
   private settings: SettingsManager;
+  private db: DatabaseManager;
 
-  constructor(settings: SettingsManager) {
+  constructor(settings: SettingsManager, db: DatabaseManager) {
     this.settings = settings;
+    this.db = db;
   }
 
   async generateCode(
@@ -65,6 +68,9 @@ export class CodingManager {
         throw new Error(result.stderr || result.stdout || 'Amp command failed');
       }
 
+      // Extract and log Amp thread URL if present
+      this.extractAndLogThreadUrl(result.stdout, taskId);
+
       return result.stdout;
     } catch (error: any) {
       if (error.code === 'ENOENT') {
@@ -73,6 +79,21 @@ export class CodingManager {
         );
       }
       throw error;
+    }
+  }
+
+  private extractAndLogThreadUrl(output: string, taskId: number): void {
+    // Amp thread URL format: https://ampcode.com/threads/T-{uuid}
+    const threadUrlRegex = /https:\/\/ampcode\.com\/threads\/T-[a-f0-9-]+/i;
+    const match = output.match(threadUrlRegex);
+
+    if (match) {
+      const threadUrl = match[0];
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'info',
+        message: `🔗 Amp Thread: ${threadUrl}`,
+      });
     }
   }
 
