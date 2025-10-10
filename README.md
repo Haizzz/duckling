@@ -134,6 +134,60 @@ graph TD
 | Auto-merge | `false` | Auto-merge approved PRs |
 | Comment prefix | `duckling` | Comments must start with this prefix to be processed |
 
+## 🔔 PR Comments Monitoring
+
+Duckling automatically monitors pull requests for review comments and implements requested changes.
+
+### How It Works
+
+1. **Polling Interval**: Every 60 seconds, Duckling checks tasks in `awaiting-review` status
+2. **Comment Collection**: Fetches three types of comments from GitHub:
+   - **Review body comments**: Top-level comments from PR reviews
+   - **Review line comments**: Code-specific comments attached to reviews
+   - **PR issue comments**: General comments on the PR
+3. **Comment Filtering**: Only processes comments that:
+   - Start with the configured prefix (default: `duckling`)
+   - Were created after the last commit timestamp
+   - Are not from the authenticated user (avoids self-responses)
+4. **Batch Processing**: All new comments are concatenated and addressed together in a single code generation pass
+5. **Automated Workflow**: For each review comment batch:
+   - Switches to task branch
+   - Generates code to address all feedback
+   - Runs precommit checks
+   - Commits with message "Address PR feedback"
+   - Pushes changes back to the PR
+6. **Status Detection**: Automatically detects PR merge or closure and updates task status accordingly
+
+### Comment Format
+
+To trigger Duckling to respond to a comment, start it with the configured prefix:
+
+```
+duckling please fix the formatting in this file
+```
+
+### Configuration
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| Poll Interval | `60s` | How often to check for new comments |
+| Comment Prefix | `duckling` | Required prefix for comments to be processed |
+| Skip Username Check | `false` | Process all comments regardless of author |
+
+### Example Flow
+
+1. Duckling creates PR #123 for a task
+2. Task status changes to `awaiting-review`
+3. Reviewer adds comment: `duckling please add error handling to the login function`
+4. After max 60 seconds, Duckling:
+   - Detects the new comment
+   - Switches to the task branch
+   - Generates code to add error handling
+   - Runs precommit checks
+   - Commits and pushes changes
+5. Task returns to `awaiting-review` status
+6. Cycle repeats until PR is merged or closed
+
 ## 🔧 CLI Reference
 
 ### Core Commands
