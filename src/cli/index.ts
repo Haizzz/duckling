@@ -294,6 +294,40 @@ taskCmd
     }
   });
 
+// Repo shortcut - add a path as repo
+program
+  .command('add-repo <path>')
+  .description('Add a repository path')
+  .action(async (path) => {
+    try {
+      const { validateAndGetRepoInfo } = await import('../utils/git-utils');
+      const services = createServices();
+
+      const repoInfo = await validateAndGetRepoInfo(path);
+      const existing = services.db.getRepository(path);
+
+      if (existing) {
+        console.log(
+          `⚠️  Already registered: ${repoInfo.owner}/${repoInfo.name}`
+        );
+        services.db.close();
+        return;
+      }
+
+      services.db.addRepository({
+        path: path,
+        name: repoInfo.name,
+        owner: repoInfo.owner,
+      });
+
+      console.log(`✅ Added: ${repoInfo.owner}/${repoInfo.name}`);
+      services.db.close();
+    } catch (error: any) {
+      console.error('❌ Failed to add repository:', error.message);
+      process.exit(1);
+    }
+  });
+
 // Status command - show system status
 program
   .command('status')
