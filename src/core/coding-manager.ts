@@ -55,7 +55,6 @@ export class CodingManager {
       const result = await execCommandWithInputStreaming(
         'amp',
         prompt,
-        ['--log-file', '/tmp/amp.log', '--log-level', 'debug'],
         {
           taskId: taskId.toString(),
           cwd: repositoryPath,
@@ -70,6 +69,7 @@ export class CodingManager {
       );
 
       if (result.exitCode !== 0) {
+        console.log(result);
         throw new Error(result.stderr || result.stdout || 'Amp command failed');
       }
 
