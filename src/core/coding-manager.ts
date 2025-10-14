@@ -1,7 +1,7 @@
 import { withRetry } from '../utils/retry';
 import { CodingTool } from '../types';
+import { exec } from 'child_process';
 import {
-  execCommand,
   execCommandStreaming,
   execCommandWithInputStreaming,
 } from '../utils/exec';
@@ -53,8 +53,17 @@ export class CodingManager {
     const { taskId, repositoryPath } = context;
 
     try {
-      console.log(process.env);
-      execCommand('amp', ['--version'], { env: { ...process.env } });
+      exec(
+        'amp --version',
+        { env: { ...process.env } },
+        (error, stdout, stderr) => {
+          if (error) {
+            console.error(error);
+          }
+          console.log(stdout);
+          console.error(stderr);
+        }
+      );
       const result = await execCommandWithInputStreaming('amp', prompt, [], {
         taskId: taskId.toString(),
         cwd: repositoryPath,
