@@ -58,6 +58,7 @@ export class CodingManager {
         timeout: 30 * 60 * 1000, // 30 minutes timeout
         env: {
           ...process.env,
+          ...(process.env.AMP_API_KEY && { AMP_API_KEY: process.env.AMP_API_KEY }),
         },
       });
 
