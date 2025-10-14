@@ -80,6 +80,7 @@ duckling task cancel <taskId>
 
 ### Optional Settings
 - **OpenAI API Key**: For OpenAI coding assistance and commit message generation
+- **Jira API Key**: For Jira integration (can be set via `JIRA_API_KEY` environment variable)
 - Branch prefix (default: `duckling-`)
 - PR title prefix (default: `[DUCKLING]`)
 - Commit suffix (default: ` [quack]`)
@@ -87,6 +88,9 @@ duckling task cancel <taskId>
 - Maximum retries (default: 3)
 - Auto-merge (default: false)
 - Poll interval for PR comments (default: 30 seconds)
+
+### Environment Variables
+- **JIRA_API_KEY**: Jira API token loaded on startup if not already configured in database
 
 ## Processing Architecture
 
