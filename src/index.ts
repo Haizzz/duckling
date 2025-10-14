@@ -14,6 +14,13 @@ export async function startDuckling(port: number = 5050): Promise<void> {
   // Create dependencies
   const db = new DatabaseManager();
   const settings = new SettingsManager(db);
+
+  // Initialize Jira API key from environment variable if available
+  if (process.env.JIRA_API_KEY && !settings.get('jiraApiKey')) {
+    settings.set('jiraApiKey', process.env.JIRA_API_KEY);
+    console.log('🔑 Jira API Key: Loaded from environment variable');
+  }
+
   const codingManager = new CodingManager(settings);
   const precommitManager = new PrecommitManager(db);
   const openaiManager = new OpenAIManager(db, settings);

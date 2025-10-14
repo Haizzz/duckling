@@ -18,6 +18,12 @@ const program = new Command();
 function createServices() {
   const db = new DatabaseManager();
   const settings = new SettingsManager(db);
+
+  // Initialize Jira API key from environment variable if available
+  if (process.env.JIRA_API_KEY && !settings.get('jiraApiKey')) {
+    settings.set('jiraApiKey', process.env.JIRA_API_KEY);
+  }
+
   const codingManager = new CodingManager(settings);
   const precommitManager = new PrecommitManager(db);
   const openaiManager = new OpenAIManager(db, settings);

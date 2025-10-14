@@ -134,6 +134,20 @@ graph TD
 | Auto-merge | `false` | Auto-merge approved PRs |
 | Comment prefix | `duckling` | Comments must start with this prefix to be processed |
 
+### Environment Variables
+
+Duckling can read configuration from environment variables on startup:
+
+| Variable | Description |
+|----------|-------------|
+| `JIRA_API_KEY` | Jira API token for integration (only set if not already configured) |
+
+Example:
+```bash
+export JIRA_API_KEY="your-jira-api-token"
+duckling start
+```
+
 ## 🔔 PR Comments Monitoring
 
 Duckling automatically monitors pull requests for review comments and implements requested changes.
