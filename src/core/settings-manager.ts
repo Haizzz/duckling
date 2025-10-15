@@ -24,7 +24,7 @@ export class SettingsManager {
   private static readonly DEFAULTS: SettingsDefaults = {
     defaultCodingTool: 'amp',
     branchPrefix: 'duckling-',
-    prTitlePrefix: '[DUCKLING]',
+    prTitlePrefix: '',
     commitSuffix: ' [quack]',
     commentPrefix: 'duckling',
     maxRetries: 3,
