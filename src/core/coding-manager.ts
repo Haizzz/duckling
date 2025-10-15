@@ -52,14 +52,18 @@ export class CodingManager {
     const { taskId, repositoryPath } = context;
 
     try {
+      const ampApiKey = this.settings.get('ampApiKey');
+      const env: NodeJS.ProcessEnv = { ...process.env };
+
+      if (ampApiKey) {
+        env.AMP_API_KEY = ampApiKey;
+      }
+
       const result = await execCommandWithInputStreaming('amp', prompt, [], {
         taskId: taskId.toString(),
         cwd: repositoryPath,
         timeout: 30 * 60 * 1000, // 30 minutes timeout
-        env: {
-          ...process.env,
-          ...(process.env.AMP_API_KEY && { AMP_API_KEY: process.env.AMP_API_KEY }),
-        },
+        env,
       });
 
       if (result.exitCode !== 0) {

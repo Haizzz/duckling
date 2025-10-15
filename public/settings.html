@@ -122,8 +122,10 @@
             <div>
               <h3 class="text-sm font-medium text-gray-900 mb-3">Amp</h3>
               <div>
-                <p class="text-xs text-gray-500 mt-1">Assumes Amp is already authenticated via CLI. Use <code>amp
-                    login</code> to authenticate.</p>
+                <label for="amp-api-key" class="block text-sm font-medium text-gray-700">API Key</label>
+                <input type="password" id="amp-api-key" name="ampApiKey"
+                  class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-gray-400 focus:border-gray-400">
+                <p class="text-xs text-gray-500 mt-1"><strong>Optional:</strong> Amp API key. Leave empty if Amp is already authenticated via CLI (<code>amp login</code>).</p>
               </div>
             </div>
             <div>

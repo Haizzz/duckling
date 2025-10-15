@@ -72,6 +72,7 @@ class Settings {
 
     // Coding tools
     document.getElementById('default-coding-tool').value = settings.defaultCodingTool || 'amp';
+    this.setSecureField('amp-api-key', settings.ampApiKey);
     this.setSecureField('openai-api-key', settings.openaiApiKey);
 
     // Integration settings

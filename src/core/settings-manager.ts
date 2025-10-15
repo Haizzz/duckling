@@ -10,6 +10,7 @@ interface SettingsDefaults {
   commentPrefix: string;
   maxRetries: number;
   openaiApiKey: string;
+  ampApiKey: string;
   jiraApiKey: string;
   jiraEmail: string;
   jiraJqlQuery: string;
@@ -28,6 +29,7 @@ export class SettingsManager {
     commentPrefix: 'duckling',
     maxRetries: 3,
     openaiApiKey: '',
+    ampApiKey: '',
     jiraApiKey: '',
     jiraEmail: '',
     jiraJqlQuery: '',

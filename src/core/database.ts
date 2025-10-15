@@ -110,6 +110,7 @@ export class DatabaseManager {
       { key: 'commitSuffix', value: DEFAULT_SETTINGS.commitSuffix },
       { key: 'maxRetries', value: DEFAULT_SETTINGS.maxRetries.toString() },
       { key: 'customPrompt', value: DEFAULT_SETTINGS.customPrompt },
+      { key: 'ampApiKey', value: '' },
     ];
 
     const insertSetting = this.db.prepare(`
