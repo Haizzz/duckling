@@ -326,6 +326,83 @@ program
     }
   });
 
+// Settings hook command group
+const settingsHookCmd = program
+  .command('settings-hook')
+  .description('Manage settings hooks');
+
+// Set a settings hook
+settingsHookCmd
+  .command('set <settingName> <command>')
+  .description(
+    'Set a hook command for a setting. Command will run with setting value appended.'
+  )
+  .action(async (settingName, command) => {
+    try {
+      const services = createServices();
+      services.db.setSettingsHook(settingName, command);
+      console.log(`✅ Set hook for ${settingName}`);
+      console.log(`   Command: ${command} <value>`);
+      services.db.close();
+    } catch (error: any) {
+      console.error('❌ Failed to set hook:', error.message);
+      process.exit(1);
+    }
+  });
+
+// List all settings hooks
+settingsHookCmd
+  .command('list')
+  .description('List all settings hooks')
+  .action(async () => {
+    try {
+      const services = createServices();
+      const hooks = services.db.getAllSettingsHooks();
+
+      if (hooks.length === 0) {
+        console.log('📭 No settings hooks configured');
+        services.db.close();
+        return;
+      }
+
+      console.log(`🔗 Settings Hooks:\n`);
+      hooks.forEach((hook) => {
+        console.log(`Setting: ${hook.setting_name}`);
+        console.log(`  Command: ${hook.command} <value>`);
+        console.log('');
+      });
+
+      services.db.close();
+    } catch (error: any) {
+      console.error('❌ Failed to list hooks:', error.message);
+      process.exit(1);
+    }
+  });
+
+// Delete a settings hook
+settingsHookCmd
+  .command('delete <settingName>')
+  .description('Delete a settings hook')
+  .action(async (settingName) => {
+    try {
+      const services = createServices();
+      const hook = services.db.getSettingsHook(settingName);
+
+      if (!hook) {
+        console.log(`❌ No hook found for: ${settingName}`);
+        services.db.close();
+        return;
+      }
+
+      services.db.deleteSettingsHook(settingName);
+      console.log(`✅ Deleted hook for: ${settingName}`);
+      services.db.close();
+    } catch (error: any) {
+      console.error('❌ Failed to delete hook:', error.message);
+      process.exit(1);
+    }
+  });
+
 // Status command - show system status
 program
   .command('status')

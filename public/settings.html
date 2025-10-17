@@ -290,6 +290,30 @@
           </div>
         </div>
 
+        <!-- Settings Hooks -->
+        <div class="bg-white shadow rounded-lg">
+          <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-lg font-medium text-gray-900">Settings Hooks</h2>
+            <p class="text-sm text-gray-500 mt-1">Commands that run when settings are updated (CLI only)</p>
+          </div>
+          <div class="px-6 py-4 space-y-4">
+            <div class="p-4 bg-blue-50 border border-blue-200 rounded-md">
+              <p class="text-sm text-blue-800">
+                Settings hooks allow you to run custom commands when specific settings are updated. 
+                Configure hooks using the CLI: <code class="bg-blue-100 px-1 py-0.5 rounded">duckling settings-hook set SETTING_NAME "command"</code>
+              </p>
+            </div>
+
+            <div id="settings-hooks-list" class="space-y-2">
+              <!-- Settings hooks will be rendered here -->
+            </div>
+
+            <div id="no-hooks-message" class="text-sm text-gray-500 italic">
+              No hooks configured. Use the CLI to add hooks.
+            </div>
+          </div>
+        </div>
+
         <!-- Save Button -->
         <div class="flex justify-end">
           <button type="submit"
