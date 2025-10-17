@@ -94,11 +94,14 @@ settingsCmd
     try {
       const services = createServices();
       const checks = services.db.getAllPrecommitChecks();
-      const nextOrder = checks.length > 0 ? Math.max(...checks.map(c => c.order_index)) + 1 : 0;
+      const nextOrder =
+        checks.length > 0
+          ? Math.max(...checks.map((c) => c.order_index)) + 1
+          : 0;
       services.db.addPrecommitCheck({
         name: command,
         command,
-        order_index: nextOrder
+        order_index: nextOrder,
       });
       console.log(`✅ Added precommit check: ${command}`);
       services.db.close();
