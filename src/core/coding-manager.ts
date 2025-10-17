@@ -138,14 +138,19 @@ export class CodingManager {
     const { taskId, repositoryPath } = context;
 
     try {
-      const result = await execCommandWithInputStreaming('claude', prompt, [], {
-        taskId: taskId.toString(),
-        cwd: repositoryPath,
-        timeout: 30 * 60 * 1000, // 30 minutes timeout
-        env: {
-          ...process.env,
-        },
-      });
+      const result = await execCommandWithInputStreaming(
+        'claude',
+        prompt,
+        ['--print'],
+        {
+          taskId: taskId.toString(),
+          cwd: repositoryPath,
+          timeout: 30 * 60 * 1000, // 30 minutes timeout
+          env: {
+            ...process.env,
+          },
+        }
+      );
 
       if (result.exitCode !== 0) {
         throw new Error(
