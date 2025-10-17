@@ -67,9 +67,12 @@ program
     }
   });
 
-// Config command - set a config value
-program
-  .command('settings <key> <value>')
+// Settings command group
+const settingsCmd = program.command('settings').description('Manage settings');
+
+// Set a config value
+settingsCmd
+  .command('set <key> <value>')
   .description('Set a settings value')
   .action(async (key, value) => {
     try {
@@ -79,6 +82,28 @@ program
       services.db.close();
     } catch (error: any) {
       console.error('❌ Failed to set settings:', error.message);
+      process.exit(1);
+    }
+  });
+
+// Add precommit check
+settingsCmd
+  .command('precommit <command>')
+  .description('Add a precommit check')
+  .action(async (command) => {
+    try {
+      const services = createServices();
+      const checks = services.db.getAllPrecommitChecks();
+      const nextOrder = checks.length > 0 ? Math.max(...checks.map(c => c.order_index)) + 1 : 0;
+      services.db.addPrecommitCheck({
+        name: command,
+        command,
+        order_index: nextOrder
+      });
+      console.log(`✅ Added precommit check: ${command}`);
+      services.db.close();
+    } catch (error: any) {
+      console.error('❌ Failed to add precommit check:', error.message);
       process.exit(1);
     }
   });
