@@ -69,8 +69,8 @@ program
 
 // Config command - set a config value
 program
-  .command('config <key> <value>')
-  .description('Set a configuration value')
+  .command('settings <key> <value>')
+  .description('Set a settings value')
   .action(async (key, value) => {
     try {
       const services = createServices();
@@ -78,7 +78,7 @@ program
       console.log(`✅ Set ${key} = ${value}`);
       services.db.close();
     } catch (error: any) {
-      console.error('❌ Failed to set config:', error.message);
+      console.error('❌ Failed to set settings:', error.message);
       process.exit(1);
     }
   });
