@@ -398,6 +398,23 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
     }
   });
 
+  // Settings hooks endpoints
+  router.get('/settings/hooks', async (req: Request, res: Response) => {
+    try {
+      const hooks = db.getAllSettingsHooks();
+      const response: ApiResponse = {
+        success: true,
+        data: hooks,
+      };
+      res.json(response);
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  });
+
   // Precommit checks endpoints
   router.get('/precommit-checks', async (req: Request, res: Response) => {
     try {

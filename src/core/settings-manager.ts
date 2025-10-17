@@ -1,6 +1,7 @@
 import { CodingTool } from '../types';
 import { DatabaseManager } from './database';
 import { DEFAULT_CODING_PROMPT } from './prompts';
+import { execShellCommand } from '../utils/exec';
 
 interface SettingsDefaults {
   defaultCodingTool: CodingTool;
@@ -62,6 +63,22 @@ export class SettingsManager {
     value: SettingsDefaults[K]
   ): void {
     this.db.setSetting(key, String(value));
+    this.executeHook(key, String(value));
+  }
+
+  private async executeHook(settingName: string, value: string): Promise<void> {
+    const hook = this.db.getSettingsHook(settingName);
+    if (hook) {
+      try {
+        const command = `${hook.command} "${value}"`;
+        await execShellCommand(command);
+      } catch (error: any) {
+        console.error(
+          `Failed to execute hook for ${settingName}:`,
+          error.message
+        );
+      }
+    }
   }
 
   getAll(): SettingsDefaults {

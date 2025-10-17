@@ -90,6 +90,16 @@ export class DatabaseManager {
       )
     `);
 
+    // Settings hooks table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS settings_hooks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        setting_name TEXT NOT NULL,
+        command TEXT NOT NULL,
+        UNIQUE(setting_name)
+      )
+    `);
+
     // Create indexes
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
@@ -354,6 +364,42 @@ export class DatabaseManager {
   deleteRepository(id: number): void {
     const stmt = this.db.prepare('DELETE FROM repositories WHERE id = ?');
     stmt.run(id);
+  }
+
+  // Settings hooks operations
+  setSettingsHook(settingName: string, command: string): void {
+    const stmt = this.db.prepare(`
+      INSERT OR REPLACE INTO settings_hooks (setting_name, command)
+      VALUES (?, ?)
+    `);
+    stmt.run(settingName, command);
+  }
+
+  getSettingsHook(
+    settingName: string
+  ): { id: number; setting_name: string; command: string } | null {
+    const stmt = this.db.prepare(
+      'SELECT * FROM settings_hooks WHERE setting_name = ?'
+    );
+    return stmt.get(settingName) as any;
+  }
+
+  getAllSettingsHooks(): Array<{
+    id: number;
+    setting_name: string;
+    command: string;
+  }> {
+    const stmt = this.db.prepare(
+      'SELECT * FROM settings_hooks ORDER BY setting_name ASC'
+    );
+    return stmt.all() as any[];
+  }
+
+  deleteSettingsHook(settingName: string): void {
+    const stmt = this.db.prepare(
+      'DELETE FROM settings_hooks WHERE setting_name = ?'
+    );
+    stmt.run(settingName);
   }
 
   private runMigrations(): void {

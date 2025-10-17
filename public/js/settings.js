@@ -98,6 +98,9 @@ class Settings {
 
     // Load precommit checks
     this.loadPrecommitChecks();
+    
+    // Load settings hooks
+    this.loadSettingsHooks();
 
     // The Jira repository dropdown will be updated when repositories are loaded
     // in the sequential loading process
@@ -251,6 +254,47 @@ class Settings {
             <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
           </svg>
         </button>
+      </div>
+    `).join('');
+  }
+
+  async loadSettingsHooks() {
+    try {
+      const response = await fetch('/api/settings/hooks');
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        this.settingsHooks = result.data || [];
+        this.renderSettingsHooks();
+      }
+    } catch (error) {
+      console.error('Failed to load settings hooks:', error);
+    }
+  }
+
+  renderSettingsHooks() {
+    const container = document.getElementById('settings-hooks-list');
+    const noHooksMessage = document.getElementById('no-hooks-message');
+
+    if (this.settingsHooks.length === 0) {
+      container.innerHTML = '';
+      noHooksMessage.classList.remove('hidden');
+      return;
+    }
+
+    noHooksMessage.classList.add('hidden');
+    container.innerHTML = this.settingsHooks.map(hook => `
+      <div class="p-3 bg-gray-50 rounded-md border border-gray-200">
+        <div class="flex items-start justify-between">
+          <div class="flex-1">
+            <div class="text-sm font-medium text-gray-900 mb-1">
+              ${this.escapeHtml(hook.setting_name)}
+            </div>
+            <code class="text-xs font-mono text-gray-700 bg-gray-100 px-2 py-1 rounded">
+              ${this.escapeHtml(hook.command)} &lt;value&gt;
+            </code>
+          </div>
+        </div>
       </div>
     `).join('');
   }
