@@ -25,9 +25,18 @@ class Dashboard {
   bindEvents() {
     // Task input submission
     const submitBtn = document.getElementById('submit-task');
+    const taskInput = document.getElementById('task-input');
 
     submitBtn.addEventListener('click', () => {
       this.createTask();
+    });
+
+    // Keyboard shortcut: Command+Enter or Control+Enter to submit
+    taskInput.addEventListener('keydown', (event) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+        event.preventDefault();
+        this.createTask();
+      }
     });
 
     // Load more button
