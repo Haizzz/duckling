@@ -94,6 +94,14 @@ settingsCmd
     try {
       const services = createServices();
       const checks = services.db.getAllPrecommitChecks();
+
+      // Check if command already exists
+      if (checks.some((c) => c.command === command)) {
+        console.log(`⚠️  Precommit check already exists: ${command}`);
+        services.db.close();
+        return;
+      }
+
       const nextOrder =
         checks.length > 0
           ? Math.max(...checks.map((c) => c.order_index)) + 1
