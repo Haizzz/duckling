@@ -29,7 +29,10 @@ class TaskDetail {
     // Close dropdown when clicking outside
     document.addEventListener('click', (event) => {
       const target = event.target;
-      if (!target.closest('#task-actions-menu') && !target.closest('#task-actions-dropdown')) {
+      if (
+        !target.closest('#task-actions-menu') &&
+        !target.closest('#task-actions-dropdown')
+      ) {
         this.hideTaskDropdown();
       }
     });
@@ -72,9 +75,18 @@ class TaskDetail {
     const statusBadge = Utils.getStatusBadge(task);
     const stageBadge = Utils.getStageBadge(task.current_stage);
 
-    const summary = task.summary || task.description.substring(0, 80) + (task.description.length > 80 ? '...' : '');
-    const canCancel = task.status !== 'completed' && task.status !== 'cancelled' && task.status !== 'failed';
-    const canComplete = task.status !== 'completed' && task.status !== 'cancelled' && task.status !== 'failed';
+    const summary =
+      task.summary ||
+      task.description.substring(0, 80) +
+        (task.description.length > 80 ? '...' : '');
+    const canCancel =
+      task.status !== 'completed' &&
+      task.status !== 'cancelled' &&
+      task.status !== 'failed';
+    const canComplete =
+      task.status !== 'completed' &&
+      task.status !== 'cancelled' &&
+      task.status !== 'failed';
     const canRetry = task.status === 'failed' || task.status === 'cancelled';
 
     // Update page title with task summary
@@ -98,7 +110,9 @@ class TaskDetail {
               ${statusBadge}
             </div>
           </div>
-          ${(canCancel || canComplete || canRetry) ? `
+          ${
+            canCancel || canComplete || canRetry
+              ? `
             <div class="relative inline-block text-left">
               <button 
                 onclick="TaskDetailInstance.toggleTaskDropdown()"
@@ -115,7 +129,9 @@ class TaskDetail {
                 class="hidden absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-md shadow-lg z-10"
               >
                 <div class="py-1">
-                  ${canRetry ? `
+                  ${
+                    canRetry
+                      ? `
                     <button 
                       onclick="TaskDetailInstance.retryTask()"
                       class="block w-full text-left px-4 py-2 text-sm text-blue-700 hover:bg-blue-50 hover:text-blue-800"
@@ -125,8 +141,12 @@ class TaskDetail {
                       </svg>
                       Retry Task
                     </button>
-                  ` : ''}
-                  ${canComplete ? `
+                  `
+                      : ''
+                  }
+                  ${
+                    canComplete
+                      ? `
                     <button 
                       onclick="TaskDetailInstance.completeTask()"
                       class="block w-full text-left px-4 py-2 text-sm text-green-700 hover:bg-green-50 hover:text-green-800"
@@ -136,8 +156,12 @@ class TaskDetail {
                       </svg>
                       Mark as Complete
                     </button>
-                  ` : ''}
-                  ${canCancel ? `
+                  `
+                      : ''
+                  }
+                  ${
+                    canCancel
+                      ? `
                     <button 
                       onclick="TaskDetailInstance.cancelTask()"
                       class="block w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50 hover:text-red-800"
@@ -147,11 +171,15 @@ class TaskDetail {
                       </svg>
                       Cancel Task
                     </button>
-                  ` : ''}
+                  `
+                      : ''
+                  }
                 </div>
               </div>
             </div>
-          ` : ''}
+          `
+              : ''
+          }
         </div>
 
         <!-- Task Details -->
@@ -173,30 +201,46 @@ class TaskDetail {
                 <span class="font-mono text-sm">${task.id}</span>
               </div>
               ${this.getRepositoryInfo(task)}
-              ${task.coding_tool ? `
+              ${
+                task.coding_tool
+                  ? `
                 <div class="flex justify-between">
                   <span class="text-gray-600">Coding Tool:</span>
                   <span class="capitalize">${task.coding_tool}</span>
                 </div>
-              ` : ''}
-              ${task.current_stage ? `
+              `
+                  : ''
+              }
+              ${
+                task.current_stage
+                  ? `
                 <div class="flex justify-between">
                   <span class="text-gray-600">Stage:</span>
                   <span>${Utils.getStageBadge(task.current_stage)}</span>
                 </div>
-              ` : ''}
-              ${task.branch_name ? `
+              `
+                  : ''
+              }
+              ${
+                task.branch_name
+                  ? `
                 <div class="flex justify-between">
                   <span class="text-gray-600">Branch:</span>
                   <span>${this.getBranchLink(task.branch_name, task.repository_path)}</span>
                 </div>
-              ` : ''}
-              ${task.pr_url ? `
+              `
+                  : ''
+              }
+              ${
+                task.pr_url
+                  ? `
                 <div class="flex justify-between">
                   <span class="text-gray-600">Pull Request:</span>
                   <a href="${task.pr_url}" target="_blank" class="text-blue-600 hover:text-blue-800 underline">#${task.pr_number}</a>
                 </div>
-              ` : ''}
+              `
+                  : ''
+              }
               <div class="flex justify-between">
                 <span class="text-gray-600">Created:</span>
                 <span>${createdDate}</span>
@@ -205,12 +249,16 @@ class TaskDetail {
                 <span class="text-gray-600">Updated:</span>
                 <span>${updatedDate}</span>
               </div>
-              ${task.completed_at ? `
+              ${
+                task.completed_at
+                  ? `
                 <div class="flex justify-between">
                   <span class="text-gray-600">Completed:</span>
                   <span>${Utils.formatLocalDateTime(task.completed_at)}</span>
                 </div>
-              ` : ''}
+              `
+                  : ''
+              }
               <div class="flex justify-between pt-2 border-t border-gray-100">
                 <span class="text-gray-500 text-sm" id="last-updated">Real-time updates active</span>
                 <span class="text-gray-500 text-sm">🔄</span>
@@ -251,9 +299,10 @@ class TaskDetail {
   async loadTaskLogs(incremental = false) {
     try {
       // For incremental loading, only fetch logs after the last loaded ID
-      const url = incremental && this.lastLogId > 0
-        ? `/api/tasks/${this.taskId}/logs?after=${this.lastLogId}`
-        : `/api/tasks/${this.taskId}/logs`;
+      const url =
+        incremental && this.lastLogId > 0
+          ? `/api/tasks/${this.taskId}/logs?after=${this.lastLogId}`
+          : `/api/tasks/${this.taskId}/logs`;
 
       const response = await fetch(url);
       const result = await response.json();
@@ -270,7 +319,7 @@ class TaskDetail {
 
         // Update last log ID
         if (result.data.length > 0) {
-          this.lastLogId = Math.max(...result.data.map(log => log.id));
+          this.lastLogId = Math.max(...result.data.map((log) => log.id));
         }
       } else {
         throw new Error(result.error || 'Failed to load logs');
@@ -300,13 +349,17 @@ class TaskDetail {
       return;
     }
 
-    const logsHTML = logs.map(log => `
+    const logsHTML = logs
+      .map(
+        (log) => `
       <div class="flex items-start space-x-2 mb-2 text-sm font-mono">
         <span class="text-gray-400">${new Date(log.timestamp).toLocaleTimeString()}</span>
         <span class="text-${this.getLogColor(log.level)}-400 font-medium">[${log.level.toUpperCase()}]</span>
         <span class="text-gray-300 flex-1 whitespace-pre-wrap">${this.escapeHtml(log.message)}</span>
       </div>
-    `).join('');
+    `
+      )
+      .join('');
 
     container.innerHTML = logsHTML;
     this.setupScrollListener(container);
@@ -321,21 +374,25 @@ class TaskDetail {
     this.logs = [...this.logs, ...newLogs.reverse()];
 
     // Only append new logs instead of re-rendering everything
-    const newLogsHTML = newLogs.map(log => `
+    const newLogsHTML = newLogs
+      .map(
+        (log) => `
       <div class="flex items-start space-x-2 mb-2 text-sm font-mono">
         <span class="text-gray-400">${new Date(log.timestamp).toLocaleTimeString()}</span>
         <span class="text-${this.getLogColor(log.level)}-400 font-medium">[${log.level.toUpperCase()}]</span>
         <span class="text-gray-300 flex-1 whitespace-pre-wrap">${this.escapeHtml(log.message)}</span>
       </div>
-    `).join('');
+    `
+      )
+      .join('');
 
     container.insertAdjacentHTML('beforeend', newLogsHTML);
-    
+
     // Ensure scroll listener is set up (in case container was recreated)
     if (!container._scrollListener) {
       this.setupScrollListener(container);
     }
-    
+
     this.scrollToBottom(container);
   }
 
@@ -347,8 +404,10 @@ class TaskDetail {
 
     // Add scroll listener to detect user scrolling
     container._scrollListener = () => {
-      const isAtBottom = container.scrollTop >= container.scrollHeight - container.clientHeight - 10;
-      
+      const isAtBottom =
+        container.scrollTop >=
+        container.scrollHeight - container.clientHeight - 10;
+
       if (!isAtBottom && this.shouldAutoScroll) {
         // User scrolled up, disable auto-scroll
         this.shouldAutoScroll = false;
@@ -394,12 +453,16 @@ class TaskDetail {
       const taskUpdate = event.detail;
       console.log('Task detail received SSE update:', taskUpdate);
 
-      if (taskUpdate.taskId == this.taskId) { // Note: == for type coercion
+      if (taskUpdate.taskId == this.taskId) {
+        // Note: == for type coercion
         console.log('Update is for current task, processing...');
 
         // Use the full task data from metadata if available, otherwise fall back to current task
         if (taskUpdate.metadata && taskUpdate.metadata.task) {
-          console.log('Using full task data from metadata:', taskUpdate.metadata.task);
+          console.log(
+            'Using full task data from metadata:',
+            taskUpdate.metadata.task
+          );
           this.currentTask = taskUpdate.metadata.task;
           this.renderTaskDetail(taskUpdate.metadata.task);
 
@@ -417,7 +480,9 @@ class TaskDetail {
           this.stopLogRefresh();
         }
       } else {
-        console.log(`Update is for different task (${taskUpdate.taskId} vs ${this.taskId}), ignoring`);
+        console.log(
+          `Update is for different task (${taskUpdate.taskId} vs ${this.taskId}), ignoring`
+        );
       }
     };
 
@@ -428,37 +493,44 @@ class TaskDetail {
   stopEventStream() {
     // Remove the event listener
     if (this.taskUpdateHandler) {
-      window.removeEventListener('duckling-task-update', this.taskUpdateHandler);
+      window.removeEventListener(
+        'duckling-task-update',
+        this.taskUpdateHandler
+      );
       this.taskUpdateHandler = null;
     }
   }
 
   getLogColor(level) {
     switch (level) {
-      case 'error': return 'red';
-      case 'warn': return 'yellow';
-      case 'debug': return 'gray';
-      default: return 'blue';
+      case 'error':
+        return 'red';
+      case 'warn':
+        return 'yellow';
+      case 'debug':
+        return 'gray';
+      default:
+        return 'blue';
     }
   }
 
   async cancelTask() {
     await Utils.cancelTask(this.taskId, {
-      hideDropdown: () => this.hideTaskDropdown()
+      hideDropdown: () => this.hideTaskDropdown(),
     });
   }
 
   async completeTask() {
     await Utils.completeTask(this.taskId, {
-      hideDropdown: () => this.hideTaskDropdown()
+      hideDropdown: () => this.hideTaskDropdown(),
     });
   }
 
   async retryTask() {
     const success = await Utils.retryTask(this.taskId, {
-      hideDropdown: () => this.hideTaskDropdown()
+      hideDropdown: () => this.hideTaskDropdown(),
     });
-    
+
     // Re-start log refresh since the task is now active again
     if (success) {
       this.startLogRefresh();
@@ -467,7 +539,7 @@ class TaskDetail {
 
   toggleTaskDropdown() {
     const dropdown = document.getElementById('task-actions-dropdown');
-    
+
     if (dropdown) {
       dropdown.classList.toggle('hidden');
     }
@@ -479,8 +551,6 @@ class TaskDetail {
       dropdown.classList.add('hidden');
     }
   }
-
-
 
   showError(message) {
     const container = document.getElementById('task-detail-container');
@@ -517,7 +587,9 @@ class TaskDetail {
   }
 
   getBranchLink(branchName, repositoryPath) {
-    const repository = this.repositories.find(repo => repo.path === repositoryPath);
+    const repository = this.repositories.find(
+      (repo) => repo.path === repositoryPath
+    );
     if (repository && repository.owner && repository.name) {
       const githubUrl = `https://github.com/${repository.owner}/${repository.name}/tree/${branchName}`;
       return `<a href="${githubUrl}" target="_blank" class="text-blue-600 hover:text-blue-800 underline font-mono text-sm break-all">${this.escapeHtml(branchName)}</a>`;
@@ -544,10 +616,12 @@ class TaskDetail {
   getRepositoryInfo(task) {
     if (!task.repository_path) return '';
 
-    const repository = this.repositories.find(repo => repo.path === task.repository_path);
-    const repositoryDisplay = repository ?
-      `<span class="break-all">${repository.name}</span> <span class="text-gray-500 break-all">(${repository.owner})</span>` :
-      `<span class="font-mono text-sm break-all">${this.escapeHtml(task.repository_path)}</span>`;
+    const repository = this.repositories.find(
+      (repo) => repo.path === task.repository_path
+    );
+    const repositoryDisplay = repository
+      ? `<span class="break-all">${repository.name}</span> <span class="text-gray-500 break-all">(${repository.owner})</span>`
+      : `<span class="font-mono text-sm break-all">${this.escapeHtml(task.repository_path)}</span>`;
 
     return `
       <div class="flex justify-between">

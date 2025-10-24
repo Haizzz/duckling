@@ -11,9 +11,9 @@ window.API = {
         const response = await fetch(url, {
           headers: {
             'Content-Type': 'application/json',
-            ...options.headers
+            ...options.headers,
           },
-          ...options
+          ...options,
         });
 
         if (!response.ok) {
@@ -29,12 +29,15 @@ window.API = {
         return data.data;
       } catch (error) {
         if (attempt === maxRetries) {
-          console.error(`API request failed after ${maxRetries} attempts:`, error);
+          console.error(
+            `API request failed after ${maxRetries} attempts:`,
+            error
+          );
           throw error;
         }
 
         // Wait before retry (exponential backoff)
-        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
       }
     }
   },
@@ -52,26 +55,26 @@ window.API = {
   async createTask(taskData) {
     return this.request('/tasks', {
       method: 'POST',
-      body: JSON.stringify(taskData)
+      body: JSON.stringify(taskData),
     });
   },
 
   async updateTask(id, updates) {
     return this.request(`/tasks/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(updates)
+      body: JSON.stringify(updates),
     });
   },
 
   async cancelTask(id) {
     return this.request(`/tasks/${id}`, {
-      method: 'DELETE'
+      method: 'DELETE',
     });
   },
 
   async retryTask(id) {
     return this.request(`/tasks/${id}/retry`, {
-      method: 'POST'
+      method: 'POST',
     });
   },
 
@@ -88,7 +91,7 @@ window.API = {
   async updateSettings(settings) {
     return this.request('/settings', {
       method: 'PUT',
-      body: JSON.stringify(settings)
+      body: JSON.stringify(settings),
     });
   },
 
@@ -96,6 +99,4 @@ window.API = {
   async getHealth() {
     return this.request('/health');
   },
-
-
 };
