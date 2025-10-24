@@ -460,10 +460,6 @@ class Dashboard {
 
 
 
-  getStageBadge(stage) {
-    return Utils.getStageBadge(stage);
-  }
-
   updateLoadMoreButton() {
     const container = document.getElementById('load-more-container');
     const loadMoreBtn = document.getElementById('load-more-btn');

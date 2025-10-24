@@ -70,7 +70,7 @@ class TaskDetail {
     const updatedDate = Utils.formatLocalDateTime(task.updated_at);
 
     const statusBadge = Utils.getStatusBadge(task);
-    const stageBadge = this.getStageBadge(task.current_stage);
+    const stageBadge = Utils.getStageBadge(task.current_stage);
 
     const summary = task.summary || task.description.substring(0, 80) + (task.description.length > 80 ? '...' : '');
     const canCancel = task.status !== 'completed' && task.status !== 'cancelled' && task.status !== 'failed';
@@ -182,7 +182,7 @@ class TaskDetail {
               ${task.current_stage ? `
                 <div class="flex justify-between">
                   <span class="text-gray-600">Stage:</span>
-                  <span>${this.getStageBadge(task.current_stage)}</span>
+                  <span>${Utils.getStageBadge(task.current_stage)}</span>
                 </div>
               ` : ''}
               ${task.branch_name ? `
@@ -481,10 +481,6 @@ class TaskDetail {
   }
 
 
-
-  getStageBadge(stage) {
-    return Utils.getStageBadge(stage);
-  }
 
   showError(message) {
     const container = document.getElementById('task-detail-container');

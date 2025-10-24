@@ -1,20 +1,5 @@
 // Utility functions
 window.Utils = {
-  // Format status for display
-  formatStatus(status) {
-    const statusMap = {
-      'pending': 'Pending',
-      'in_progress': 'In Progress',
-      'awaiting_review': 'Awaiting Review',
-      'addressing_review': 'Addressing Review',
-      'completed': 'Completed',
-      'failed': 'Failed',
-      'cancelled': 'Cancelled'
-    };
-    return statusMap[status] || status;
-  },
-
-
 
   // Debounce function
   debounce(func, wait) {
