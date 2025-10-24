@@ -302,7 +302,11 @@ export class CoreEngine extends EventEmitter {
             message: `💬 Processing ${result.comments.length} PR review comment(s)...`,
           });
 
-          await this.handleAllPRComments(task.id, concatenatedComments);
+          await this.handleAllPRComments(
+            task.id,
+            concatenatedComments,
+            result.threadIds
+          );
         }
       } catch (error: any) {
         this.db.addTaskLog({
@@ -589,12 +593,13 @@ export class CoreEngine extends EventEmitter {
     prNumber: number
   ): Promise<{
     comments: string[];
+    threadIds: string[];
     statusUpdate?: 'completed' | 'cancelled';
   }> {
     logger.info(`Collecting PR comments for task: ${taskId} ${prNumber}`);
     const task = this.db.getTask(taskId);
     if (!task || task.status !== 'awaiting-review') {
-      return { comments: [] }; // Task completed or cancelled
+      return { comments: [], threadIds: [] };
     }
 
     const githubManager = this.getGitHubManager();
@@ -608,19 +613,20 @@ export class CoreEngine extends EventEmitter {
           task.branch_name
         );
         logger.info(
-          `last commit timestamp for branch ${task.branch_name}: ${lastCommitTimestamp}`
+          `Last commit timestamp for branch ${task.branch_name}: ${lastCommitTimestamp}`
         );
       } catch (error) {
-        // If we can't get commit timestamp, continue with null (will get all comments)
-        console.warn(
+        logger.warn(
           `Could not get last commit timestamp for branch ${task.branch_name}:`,
-          error
+          String(error)
         );
       }
     }
 
-    // Poll for new comments since last commit
-    const newComments = await githubManager.pollForComments(
+    // Poll for unresolved comments
+    // Review comments: filtered by resolved status
+    // General PR comments: filtered by timestamp
+    const { comments, threadIds } = await githubManager.pollForComments(
       prNumber,
       lastCommitTimestamp,
       task.repository_path
@@ -639,12 +645,13 @@ export class CoreEngine extends EventEmitter {
       statusUpdate = 'cancelled';
     }
 
-    return { comments: newComments, statusUpdate };
+    return { comments, threadIds, statusUpdate };
   }
 
   private async handleAllPRComments(
     taskId: number,
-    concatenatedComments: string
+    concatenatedComments: string,
+    threadIds: string[]
   ): Promise<void> {
     logger.info(`Handling concatenated PR comments for task: ${taskId}`);
     const task = this.db.getTask(taskId);
@@ -728,6 +735,14 @@ export class CoreEngine extends EventEmitter {
             level: 'info',
             message: '✅ All PR feedback addressed and changes pushed',
           });
+
+          // Mark the review threads as resolved
+          const githubManager = this.getGitHubManager();
+          await githubManager.resolveThreadsByIds(
+            threadIds,
+            task.repository_path,
+            taskId
+          );
 
           // Update status back to awaiting-review
           this.db.updateTask(taskId, {

@@ -14,6 +14,48 @@ import { SettingsManager } from './settings-manager';
 import { JiraManager } from './jira-manager';
 import { Task } from '../types';
 
+interface GitHubUser {
+  login: string;
+}
+
+interface GitHubComment {
+  id: number;
+  user: GitHubUser;
+  body: string;
+  created_at: string;
+  path?: string;
+  line?: number;
+  diff_hunk?: string;
+}
+
+interface ReviewThreadComment {
+  id: string;
+  databaseId: number;
+  body: string;
+  author: { login: string };
+  createdAt: string;
+  path?: string;
+  line?: number;
+  diffHunk?: string;
+}
+
+interface ReviewThread {
+  id: string;
+  isResolved: boolean;
+  comments: {
+    nodes: ReviewThreadComment[];
+  };
+}
+
+interface GitHubReviewBody {
+  id: string;
+  databaseId: number;
+  body: string;
+  state: string;
+  author: { login: string };
+  createdAt: string;
+}
+
 export class GitHubCLIProvider {
   private db: DatabaseManager;
   private openaiManager: OpenAIManager;
@@ -211,7 +253,7 @@ export class GitHubCLIProvider {
   async findPRByBranch(
     branchName: string,
     repositoryPath?: string
-  ): Promise<any> {
+  ): Promise<{ number: number; url: string; title: string } | null> {
     if (repositoryPath) {
       await this.ensureInitialized(repositoryPath);
     }
@@ -251,7 +293,10 @@ export class GitHubCLIProvider {
     prNumber: number,
     lastCommitTimestamp: string | null,
     repositoryPath: string
-  ): Promise<string[]> {
+  ): Promise<{
+    comments: string[];
+    threadIds: string[];
+  }> {
     try {
       const commentPrefix = this.settings.get('commentPrefix');
       const skipUsernameCheck = this.settings.get('skipUsernameCheck');
@@ -259,56 +304,79 @@ export class GitHubCLIProvider {
       // Get current user to filter out their own comments
       const currentUser = await this.getCurrentUser(repositoryPath);
 
-      // Get all comment types (reviews, review comments, and PR comments)
-      const { reviewComments, prComments } = await this.getAllCommentsSeparated(
-        prNumber,
-        repositoryPath
-      );
+      // Get unresolved review threads from GraphQL
+      const { reviewThreads, reviewBodies } =
+        await this.getUnresolvedReviewThreads(prNumber, repositoryPath);
+      const reviewCommentData: CommentData[] = [
+        // Add review bodies (overall review summaries) - these don't have threads
+        ...reviewBodies
+          .filter((review) => review.body && review.body.trim())
+          .map((review) => ({
+            id: review.databaseId,
+            user: { login: review.author.login },
+            body: review.body,
+            created_at: review.createdAt,
+          })),
+        // Add line-level comments from threads
+        ...reviewThreads.flatMap((thread) =>
+          thread.comments.nodes.map((comment) => ({
+            id: comment.databaseId,
+            user: { login: comment.author.login },
+            body: comment.body,
+            created_at: comment.createdAt,
+            path: comment.path,
+            line: comment.line,
+            diff_hunk: comment.diffHunk,
+          }))
+        ),
+      ];
 
-      // Convert to common format
-      const prCommentData: CommentData[] = prComments.map((comment: any) => ({
+      // Get general PR comments from REST API (filtered by timestamp)
+      const prCommentData: CommentData[] = (
+        await this.getPRComments(prNumber, repositoryPath, lastCommitTimestamp)
+      ).map((comment) => ({
+        id: comment.id,
         user: comment.user,
         body: comment.body,
         created_at: comment.created_at,
       }));
 
-      const reviewCommentData: CommentData[] = reviewComments.map(
-        (comment: any) => ({
-          user: comment.user,
-          body: comment.body,
-          created_at: comment.created_at,
-          state: comment.state,
-          path: comment.path,
-          line: comment.line,
-          diff_hunk: comment.diff_hunk,
-        })
+      const comments = processAllComments(
+        [...prCommentData, ...reviewCommentData],
+        {
+          commentPrefix,
+          currentUser,
+          skipUsernameCheck,
+        }
       );
 
-      return processAllComments(prCommentData, reviewCommentData, {
-        commentPrefix,
-        lastCommitTimestamp,
-        currentUser,
-        skipUsernameCheck,
-      });
+      // Extract thread IDs directly from review threads
+      const threadIds = reviewThreads.map((thread) => thread.id);
+
+      return { comments, threadIds };
     } catch (error) {
       logger.error(
         'Failed to fetch PR comments via GitHub CLI:',
         String(error)
       );
-      return [];
+      return { comments: [], threadIds: [] };
     }
   }
 
-  async getPRReviews(prNumber: number, repositoryPath: string): Promise<any[]> {
+  async getPRComments(
+    prNumber: number,
+    repositoryPath: string,
+    lastCommitTimestamp?: string | null
+  ): Promise<GitHubComment[]> {
+    await this.ensureInitialized(repositoryPath);
+
     return await withRetry(
       async () => {
-        await this.ensureInitialized(repositoryPath);
-
         const result = await execCommand(
           'gh',
           [
             'api',
-            `/repos/${this.repoOwner}/${this.repoName}/pulls/${prNumber}/reviews`,
+            `/repos/${this.repoOwner}/${this.repoName}/issues/${prNumber}/comments`,
           ],
           { cwd: repositoryPath }
         );
@@ -316,105 +384,221 @@ export class GitHubCLIProvider {
           throw new Error(`GitHub CLI command failed: ${result.stderr}`);
         }
 
-        return JSON.parse(result.stdout);
+        const allComments = JSON.parse(result.stdout) as GitHubComment[];
+
+        // Filter by timestamp if provided
+        if (!lastCommitTimestamp) {
+          return allComments;
+        }
+
+        const lastCommitDate = new Date(lastCommitTimestamp);
+        return allComments.filter((comment) => {
+          const commentDate = new Date(comment.created_at);
+          return commentDate > lastCommitDate;
+        });
       },
-      'Get PR reviews via GitHub CLI',
+      'Get PR comments via GitHub CLI',
       2
     );
   }
 
-  async getAllCommentsSeparated(
+  private async fetchAllReviewThreads(
     prNumber: number,
     repositoryPath: string
-  ): Promise<{ reviewComments: any[]; prComments: any[] }> {
+  ): Promise<{
+    reviewThreads: ReviewThread[];
+    reviewBodies: GitHubReviewBody[];
+  }> {
     await this.ensureInitialized(repositoryPath);
-    const reviewComments = [];
-    const prComments = [];
 
-    // 1. Get PR reviews (review bodies)
-    const reviews = await this.getPRReviews(prNumber, repositoryPath);
-
-    // Filter out pending reviews and process only submitted ones
-    const submittedReviews = reviews.filter(
-      (review) => review.state !== 'PENDING'
-    );
-
-    if (reviews.length > submittedReviews.length) {
-      logger.info(
-        `Filtered out ${reviews.length - submittedReviews.length} pending review(s)`
-      );
-    }
-
-    // Add review body comments and get their associated review comments
-    for (const review of submittedReviews) {
-      // Add the review body comment
-      if (review.body && review.body.trim()) {
-        reviewComments.push({
-          user: { login: review.user.login },
-          body: review.body,
-          created_at: review.submitted_at,
-          state: review.state,
-        });
-      }
-
-      if (review.id) {
-        // 2. Get all review comments (line-by-line comments attached to reviews)
-        const reviewCommentsResult = await execCommand(
-          'gh',
-          [
-            'api',
-            `/repos/${this.repoOwner}/${this.repoName}/pulls/${prNumber}/reviews/${review.id}/comments`,
-          ],
-          { cwd: repositoryPath }
-        );
-        if (reviewCommentsResult.exitCode === 0) {
-          const reviewLineComments = JSON.parse(reviewCommentsResult.stdout);
-          reviewComments.push(
-            ...reviewLineComments.map((comment: any) => ({
-              user: { login: comment.user.login },
-              body: comment.body,
-              created_at: comment.created_at,
-              path: comment.path,
-              line: comment.line,
-              diff_hunk: comment.diff_hunk,
-            }))
-          );
+    try {
+      const query = `
+        query($owner: String!, $repo: String!, $prNumber: Int!) {
+          repository(owner: $owner, name: $repo) {
+            pullRequest(number: $prNumber) {
+              reviews(first: 100) {
+                nodes {
+                  id
+                  databaseId
+                  body
+                  state
+                  author { login }
+                  createdAt
+                }
+              }
+              reviewThreads(first: 100) {
+                nodes {
+                  id
+                  isResolved
+                  comments(first: 100) {
+                    nodes {
+                      id
+                      databaseId
+                      body
+                      author { login }
+                      createdAt
+                      path
+                      line
+                      diffHunk
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
-      }
-    }
+      `;
 
-    // 3. Get individual PR comments (not attached to reviews)
-    const prCommentsResult = await execCommand(
-      'gh',
-      [
-        'api',
-        `/repos/${this.repoOwner}/${this.repoName}/issues/${prNumber}/comments`,
-      ],
-      { cwd: repositoryPath }
-    );
-    if (prCommentsResult.exitCode === 0) {
-      const prCommentsData = JSON.parse(prCommentsResult.stdout);
-      prComments.push(
-        ...prCommentsData.map((comment: any) => ({
-          user: { login: comment.user.login },
-          body: comment.body,
-          created_at: comment.created_at,
-        }))
+      const result = await execCommand(
+        'gh',
+        [
+          'api',
+          'graphql',
+          '-f',
+          `query=${query}`,
+          '-F',
+          `owner=${this.repoOwner}`,
+          '-F',
+          `repo=${this.repoName}`,
+          '-F',
+          `prNumber=${prNumber}`,
+        ],
+        { cwd: repositoryPath }
       );
-    }
 
-    return { reviewComments, prComments };
+      if (result.exitCode !== 0) {
+        throw new Error(`GitHub CLI command failed: ${result.stderr}`);
+      }
+
+      const response = JSON.parse(result.stdout);
+      const reviewThreads =
+        response.data?.repository?.pullRequest?.reviewThreads?.nodes || [];
+      const reviewBodies =
+        response.data?.repository?.pullRequest?.reviews?.nodes || [];
+
+      return { reviewThreads, reviewBodies };
+    } catch (error) {
+      logger.warn(`Failed to fetch review threads: ${error}`);
+      return { reviewThreads: [], reviewBodies: [] };
+    }
   }
 
-  async getAllReviewComments(
+  async getUnresolvedReviewThreads(
     prNumber: number,
     repositoryPath: string
-  ): Promise<any[]> {
-    const { reviewComments, prComments } = await this.getAllCommentsSeparated(
+  ): Promise<{
+    reviewThreads: ReviewThread[];
+    reviewBodies: GitHubReviewBody[];
+  }> {
+    const { reviewThreads, reviewBodies } = await this.fetchAllReviewThreads(
       prNumber,
       repositoryPath
     );
-    return [...reviewComments, ...prComments];
+
+    // Filter submitted reviews only (exclude PENDING)
+    const submittedReviews = reviewBodies.filter(
+      (review: GitHubReviewBody) => review.state !== 'PENDING'
+    );
+
+    // Filter unresolved threads only
+    const unresolvedThreads = reviewThreads.filter(
+      (thread: ReviewThread) => !thread.isResolved
+    );
+
+    return { reviewThreads: unresolvedThreads, reviewBodies: submittedReviews };
+  }
+
+  async resolveReviewThread(
+    threadId: string,
+    repositoryPath: string,
+    taskId?: number
+  ): Promise<boolean> {
+    await this.ensureInitialized(repositoryPath);
+
+    try {
+      const mutation = `
+        mutation($threadId: ID!) {
+          resolveReviewThread(input: { threadId: $threadId }) {
+            thread {
+              id
+              isResolved
+            }
+          }
+        }
+      `;
+
+      const result = await execCommand(
+        'gh',
+        [
+          'api',
+          'graphql',
+          '-f',
+          `query=${mutation}`,
+          '-f',
+          `threadId=${threadId}`,
+        ],
+        { cwd: repositoryPath }
+      );
+
+      if (result.exitCode !== 0) {
+        throw new Error(`GitHub CLI command failed: ${result.stderr}`);
+      }
+
+      if (taskId) {
+        this.db.addTaskLog({
+          task_id: taskId,
+          level: 'info',
+          message: `✅ Resolved review thread ${threadId}`,
+        });
+      }
+
+      return true;
+    } catch (error) {
+      logger.warn(`Failed to resolve review thread ${threadId}: ${error}`);
+      if (taskId) {
+        this.db.addTaskLog({
+          task_id: taskId,
+          level: 'warn',
+          message: `⚠️ Failed to resolve review thread ${threadId}: ${error}`,
+        });
+      }
+      return false;
+    }
+  }
+
+  async resolveThreadsByIds(
+    threadIds: string[],
+    repositoryPath: string,
+    taskId?: number
+  ): Promise<void> {
+    if (threadIds.length === 0) {
+      return;
+    }
+
+    if (taskId) {
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'info',
+        message: `🔄 Resolving ${threadIds.length} review thread(s)...`,
+      });
+    }
+
+    // Resolve all threads in parallel
+    const results = await Promise.all(
+      threadIds.map((threadId) =>
+        this.resolveReviewThread(threadId, repositoryPath, taskId)
+      )
+    );
+
+    const resolved = results.filter((success) => success).length;
+
+    if (taskId) {
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'info',
+        message: `✅ Successfully resolved ${resolved} review thread(s)`,
+      });
+    }
   }
 
   async getCurrentUser(repositoryPath: string): Promise<string | null> {
