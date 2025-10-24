@@ -3,12 +3,12 @@ class Dashboard {
   constructor() {
     this.loadedTasks = [];
     this.repositories = [];
-    this.currentPage = 1;
     this.tasksPerPage = 10;
     this.isLoading = false;
-    this.hasMore = true;
     this.hasRecentSSEUpdate = false;
     this.isUpdating = false; // Prevent race conditions in updates
+    this.completedPage = 1; // Separate pagination for completed tasks
+    this.hasMoreCompleted = true; // Track if more completed tasks are available
     this.init();
   }
 
@@ -271,61 +271,104 @@ class Dashboard {
     }
   }
 
-  async loadTasks() {
-    if (this.isLoading) return;
-    this.isLoading = true;
+  async loadAllTasks() {
+    this.completedPage = 1;
+    this.loadedTasks = [];
+    this.hasMoreCompleted = true;
 
-    const loadingEl = document.getElementById('loading-tasks');
-    if (this.loadedTasks.length === 0 && loadingEl) {
-      loadingEl.classList.remove('hidden');
-    }
+    // Load ALL active tasks (these are more important and usually fewer)
+    await this.loadTasksByStatus(TaskConstants.ACTIVE_TASK_STATUSES);
 
-    try {
-      const url = `/api/tasks?page=${this.currentPage}&limit=${this.tasksPerPage}`;
-      const response = await fetch(url);
-      const result = await response.json();
+    // Load only first page of completed tasks
+    await this.loadCompletedTasks();
 
-      if (response.ok && result.success) {
-        if (this.currentPage === 1) {
-          this.loadedTasks = result.data.tasks;
-        } else {
-          this.loadedTasks.push(...result.data.tasks);
+    // Sort all tasks by created_at DESC (newest first)
+    this.loadedTasks.sort(
+      (a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+
+    this.renderTasks();
+    this.updateLoadMoreButton();
+  }
+
+  async loadTasksByStatus(statuses) {
+    for (const status of statuses) {
+      let currentPage = 1;
+      let hasMore = true;
+
+      while (hasMore) {
+        try {
+          const response = await fetch(
+            `/api/tasks?page=${currentPage}&limit=${this.tasksPerPage}&status=${status}`
+          );
+          const result = await response.json();
+
+          if (response.ok && result.success) {
+            this.loadedTasks.push(...result.data.tasks);
+
+            const pagination = result.data.pagination;
+            hasMore = pagination
+              ? currentPage < pagination.totalPages
+              : result.data.tasks.length === this.tasksPerPage;
+            currentPage++;
+          } else {
+            hasMore = false;
+          }
+        } catch (error) {
+          console.error(`Error loading ${status} tasks:`, error);
+          hasMore = false;
         }
-
-        // Use pagination info to determine if there are more tasks
-        const pagination = result.data.pagination;
-        this.hasMore = pagination
-          ? this.currentPage < pagination.totalPages
-          : result.data.tasks.length === this.tasksPerPage;
-        this.renderTasks();
-      } else {
-        throw new Error(result.error || 'Failed to load tasks');
       }
-    } catch (error) {
-      console.error('Error loading tasks:', error);
-      this.showError('Failed to load tasks');
-    } finally {
-      this.isLoading = false;
-      if (loadingEl) {
-        loadingEl.classList.add('hidden');
-      }
-      this.updateLoadMoreButton();
     }
   }
 
-  async loadAllTasks() {
-    this.currentPage = 1;
-    this.loadedTasks = [];
-    this.hasMore = true;
+  async loadCompletedTasks() {
+    const completedStatuses = TaskConstants.COMPLETED_TASK_STATUSES;
+    let hasMoreTasks = false;
 
-    await this.loadTasks();
+    for (const status of completedStatuses) {
+      try {
+        const response = await fetch(
+          `/api/tasks?page=${this.completedPage}&limit=${this.tasksPerPage}&status=${status}`
+        );
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+          this.loadedTasks.push(...result.data.tasks);
+
+          const pagination = result.data.pagination;
+          if (pagination && this.completedPage < pagination.totalPages) {
+            hasMoreTasks = true;
+          } else if (
+            !pagination &&
+            result.data.tasks.length === this.tasksPerPage
+          ) {
+            hasMoreTasks = true;
+          }
+        }
+      } catch (error) {
+        console.error(`Error loading ${status} tasks:`, error);
+      }
+    }
+
+    this.hasMoreCompleted = hasMoreTasks;
   }
 
   async loadMoreTasks() {
-    if (this.isLoading || !this.hasMore) return;
+    if (this.isLoading || !this.hasMoreCompleted) return;
 
-    this.currentPage++;
-    await this.loadTasks();
+    this.isLoading = true;
+    this.updateLoadMoreButton();
+
+    try {
+      this.completedPage++;
+      await this.loadCompletedTasks();
+      this.renderTasks();
+    } finally {
+      this.isLoading = false;
+      this.updateLoadMoreButton();
+    }
   }
 
   async refreshTasks() {
@@ -345,10 +388,39 @@ class Dashboard {
       return;
     }
 
-    // Render all tasks in order (backend already sorts by created_at DESC)
-    const tasksHTML = this.loadedTasks
-      .map((task) => this.renderTaskCard(task))
-      .join('');
+    const activeTasks = this.loadedTasks.filter((task) =>
+      TaskConstants.ACTIVE_TASK_STATUSES.includes(task.status)
+    );
+
+    const completedTasks = this.loadedTasks.filter((task) =>
+      TaskConstants.COMPLETED_TASK_STATUSES.includes(task.status)
+    );
+
+    // Build HTML with divider if both sections exist
+    let tasksHTML = '';
+
+    if (activeTasks.length > 0) {
+      tasksHTML += activeTasks
+        .map((task) => this.renderTaskCard(task))
+        .join('');
+    }
+
+    if (activeTasks.length > 0 && completedTasks.length > 0) {
+      tasksHTML += `
+        <div class="flex items-center py-4">
+          <div class="flex-1 border-t border-gray-300"></div>
+          <div class="px-4 text-sm text-gray-500 font-medium">Completed</div>
+          <div class="flex-1 border-t border-gray-300"></div>
+        </div>
+      `;
+    }
+
+    if (completedTasks.length > 0) {
+      tasksHTML += completedTasks
+        .map((task) => this.renderTaskCard(task))
+        .join('');
+    }
+
     container.innerHTML = `<div class="space-y-4">${tasksHTML}</div>`;
 
     if (loadingEl) {
@@ -514,7 +586,7 @@ class Dashboard {
     const loadMoreBtn = document.getElementById('load-more-btn');
 
     if (container && loadMoreBtn) {
-      if (this.hasMore && !this.isLoading) {
+      if (this.hasMoreCompleted && !this.isLoading) {
         container.classList.remove('hidden');
         loadMoreBtn.disabled = false;
         loadMoreBtn.textContent = 'Load More';
@@ -602,8 +674,8 @@ class Dashboard {
         // Only update the specific task card instead of re-rendering everything
         this.updateTaskCard(taskIndex);
       } else {
-        // Task not in current view, might be new - add it to the beginning if on first page
-        if (this.currentPage === 1 && metadata) {
+        // Task not in current view, might be new - add it to the beginning
+        if (metadata) {
           // Add new task to the beginning of the list - prefer full task from metadata
           const newTask = metadata.task || { id: taskId, status, ...metadata };
           this.loadedTasks.unshift(newTask);

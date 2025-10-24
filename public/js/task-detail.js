@@ -53,7 +53,9 @@ class TaskDetail {
         this.renderTaskDetail(result.data);
 
         // Stop log refresh if task is completed
-        if (['completed', 'cancelled', 'failed'].includes(result.data.status)) {
+        if (
+          TaskConstants.COMPLETED_TASK_STATUSES.includes(result.data.status)
+        ) {
           this.stopLogRefresh();
         }
       } else {
@@ -79,14 +81,12 @@ class TaskDetail {
       task.summary ||
       task.description.substring(0, 80) +
         (task.description.length > 80 ? '...' : '');
-    const canCancel =
-      task.status !== 'completed' &&
-      task.status !== 'cancelled' &&
-      task.status !== 'failed';
-    const canComplete =
-      task.status !== 'completed' &&
-      task.status !== 'cancelled' &&
-      task.status !== 'failed';
+    const canCancel = !TaskConstants.COMPLETED_TASK_STATUSES.includes(
+      task.status
+    );
+    const canComplete = !TaskConstants.COMPLETED_TASK_STATUSES.includes(
+      task.status
+    );
     const canRetry = task.status === 'failed' || task.status === 'cancelled';
 
     // Update page title with task summary
