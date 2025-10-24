@@ -1,21 +1,5 @@
 // Utility functions
 window.Utils = {
-  // Format status for display
-  formatStatus(status) {
-    const statusMap = {
-      'pending': 'Pending',
-      'in_progress': 'In Progress',
-      'awaiting_review': 'Awaiting Review',
-      'addressing_review': 'Addressing Review',
-      'completed': 'Completed',
-      'failed': 'Failed',
-      'cancelled': 'Cancelled'
-    };
-    return statusMap[status] || status;
-  },
-
-
-
   // Debounce function
   debounce(func, wait) {
     let timeout;
@@ -32,11 +16,11 @@ window.Utils = {
   // Escape HTML
   escapeHtml(unsafe) {
     return unsafe
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
   },
 
   // Format date to local time with user-friendly format
@@ -47,7 +31,7 @@ window.Utils = {
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     });
   },
 
@@ -64,13 +48,22 @@ window.Utils = {
 
   // Show toast notification
   showToast(message, type = 'info') {
-    console.log('showToast called with message:', JSON.stringify(message), 'type:', type);
+    console.log(
+      'showToast called with message:',
+      JSON.stringify(message),
+      'type:',
+      type
+    );
     const toast = document.createElement('div');
-    toast.className = `fixed top-4 right-4 px-4 py-2 rounded-md shadow-lg z-50 ${type === 'success' ? 'bg-green-600 text-white' :
-      type === 'error' ? 'bg-red-600 text-white' :
-        type === 'warning' ? 'bg-yellow-600 text-white' :
-          'bg-blue-600 text-white'
-      }`;
+    toast.className = `fixed top-4 right-4 px-4 py-2 rounded-md shadow-lg z-50 ${
+      type === 'success'
+        ? 'bg-green-600 text-white'
+        : type === 'error'
+          ? 'bg-red-600 text-white'
+          : type === 'warning'
+            ? 'bg-yellow-600 text-white'
+            : 'bg-blue-600 text-white'
+    }`;
     toast.textContent = message;
 
     // Add transition styles
@@ -89,7 +82,9 @@ window.Utils = {
 
   // Check if task is from Jira integration
   isJiraTask(task) {
-    return task && task.description && task.description.includes('Jira Ticket: ');
+    return (
+      task && task.description && task.description.includes('Jira Ticket: ')
+    );
   },
 
   // Get Jira icon PNG - Using a PNG file for Jira tickets
@@ -101,17 +96,19 @@ window.Utils = {
   getStatusBadge(task) {
     const { status } = task;
     const badges = {
-      'pending': 'bg-gray-100 text-gray-800',
+      pending: 'bg-gray-100 text-gray-800',
       'in-progress': 'bg-yellow-100 text-yellow-800',
       'addressing-review': 'bg-yellow-100 text-yellow-800',
       'awaiting-review': 'bg-blue-100 text-blue-800',
-      'completed': 'bg-green-100 text-green-800',
-      'failed': 'bg-red-100 text-red-800',
-      'cancelled': 'bg-red-100 text-red-800'
+      completed: 'bg-green-100 text-green-800',
+      failed: 'bg-red-100 text-red-800',
+      cancelled: 'bg-red-100 text-red-800',
     };
 
     const badgeClass = badges[status] || 'bg-gray-100 text-gray-800';
-    const displayStatus = status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase());
+    const displayStatus = status
+      .replace('-', ' ')
+      .replace(/\b\w/g, (l) => l.toUpperCase());
 
     // Add Jira icon if task is from Jira
     const jiraIcon = this.isJiraTask(task) ? this.getJiraIcon() : '';
@@ -124,7 +121,9 @@ window.Utils = {
     if (!stage) return '';
 
     const stageClass = 'bg-gray-50 text-gray-700 border border-gray-200';
-    const displayStage = stage.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+    const displayStage = stage
+      .replace('_', ' ')
+      .replace(/\b\w/g, (l) => l.toUpperCase());
 
     return `<span class="px-2 py-1 text-xs font-medium rounded ${stageClass}">${displayStage}</span>`;
   },
@@ -165,7 +164,7 @@ window.Utils = {
     try {
       const response = await fetch(`/api/tasks/${taskId}/${action}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       });
 
       if (response.ok) {
@@ -193,21 +192,21 @@ window.Utils = {
   async cancelTask(taskId, options = {}) {
     return this.performTaskAction(taskId, 'cancel', {
       confirmMessage: 'Are you sure you want to cancel this task?',
-      ...options
+      ...options,
     });
   },
 
   async completeTask(taskId, options = {}) {
     return this.performTaskAction(taskId, 'complete', {
       confirmMessage: 'Are you sure you want to mark this task as complete?',
-      ...options
+      ...options,
     });
   },
 
   async retryTask(taskId, options = {}) {
     return this.performTaskAction(taskId, 'retry', {
       // No confirmation required as per PR feedback
-      ...options
+      ...options,
     });
-  }
+  },
 };

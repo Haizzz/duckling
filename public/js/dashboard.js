@@ -9,8 +9,6 @@ class Dashboard {
     this.hasMore = true;
     this.hasRecentSSEUpdate = false;
     this.isUpdating = false; // Prevent race conditions in updates
-    this.completedPage = 1; // Separate pagination for completed tasks
-    this.hasMoreCompleted = true; // Track if more completed tasks are available
     this.init();
   }
 
@@ -50,15 +48,18 @@ class Dashboard {
     // Close dropdowns when clicking outside
     document.addEventListener('click', (event) => {
       const target = event.target;
-      if (!target.closest('[id^="task-menu-"]') && !target.closest('[id^="task-dropdown-"]')) {
-        document.querySelectorAll('[id^="task-dropdown-"]').forEach(dropdown => {
-          dropdown.classList.add('hidden');
-        });
+      if (
+        !target.closest('[id^="task-menu-"]') &&
+        !target.closest('[id^="task-dropdown-"]')
+      ) {
+        document
+          .querySelectorAll('[id^="task-dropdown-"]')
+          .forEach((dropdown) => {
+            dropdown.classList.add('hidden');
+          });
       }
     });
   }
-
-
 
   async checkRequiredSettings() {
     try {
@@ -75,12 +76,18 @@ class Dashboard {
 
         // Optional warnings (not blocking)
         const warnings = [];
-        if (!hasOpenAiTool) warnings.push('OpenAI API key (optional - for commit messages and OpenAI coding)');
+        if (!hasOpenAiTool)
+          warnings.push(
+            'OpenAI API key (optional - for commit messages and OpenAI coding)'
+          );
 
         if (missingRequirements.length > 0) {
           // Mark settings as missing and update form state
           const missingText = missingRequirements.join(', ');
-          this.setTaskFormEnabled(false, `Missing configuration: ${missingText}. Visit settings to configure.`);
+          this.setTaskFormEnabled(
+            false,
+            `Missing configuration: ${missingText}. Visit settings to configure.`
+          );
 
           // Show a helper message
           this.showConfigurationHelper(missingRequirements);
@@ -113,13 +120,18 @@ class Dashboard {
       // Create the helper element
       helperEl = document.createElement('div');
       helperEl.id = 'config-helper';
-      helperEl.className = 'bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 max-w-6xl mx-auto';
+      helperEl.className =
+        'bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 max-w-6xl mx-auto';
 
-      const taskInputContainer = document.querySelector('.max-w-6xl.mx-auto.space-y-4');
+      const taskInputContainer = document.querySelector(
+        '.max-w-6xl.mx-auto.space-y-4'
+      );
       taskInputContainer.insertBefore(helperEl, taskInputContainer.firstChild);
     }
 
-    const toolsText = missingRequirements.includes('at least one coding tool (Amp or OpenAI)')
+    const toolsText = missingRequirements.includes(
+      'at least one coding tool (Amp or OpenAI)'
+    )
       ? '<li><strong>Coding Tool:</strong> Configure either Amp (requires Amp token) or OpenAI (requires OpenAI key)</li>'
       : '';
 
@@ -167,9 +179,12 @@ class Dashboard {
       // Create the warning element
       warningEl = document.createElement('div');
       warningEl.id = 'config-warning';
-      warningEl.className = 'bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 max-w-6xl mx-auto';
+      warningEl.className =
+        'bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 max-w-6xl mx-auto';
 
-      const taskInputContainer = document.querySelector('.max-w-6xl.mx-auto.space-y-4');
+      const taskInputContainer = document.querySelector(
+        '.max-w-6xl.mx-auto.space-y-4'
+      );
       taskInputContainer.insertBefore(warningEl, taskInputContainer.firstChild);
     }
 
@@ -231,7 +246,7 @@ class Dashboard {
       const response = await fetch('/api/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ description, repositoryPath })
+        body: JSON.stringify({ description, repositoryPath }),
       });
 
       if (response.ok) {
@@ -246,7 +261,9 @@ class Dashboard {
       }
     } catch (error) {
       console.error('Error creating task:', error);
-      this.showError(error.message || 'Failed to create task. Please try again.');
+      this.showError(
+        error.message || 'Failed to create task. Please try again.'
+      );
     } finally {
       // Restore original icon and re-enable button
       submitBtn.innerHTML = originalIcon;
@@ -254,7 +271,7 @@ class Dashboard {
     }
   }
 
-  async loadTasks(status = null) {
+  async loadTasks() {
     if (this.isLoading) return;
     this.isLoading = true;
 
@@ -264,10 +281,7 @@ class Dashboard {
     }
 
     try {
-      let url = `/api/tasks?page=${this.currentPage}&limit=${this.tasksPerPage}`;
-      if (status) {
-        url += `&status=${encodeURIComponent(status)}`;
-      }
+      const url = `/api/tasks?page=${this.currentPage}&limit=${this.tasksPerPage}`;
       const response = await fetch(url);
       const result = await response.json();
 
@@ -280,7 +294,9 @@ class Dashboard {
 
         // Use pagination info to determine if there are more tasks
         const pagination = result.data.pagination;
-        this.hasMore = pagination ? this.currentPage < pagination.totalPages : result.data.tasks.length === this.tasksPerPage;
+        this.hasMore = pagination
+          ? this.currentPage < pagination.totalPages
+          : result.data.tasks.length === this.tasksPerPage;
         this.renderTasks();
       } else {
         throw new Error(result.error || 'Failed to load tasks');
@@ -299,89 +315,17 @@ class Dashboard {
 
   async loadAllTasks() {
     this.currentPage = 1;
-    this.completedPage = 1;
     this.loadedTasks = [];
     this.hasMore = true;
-    this.hasMoreCompleted = true;
 
-    // Load ALL active tasks (these are more important and usually fewer)
-    await this.loadTasksByStatus(['pending', 'in-progress', 'addressing-review', 'awaiting-review']);
-
-    // Load only first page of completed tasks
-    await this.loadCompletedTasks();
-
-    this.renderTasks();
-    this.updateLoadMoreButton();
-  }
-
-  async loadTasksByStatus(statuses) {
-    for (const status of statuses) {
-      let currentPage = 1;
-      let hasMore = true;
-
-      while (hasMore) {
-        try {
-          const response = await fetch(`/api/tasks?page=${currentPage}&limit=${this.tasksPerPage}&status=${status}`);
-          const result = await response.json();
-
-          if (response.ok && result.success) {
-            this.loadedTasks.push(...result.data.tasks);
-
-            const pagination = result.data.pagination;
-            hasMore = pagination ? currentPage < pagination.totalPages : result.data.tasks.length === this.tasksPerPage;
-            currentPage++;
-          } else {
-            hasMore = false;
-          }
-        } catch (error) {
-          console.error(`Error loading ${status} tasks:`, error);
-          hasMore = false;
-        }
-      }
-    }
-  }
-
-  async loadCompletedTasks() {
-    const completedStatuses = ['completed', 'cancelled', 'failed'];
-    let hasMoreTasks = false;
-
-    for (const status of completedStatuses) {
-      try {
-        const response = await fetch(`/api/tasks?page=${this.completedPage}&limit=${this.tasksPerPage}&status=${status}`);
-        const result = await response.json();
-
-        if (response.ok && result.success) {
-          this.loadedTasks.push(...result.data.tasks);
-
-          const pagination = result.data.pagination;
-          if (pagination && this.completedPage < pagination.totalPages) {
-            hasMoreTasks = true;
-          } else if (!pagination && result.data.tasks.length === this.tasksPerPage) {
-            hasMoreTasks = true;
-          }
-        }
-      } catch (error) {
-        console.error(`Error loading ${status} tasks:`, error);
-      }
-    }
-
-    this.hasMoreCompleted = hasMoreTasks;
+    await this.loadTasks();
   }
 
   async loadMoreTasks() {
-    if (this.isLoading || !this.hasMoreCompleted) return;
+    if (this.isLoading || !this.hasMore) return;
 
-    this.isLoading = true;
-    this.updateLoadMoreButton();
-
-    try {
-      this.completedPage++;
-      await this.loadCompletedTasks();
-      this.renderTasks();
-    } finally {
-      this.isLoading = false;
-      this.updateLoadMoreButton();
-    }
+    this.currentPage++;
+    await this.loadTasks();
   }
 
   async refreshTasks() {
@@ -401,36 +345,10 @@ class Dashboard {
       return;
     }
 
-    // Separate active and completed tasks (already pre-sorted by backend status filter)
-    const activeTasks = this.loadedTasks.filter(task =>
-      ['pending', 'in-progress', 'addressing-review', 'awaiting-review'].includes(task.status)
-    );
-
-    const completedTasks = this.loadedTasks.filter(task =>
-      !['pending', 'in-progress', 'addressing-review', 'awaiting-review'].includes(task.status)
-    );
-
-    // Build HTML with divider if both sections exist
-    let tasksHTML = '';
-
-    if (activeTasks.length > 0) {
-      tasksHTML += activeTasks.map(task => this.renderTaskCard(task)).join('');
-    }
-
-    if (activeTasks.length > 0 && completedTasks.length > 0) {
-      tasksHTML += `
-        <div class="flex items-center py-4">
-          <div class="flex-1 border-t border-gray-300"></div>
-          <div class="px-4 text-sm text-gray-500 font-medium">Completed</div>
-          <div class="flex-1 border-t border-gray-300"></div>
-        </div>
-      `;
-    }
-
-    if (completedTasks.length > 0) {
-      tasksHTML += completedTasks.map(task => this.renderTaskCard(task)).join('');
-    }
-
+    // Render all tasks in order (backend already sorts by created_at DESC)
+    const tasksHTML = this.loadedTasks
+      .map((task) => this.renderTaskCard(task))
+      .join('');
     container.innerHTML = `<div class="space-y-4">${tasksHTML}</div>`;
 
     if (loadingEl) {
@@ -444,25 +362,37 @@ class Dashboard {
 
     const statusBadge = Utils.getStatusBadge(task);
 
-    const prLink = task.pr_url && task.pr_number ?
-      `<span class="text-blue-600 text-sm cursor-pointer underline break-all" onclick="window.open('${task.pr_url}', '_blank')">#${task.pr_number}</span>` :
-      '<span class="text-gray-400 text-sm">No PR yet</span>';
+    const prLink =
+      task.pr_url && task.pr_number
+        ? `<span class="text-blue-600 text-sm cursor-pointer underline break-all" onclick="window.open('${task.pr_url}', '_blank')">#${task.pr_number}</span>`
+        : '<span class="text-gray-400 text-sm">No PR yet</span>';
 
-    const branchName = task.branch_name ?
-      this.getBranchLink(task.branch_name, task.repository_path) :
-      '<span class="text-gray-400 text-sm">No branch yet</span>';
+    const branchName = task.branch_name
+      ? this.getBranchLink(task.branch_name, task.repository_path)
+      : '<span class="text-gray-400 text-sm">No branch yet</span>';
 
     // Get repository info
-    const repository = this.repositories.find(repo => repo.path === task.repository_path);
-    const repositoryInfo = repository ?
-      `<span class="text-sm text-gray-600 break-all">${repository.name}</span>` :
-      `<span class="text-sm text-gray-500 font-mono break-all">${this.escapeHtml(task.repository_path || 'Unknown')}</span>`;
+    const repository = this.repositories.find(
+      (repo) => repo.path === task.repository_path
+    );
+    const repositoryInfo = repository
+      ? `<span class="text-sm text-gray-600 break-all">${repository.name}</span>`
+      : `<span class="text-sm text-gray-500 font-mono break-all">${this.escapeHtml(task.repository_path || 'Unknown')}</span>`;
 
     // Generate a summary from the description (first 80 chars)
-    const summary = task.summary || task.description.substring(0, 80) + (task.description.length > 80 ? '...' : '');
+    const summary =
+      task.summary ||
+      task.description.substring(0, 80) +
+        (task.description.length > 80 ? '...' : '');
 
-    const canCancel = task.status !== 'completed' && task.status !== 'cancelled' && task.status !== 'failed';
-    const canComplete = task.status !== 'completed' && task.status !== 'cancelled' && task.status !== 'failed';
+    const canCancel =
+      task.status !== 'completed' &&
+      task.status !== 'cancelled' &&
+      task.status !== 'failed';
+    const canComplete =
+      task.status !== 'completed' &&
+      task.status !== 'cancelled' &&
+      task.status !== 'failed';
     const canRetry = task.status === 'failed' || task.status === 'cancelled';
 
     // Add pulsing border based on status
@@ -513,7 +443,9 @@ class Dashboard {
             <span>Created ${createdDate}</span>
             <span>Updated ${updatedDate}</span>
           </div>
-          ${(canCancel || canComplete || canRetry) ? `
+          ${
+            canCancel || canComplete || canRetry
+              ? `
             <div class="relative inline-block text-left">
               <button 
                 onclick="window.Dashboard.toggleTaskDropdown('${task.id}')"
@@ -530,43 +462,51 @@ class Dashboard {
                 class="hidden absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-10"
               >
                 <div class="py-1">
-                  ${canRetry ? `
+                  ${
+                    canRetry
+                      ? `
                     <button 
                       onclick="window.Dashboard.retryTask('${task.id}')"
                       class="block w-full text-left px-4 py-2 text-sm text-blue-700 hover:bg-blue-50 hover:text-blue-800"
                     >
                       Retry Task
                     </button>
-                  ` : ''}
-                  ${canComplete ? `
+                  `
+                      : ''
+                  }
+                  ${
+                    canComplete
+                      ? `
                     <button 
                       onclick="window.Dashboard.completeTask('${task.id}')"
                       class="block w-full text-left px-4 py-2 text-sm text-green-700 hover:bg-green-50 hover:text-green-800"
                     >
                       Mark as Complete
                     </button>
-                  ` : ''}
-                  ${canCancel ? `
+                  `
+                      : ''
+                  }
+                  ${
+                    canCancel
+                      ? `
                     <button 
                       onclick="window.Dashboard.cancelTask('${task.id}')"
                       class="block w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50 hover:text-red-800"
                     >
                       Cancel Task
                     </button>
-                  ` : ''}
+                  `
+                      : ''
+                  }
                 </div>
               </div>
             </div>
-          ` : ''}
+          `
+              : ''
+          }
         </div>
       </div>
     `;
-  }
-
-
-
-  getStageBadge(stage) {
-    return Utils.getStageBadge(stage);
   }
 
   updateLoadMoreButton() {
@@ -574,7 +514,7 @@ class Dashboard {
     const loadMoreBtn = document.getElementById('load-more-btn');
 
     if (container && loadMoreBtn) {
-      if (this.hasMoreCompleted && !this.isLoading) {
+      if (this.hasMore && !this.isLoading) {
         container.classList.remove('hidden');
         loadMoreBtn.disabled = false;
         loadMoreBtn.textContent = 'Load More';
@@ -596,7 +536,7 @@ class Dashboard {
       let pollInterval = 10; // Default fallback
 
       if (response.ok && result.success) {
-        const pollSetting = result.data.find(s => s.key === 'pollInterval');
+        const pollSetting = result.data.find((s) => s.key === 'pollInterval');
         if (pollSetting) {
           pollInterval = parseInt(pollSetting.value);
         }
@@ -604,7 +544,9 @@ class Dashboard {
 
       // Use 6x the poll interval for backup polling (less frequent)
       const backupPollMs = pollInterval * 6 * 1000;
-      console.log(`Starting backup polling with ${backupPollMs / 1000}s interval`);
+      console.log(
+        `Starting backup polling with ${backupPollMs / 1000}s interval`
+      );
 
       setInterval(() => {
         if (!this.isLoading && !this.hasRecentSSEUpdate) {
@@ -615,7 +557,10 @@ class Dashboard {
         this.hasRecentSSEUpdate = false;
       }, backupPollMs);
     } catch (error) {
-      console.warn('Failed to get poll interval, using default 60s backup polling:', error);
+      console.warn(
+        'Failed to get poll interval, using default 60s backup polling:',
+        error
+      );
       setInterval(() => {
         if (!this.isLoading && !this.hasRecentSSEUpdate) {
           this.loadAllTasks();
@@ -640,13 +585,19 @@ class Dashboard {
       const { taskId, status, metadata } = data;
 
       // Find and update the task in our loaded tasks
-      const taskIndex = this.loadedTasks.findIndex(task => task.id === taskId);
+      const taskIndex = this.loadedTasks.findIndex(
+        (task) => task.id === taskId
+      );
       if (taskIndex >= 0) {
         // Update the task data - prefer full task from metadata if available
         if (metadata && metadata.task) {
           this.loadedTasks[taskIndex] = metadata.task;
         } else {
-          this.loadedTasks[taskIndex] = { ...this.loadedTasks[taskIndex], ...metadata, status };
+          this.loadedTasks[taskIndex] = {
+            ...this.loadedTasks[taskIndex],
+            ...metadata,
+            status,
+          };
         }
         // Only update the specific task card instead of re-rendering everything
         this.updateTaskCard(taskIndex);
@@ -682,19 +633,19 @@ class Dashboard {
 
   async cancelTask(taskId) {
     await Utils.cancelTask(taskId, {
-      hideDropdown: () => this.hideTaskDropdown(taskId)
+      hideDropdown: () => this.hideTaskDropdown(taskId),
     });
   }
 
   async completeTask(taskId) {
     await Utils.completeTask(taskId, {
-      hideDropdown: () => this.hideTaskDropdown(taskId)
+      hideDropdown: () => this.hideTaskDropdown(taskId),
     });
   }
 
   async retryTask(taskId) {
     await Utils.retryTask(taskId, {
-      hideDropdown: () => this.hideTaskDropdown(taskId)
+      hideDropdown: () => this.hideTaskDropdown(taskId),
     });
   }
 
@@ -702,7 +653,7 @@ class Dashboard {
     const dropdown = document.getElementById(`task-dropdown-${taskId}`);
 
     // Hide all other dropdowns first
-    document.querySelectorAll('[id^="task-dropdown-"]').forEach(el => {
+    document.querySelectorAll('[id^="task-dropdown-"]').forEach((el) => {
       if (el.id !== `task-dropdown-${taskId}`) {
         el.classList.add('hidden');
       }
@@ -721,14 +672,14 @@ class Dashboard {
     }
   }
 
-
-
   escapeHtml(text) {
     return Utils.escapeHtml(text || '');
   }
 
   getBranchLink(branchName, repositoryPath) {
-    const repository = this.repositories.find(repo => repo.path === repositoryPath);
+    const repository = this.repositories.find(
+      (repo) => repo.path === repositoryPath
+    );
     if (repository && repository.owner && repository.name) {
       const githubUrl = `https://github.com/${repository.owner}/${repository.name}/tree/${branchName}`;
       return `<a href="${githubUrl}" target="_blank" class="text-blue-600 text-sm hover:text-blue-800 underline font-mono break-all">${this.escapeHtml(branchName)}</a>`;
@@ -748,12 +699,15 @@ class Dashboard {
 
     // Check if we have required settings (simplified check here)
     // We'll call this from checkRequiredSettings with the actual settings
-    const hasRequiredSettings = !taskInput.hasAttribute('data-missing-settings');
+    const hasRequiredSettings = !taskInput.hasAttribute(
+      'data-missing-settings'
+    );
 
     if (!hasRepositories) {
       // No repositories takes priority
       taskInput.disabled = true;
-      taskInput.placeholder = 'Add repositories in settings before creating tasks';
+      taskInput.placeholder =
+        'Add repositories in settings before creating tasks';
       submitBtn.disabled = true;
       submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
     } else if (!hasRequiredSettings) {
@@ -778,7 +732,8 @@ class Dashboard {
 
     if (enabled) {
       taskInput.disabled = false;
-      taskInput.placeholder = placeholderText || 'What would you like me to work on?';
+      taskInput.placeholder =
+        placeholderText || 'What would you like me to work on?';
       submitBtn.disabled = false;
       submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
       taskInput.removeAttribute('data-missing-settings');
@@ -787,7 +742,10 @@ class Dashboard {
       taskInput.placeholder = placeholderText || 'Task creation disabled';
       submitBtn.disabled = true;
       submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
-      if (placeholderText && placeholderText.includes('Missing configuration')) {
+      if (
+        placeholderText &&
+        placeholderText.includes('Missing configuration')
+      ) {
         taskInput.setAttribute('data-missing-settings', 'true');
       }
     }
@@ -827,9 +785,13 @@ class Dashboard {
       noReposWarning.classList.add('hidden');
 
       // Populate repository dropdown with name only when closed, name + path when open
-      repositorySelect.innerHTML = this.repositories.map(repo => `
+      repositorySelect.innerHTML = this.repositories
+        .map(
+          (repo) => `
         <option value="${repo.path}">${repo.name} (${repo.path})</option>
-      `).join('');
+      `
+        )
+        .join('');
 
       // Set first repository as default (always have a selection)
       if (this.repositories.length > 0) {

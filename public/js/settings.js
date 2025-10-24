@@ -20,17 +20,21 @@ class Settings {
     });
 
     // Add precommit check button
-    document.getElementById('add-precommit-btn').addEventListener('click', () => {
-      this.addPrecommitCheck();
-    });
+    document
+      .getElementById('add-precommit-btn')
+      .addEventListener('click', () => {
+        this.addPrecommitCheck();
+      });
 
     // Enter key in precommit input
-    document.getElementById('precommit-command').addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        this.addPrecommitCheck();
-      }
-    });
+    document
+      .getElementById('precommit-command')
+      .addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          this.addPrecommitCheck();
+        }
+      });
 
     // Add repository button
     document.getElementById('add-repo-btn').addEventListener('click', () => {
@@ -71,7 +75,8 @@ class Settings {
     // GitHub CLI status is handled in the HTML
 
     // Coding tools
-    document.getElementById('default-coding-tool').value = settings.defaultCodingTool || 'amp';
+    document.getElementById('default-coding-tool').value =
+      settings.defaultCodingTool || 'amp';
     this.setSecureField('amp-api-key', settings.ampApiKey);
     this.setSecureField('openai-api-key', settings.openaiApiKey);
 
@@ -79,26 +84,32 @@ class Settings {
     document.getElementById('jira-email').value = settings.jiraEmail || '';
     this.setSecureField('jira-api-key', settings.jiraApiKey);
     document.getElementById('jira-base-url').value = settings.jiraBaseUrl || '';
-    document.getElementById('jira-jql-query').value = settings.jiraJqlQuery || '';
+    document.getElementById('jira-jql-query').value =
+      settings.jiraJqlQuery || '';
     // Store Jira repository setting
     this.selectedJiraRepository = settings.jiraRepository || '';
 
     // Task configuration
-    document.getElementById('custom-prompt').value = settings.customPrompt ?? '';
-    document.getElementById('branch-prefix').value = settings.branchPrefix ?? 'duckling-';
-    document.getElementById('pr-title-prefix').value = settings.prTitlePrefix ?? '[DUCKLING]';
-    document.getElementById('commit-suffix').value = settings.commitSuffix ?? ' [quack]';
-    document.getElementById('comment-prefix').value = settings.commentPrefix ?? 'duckling';
+    document.getElementById('custom-prompt').value =
+      settings.customPrompt ?? '';
+    document.getElementById('branch-prefix').value =
+      settings.branchPrefix ?? 'duckling-';
+    document.getElementById('pr-title-prefix').value =
+      settings.prTitlePrefix ?? '[DUCKLING]';
+    document.getElementById('commit-suffix').value =
+      settings.commitSuffix ?? ' [quack]';
+    document.getElementById('comment-prefix').value =
+      settings.commentPrefix ?? 'duckling';
     document.getElementById('max-retries').value = settings.maxRetries ?? 3;
-    document.getElementById('skip-username-check').checked = settings.skipUsernameCheck ?? false;
-
+    document.getElementById('skip-username-check').checked =
+      settings.skipUsernameCheck ?? false;
 
     // Show configuration status
     this.showConfigurationStatus(settings);
 
     // Load precommit checks
     this.loadPrecommitChecks();
-    
+
     // Load settings hooks
     this.loadSettingsHooks();
 
@@ -125,7 +136,7 @@ class Settings {
       const response = await fetch('/api/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(settings)
+        body: JSON.stringify(settings),
       });
 
       if (response.ok) {
@@ -143,15 +154,15 @@ class Settings {
       } else {
         const error = await response.json();
         console.error('Server error saving settings:', error);
-        this.showError(error.message || error.error || 'Failed to save settings');
+        this.showError(
+          error.message || error.error || 'Failed to save settings'
+        );
       }
     } catch (error) {
       console.error('Error saving settings:', error);
       this.showError('Failed to save settings: ' + error.message);
     }
   }
-
-
 
   setSecureField(fieldId, value) {
     const field = document.getElementById(fieldId);
@@ -166,8 +177,6 @@ class Settings {
       field.placeholder = 'Enter value...';
     }
   }
-
-
 
   async loadPrecommitChecks() {
     try {
@@ -201,7 +210,7 @@ class Settings {
       const response = await fetch('/api/precommit-checks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: command, command, required: true })
+        body: JSON.stringify({ name: command, command, required: true }),
       });
 
       if (response.ok) {
@@ -218,7 +227,7 @@ class Settings {
   async removePrecommitCheck(id) {
     try {
       const response = await fetch(`/api/precommit-checks/${id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
       });
 
       if (response.ok) {
@@ -236,11 +245,14 @@ class Settings {
     const container = document.getElementById('precommit-list');
 
     if (this.precommitChecks.length === 0) {
-      container.innerHTML = '<p class="text-sm text-gray-500 italic">No precommit checks configured</p>';
+      container.innerHTML =
+        '<p class="text-sm text-gray-500 italic">No precommit checks configured</p>';
       return;
     }
 
-    container.innerHTML = this.precommitChecks.map(check => `
+    container.innerHTML = this.precommitChecks
+      .map(
+        (check) => `
       <div class="flex items-center justify-between p-3 bg-gray-50 rounded-md">
         <div class="flex-1">
           <code class="text-sm font-mono text-gray-800">${this.escapeHtml(check.command)}</code>
@@ -255,7 +267,9 @@ class Settings {
           </svg>
         </button>
       </div>
-    `).join('');
+    `
+      )
+      .join('');
   }
 
   async loadSettingsHooks() {
@@ -283,7 +297,9 @@ class Settings {
     }
 
     noHooksMessage.classList.add('hidden');
-    container.innerHTML = this.settingsHooks.map(hook => `
+    container.innerHTML = this.settingsHooks
+      .map(
+        (hook) => `
       <div class="p-3 bg-gray-50 rounded-md border border-gray-200">
         <div class="flex items-start justify-between">
           <div class="flex-1">
@@ -296,7 +312,9 @@ class Settings {
           </div>
         </div>
       </div>
-    `).join('');
+    `
+      )
+      .join('');
   }
 
   escapeHtml(text) {
@@ -313,13 +331,17 @@ class Settings {
 
     // Optional warnings
     const warnings = [];
-    if (!hasOpenAiTool) warnings.push('OpenAI API key (optional - for commit messages and OpenAI coding)');
+    if (!hasOpenAiTool)
+      warnings.push(
+        'OpenAI API key (optional - for commit messages and OpenAI coding)'
+      );
 
     if (missingRequirements.length === 0) {
       // No blocking issues
       if (warnings.length === 0) {
         // Everything is configured
-        statusEl.className = 'bg-green-50 border border-green-200 rounded-lg p-4';
+        statusEl.className =
+          'bg-green-50 border border-green-200 rounded-lg p-4';
         statusEl.innerHTML = `
           <div class="flex items-center">
             <div class="flex-shrink-0">
@@ -352,7 +374,9 @@ class Settings {
       }
     } else {
       // Missing requirements
-      const toolsText = missingRequirements.includes('at least one coding tool (Amp or OpenAI)')
+      const toolsText = missingRequirements.includes(
+        'at least one coding tool (Amp or OpenAI)'
+      )
         ? '<li><strong>Coding Tool:</strong> Configure either Amp (requires Amp token) or OpenAI (for code generation)</li>'
         : '';
 
@@ -394,7 +418,8 @@ class Settings {
 
   showSettingsSaveSuccess(message) {
     // Ensure we always have a message
-    const finalMessage = message && message.trim() ? message : 'Settings saved successfully!';
+    const finalMessage =
+      message && message.trim() ? message : 'Settings saved successfully!';
     Utils.showToast(finalMessage, 'success');
 
     // Also refresh the configuration status for settings saves
@@ -431,7 +456,9 @@ class Settings {
     }
 
     warningEl.classList.add('hidden');
-    container.innerHTML = this.repositories.map(repo => `
+    container.innerHTML = this.repositories
+      .map(
+        (repo) => `
       <div class="flex items-center justify-between p-3 bg-gray-50 rounded-md">
         <div class="flex-1">
           <div class="font-medium text-gray-900">${repo.name}</div>
@@ -444,7 +471,9 @@ class Settings {
           Remove
         </button>
       </div>
-    `).join('');
+    `
+      )
+      .join('');
 
     // Update the Jira repository dropdown
     this.updateJiraRepositoryDropdown();
@@ -457,7 +486,7 @@ class Settings {
     dropdown.innerHTML = '<option value="">-- Select a repository --</option>';
 
     // Add repository options
-    this.repositories.forEach(repo => {
+    this.repositories.forEach((repo) => {
       const option = document.createElement('option');
       option.value = repo.path;
       option.textContent = `${repo.name} (${repo.path})`;
@@ -469,7 +498,9 @@ class Settings {
       dropdown.value = this.selectedJiraRepository;
 
       // Check if the selected repository still exists
-      const repoExists = this.repositories.some(repo => repo.path === this.selectedJiraRepository);
+      const repoExists = this.repositories.some(
+        (repo) => repo.path === this.selectedJiraRepository
+      );
       if (!repoExists) {
         // Repository was removed, clear the selection and save settings
         this.selectedJiraRepository = '';
@@ -484,11 +515,13 @@ class Settings {
       const response = await fetch('/api/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jiraRepository: '' })
+        body: JSON.stringify({ jiraRepository: '' }),
       });
 
       if (response.ok) {
-        console.log('Cleared Jira repository setting due to repository removal');
+        console.log(
+          'Cleared Jira repository setting due to repository removal'
+        );
       } else {
         console.error('Failed to clear Jira repository setting');
       }
@@ -539,11 +572,13 @@ class Settings {
 
   async removeRepository(repoId) {
     // Find the repository being removed
-    const repoToRemove = this.repositories.find(repo => repo.id === repoId);
+    const repoToRemove = this.repositories.find((repo) => repo.id === repoId);
 
-    let confirmMessage = 'Are you sure you want to remove this repository? Existing tasks will not be deleted.';
+    let confirmMessage =
+      'Are you sure you want to remove this repository? Existing tasks will not be deleted.';
     if (repoToRemove && this.selectedJiraRepository === repoToRemove.path) {
-      confirmMessage += '\n\nThis repository is currently selected for Jira integration and will be disabled.';
+      confirmMessage +=
+        '\n\nThis repository is currently selected for Jira integration and will be disabled.';
     }
 
     if (!confirm(confirmMessage)) {
