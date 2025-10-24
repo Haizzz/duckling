@@ -9,8 +9,6 @@ class Dashboard {
     this.hasMore = true;
     this.hasRecentSSEUpdate = false;
     this.isUpdating = false; // Prevent race conditions in updates
-    this.completedPage = 1; // Separate pagination for completed tasks
-    this.hasMoreCompleted = true; // Track if more completed tasks are available
     this.init();
   }
 
@@ -254,7 +252,7 @@ class Dashboard {
     }
   }
 
-  async loadTasks(status = null) {
+  async loadTasks() {
     if (this.isLoading) return;
     this.isLoading = true;
 
@@ -264,10 +262,7 @@ class Dashboard {
     }
 
     try {
-      let url = `/api/tasks?page=${this.currentPage}&limit=${this.tasksPerPage}`;
-      if (status) {
-        url += `&status=${encodeURIComponent(status)}`;
-      }
+      const url = `/api/tasks?page=${this.currentPage}&limit=${this.tasksPerPage}`;
       const response = await fetch(url);
       const result = await response.json();
 
@@ -299,89 +294,17 @@ class Dashboard {
 
   async loadAllTasks() {
     this.currentPage = 1;
-    this.completedPage = 1;
     this.loadedTasks = [];
     this.hasMore = true;
-    this.hasMoreCompleted = true;
 
-    // Load ALL active tasks (these are more important and usually fewer)
-    await this.loadTasksByStatus(['pending', 'in-progress', 'addressing-review', 'awaiting-review']);
-
-    // Load only first page of completed tasks
-    await this.loadCompletedTasks();
-
-    this.renderTasks();
-    this.updateLoadMoreButton();
-  }
-
-  async loadTasksByStatus(statuses) {
-    for (const status of statuses) {
-      let currentPage = 1;
-      let hasMore = true;
-
-      while (hasMore) {
-        try {
-          const response = await fetch(`/api/tasks?page=${currentPage}&limit=${this.tasksPerPage}&status=${status}`);
-          const result = await response.json();
-
-          if (response.ok && result.success) {
-            this.loadedTasks.push(...result.data.tasks);
-
-            const pagination = result.data.pagination;
-            hasMore = pagination ? currentPage < pagination.totalPages : result.data.tasks.length === this.tasksPerPage;
-            currentPage++;
-          } else {
-            hasMore = false;
-          }
-        } catch (error) {
-          console.error(`Error loading ${status} tasks:`, error);
-          hasMore = false;
-        }
-      }
-    }
-  }
-
-  async loadCompletedTasks() {
-    const completedStatuses = ['completed', 'cancelled', 'failed'];
-    let hasMoreTasks = false;
-
-    for (const status of completedStatuses) {
-      try {
-        const response = await fetch(`/api/tasks?page=${this.completedPage}&limit=${this.tasksPerPage}&status=${status}`);
-        const result = await response.json();
-
-        if (response.ok && result.success) {
-          this.loadedTasks.push(...result.data.tasks);
-
-          const pagination = result.data.pagination;
-          if (pagination && this.completedPage < pagination.totalPages) {
-            hasMoreTasks = true;
-          } else if (!pagination && result.data.tasks.length === this.tasksPerPage) {
-            hasMoreTasks = true;
-          }
-        }
-      } catch (error) {
-        console.error(`Error loading ${status} tasks:`, error);
-      }
-    }
-
-    this.hasMoreCompleted = hasMoreTasks;
+    await this.loadTasks();
   }
 
   async loadMoreTasks() {
-    if (this.isLoading || !this.hasMoreCompleted) return;
+    if (this.isLoading || !this.hasMore) return;
 
-    this.isLoading = true;
-    this.updateLoadMoreButton();
-
-    try {
-      this.completedPage++;
-      await this.loadCompletedTasks();
-      this.renderTasks();
-    } finally {
-      this.isLoading = false;
-      this.updateLoadMoreButton();
-    }
+    this.currentPage++;
+    await this.loadTasks();
   }
 
   async refreshTasks() {
@@ -401,36 +324,8 @@ class Dashboard {
       return;
     }
 
-    // Separate active and completed tasks (already pre-sorted by backend status filter)
-    const activeTasks = this.loadedTasks.filter(task =>
-      ['pending', 'in-progress', 'addressing-review', 'awaiting-review'].includes(task.status)
-    );
-
-    const completedTasks = this.loadedTasks.filter(task =>
-      !['pending', 'in-progress', 'addressing-review', 'awaiting-review'].includes(task.status)
-    );
-
-    // Build HTML with divider if both sections exist
-    let tasksHTML = '';
-
-    if (activeTasks.length > 0) {
-      tasksHTML += activeTasks.map(task => this.renderTaskCard(task)).join('');
-    }
-
-    if (activeTasks.length > 0 && completedTasks.length > 0) {
-      tasksHTML += `
-        <div class="flex items-center py-4">
-          <div class="flex-1 border-t border-gray-300"></div>
-          <div class="px-4 text-sm text-gray-500 font-medium">Completed</div>
-          <div class="flex-1 border-t border-gray-300"></div>
-        </div>
-      `;
-    }
-
-    if (completedTasks.length > 0) {
-      tasksHTML += completedTasks.map(task => this.renderTaskCard(task)).join('');
-    }
-
+    // Render all tasks in order (backend already sorts by created_at DESC)
+    const tasksHTML = this.loadedTasks.map(task => this.renderTaskCard(task)).join('');
     container.innerHTML = `<div class="space-y-4">${tasksHTML}</div>`;
 
     if (loadingEl) {
@@ -574,7 +469,7 @@ class Dashboard {
     const loadMoreBtn = document.getElementById('load-more-btn');
 
     if (container && loadMoreBtn) {
-      if (this.hasMoreCompleted && !this.isLoading) {
+      if (this.hasMore && !this.isLoading) {
         container.classList.remove('hidden');
         loadMoreBtn.disabled = false;
         loadMoreBtn.textContent = 'Load More';
