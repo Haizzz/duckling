@@ -269,22 +269,22 @@ export class GitHubCLIProvider {
     try {
       const result = repositoryPath
         ? await execCommand(
-          'gh',
-          [
-            'pr',
-            'list',
-            '--head',
-            branchName,
-            '--json',
-            'number,url,title',
-            '--state',
-            'open',
-          ],
-          { cwd: repositoryPath }
-        )
+            'gh',
+            [
+              'pr',
+              'list',
+              '--head',
+              branchName,
+              '--json',
+              'number,url,title',
+              '--state',
+              'open',
+            ],
+            { cwd: repositoryPath }
+          )
         : await executeGitHubCLI(
-          `pr list --head ${branchName} --repo ${this.repoOwner}/${this.repoName} --json number,url,title --state open`
-        );
+            `pr list --head ${branchName} --repo ${this.repoOwner}/${this.repoName} --json number,url,title --state open`
+          );
 
       if (repositoryPath && 'exitCode' in result && result.exitCode !== 0) {
         throw new Error(`GitHub CLI command failed: ${result.stderr}`);

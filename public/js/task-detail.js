@@ -105,11 +105,10 @@ class TaskDetail {
         <!-- Header -->
         <div class="flex justify-between items-start mb-6">
           <div class="flex-1">
-            <div class="flex items-center gap-3 mb-2">
-              <h1 class="text-2xl font-bold text-gray-900 break-all">${this.escapeHtml(summary)}</h1>
-              ${statusBadge}
-            </div>
+            <h1 class="text-2xl font-bold text-gray-900 break-all mb-2">${this.escapeHtml(summary)}</h1>
           </div>
+          <div class="flex items-center gap-3 flex-shrink-0">
+            ${statusBadge}
           ${
             canCancel || canComplete || canRetry
               ? `
@@ -180,6 +179,7 @@ class TaskDetail {
           `
               : ''
           }
+          </div>
         </div>
 
         <!-- Task Details -->
