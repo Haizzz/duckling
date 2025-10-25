@@ -1,5 +1,6 @@
 import { simpleGit } from 'simple-git';
 import { logger } from './logger';
+import { toMessage } from './error-utils';
 
 interface GitRepoInfo {
   repoPath: string;
@@ -54,8 +55,8 @@ export async function validateAndGetRepoInfo(
     logger.info(`Git repository validated: ${owner}/${name}`);
 
     return repoInfo;
-  } catch (error: any) {
-    logger.error(`Git repository validation failed: ${error.message}`);
+  } catch (error: unknown) {
+    logger.error(`Git repository validation failed: ${toMessage(error)}`);
     throw error;
   }
 }

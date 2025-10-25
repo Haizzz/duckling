@@ -201,7 +201,7 @@ export class JiraManager {
         `Retrieved ${allTickets.length} Jira ticket(s): ${allTickets.map((t) => t.key).join(', ')}`
       );
       return allTickets;
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error(`Failed to fetch Jira tickets: ${error}`);
       return [];
     }
@@ -259,7 +259,7 @@ export class JiraManager {
         }
         throw apiError;
       }
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error(`Failed to fetch Jira ticket ${key}: ${error}`);
       return null;
     }
@@ -340,7 +340,7 @@ export class JiraManager {
         `Processed ${jiraTickets.length} Jira tickets, created/found ${taskIds.length} tasks`
       );
       return taskIds;
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error(`Failed to get latest tasks from Jira: ${error}`);
       return [];
     }

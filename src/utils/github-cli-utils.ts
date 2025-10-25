@@ -4,6 +4,7 @@
 
 import { logger } from './logger';
 import { execCommand } from './exec';
+import { toMessage } from './error-utils';
 
 /**
  * Check if GitHub CLI is available (both installed and authenticated)
@@ -12,8 +13,8 @@ export async function isGitHubCLIAvailable(): Promise<boolean> {
   // Check if GitHub CLI is installed
   try {
     await execCommand('gh', ['--version']);
-  } catch (error) {
-    logger.debug('GitHub CLI not installed:', String(error));
+  } catch (error: unknown) {
+    logger.debug('GitHub CLI not installed:', toMessage(error));
     return false;
   }
 
@@ -21,9 +22,9 @@ export async function isGitHubCLIAvailable(): Promise<boolean> {
   try {
     const result = await execCommand('gh', ['auth', 'status']);
     return result.exitCode === 0;
-  } catch (error) {
+  } catch (error: unknown) {
     // If gh auth status returns non-zero exit code, user is not authenticated
-    logger.debug('GitHub CLI not authenticated:', String(error));
+    logger.debug('GitHub CLI not authenticated:', toMessage(error));
     return false;
   }
 }
@@ -37,8 +38,8 @@ export async function executeGitHubCLI(
   try {
     const result = await execCommand('gh', command.split(' '));
     return { stdout: result.stdout, stderr: result.stderr };
-  } catch (error: any) {
-    logger.error('GitHub CLI command failed:', error.message);
+  } catch (error: unknown) {
+    logger.error('GitHub CLI command failed:', toMessage(error));
     throw error;
   }
 }

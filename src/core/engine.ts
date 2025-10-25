@@ -1,5 +1,11 @@
 import { EventEmitter } from 'events';
-import { Task, TaskStatus, TaskUpdateEvent, CreateTaskRequest } from '../types';
+import {
+  Task,
+  TaskStatus,
+  TaskUpdateEvent,
+  CreateTaskRequest,
+  LogLevel,
+} from '../types';
 import { taskExecutor } from './task-executor';
 import { logger } from '../utils/logger';
 import { withTaskLogMessages } from '../utils/task-logging';
@@ -11,6 +17,7 @@ import { OpenAIManager } from './openai-manager';
 import { GitManager } from './git-manager';
 import { GitHubCLIProvider } from './github-cli-provider';
 import { JiraManager } from './jira-manager';
+import { toMessage } from '../utils/error-utils';
 
 export class CoreEngine extends EventEmitter {
   private db: DatabaseManager;
@@ -43,16 +50,19 @@ export class CoreEngine extends EventEmitter {
 
   private getGitManager(repositoryPath: string): GitManager {
     try {
+      const githubProvider = this.getGitHubManager();
       return new GitManager(
         this.db,
         repositoryPath,
         this.openaiManager,
         this.settings,
-        this.jiraManager
+        this.jiraManager,
+        githubProvider
       );
-    } catch (error: any) {
-      logger.error(`Failed to initialize GitManager: ${error.message}`);
-      throw new Error(`Git repository validation failed: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMsg = toMessage(error);
+      logger.error(`Failed to initialize GitManager: ${errorMsg}`);
+      throw new Error(`Git repository validation failed: ${errorMsg}`);
     }
   }
 
@@ -69,12 +79,29 @@ export class CoreEngine extends EventEmitter {
         this.jiraManager
       );
       return this.githubManager;
-    } catch (error) {
-      const errorMsg = `Failed to initialize GitHub CLI provider: ${error}`;
+    } catch (error: unknown) {
+      const errorMsg = `Failed to initialize GitHub CLI provider: ${toMessage(error)}`;
       logger.error(errorMsg);
-      console.error(`❌ ${errorMsg}`);
       throw new Error(errorMsg);
     }
+  }
+
+  private dbLog(taskId: number, level: LogLevel, message: string): void {
+    this.db.addTaskLog({ task_id: taskId, level, message });
+  }
+
+  private setTaskStatus(
+    taskId: number,
+    status: TaskStatus,
+    currentStage?: string,
+    extra?: Partial<Task>
+  ): void {
+    this.db.updateTask(taskId, {
+      status,
+      current_stage: currentStage,
+      ...extra,
+    });
+    this.emitTaskUpdate(taskId, status);
   }
 
   async initialize(): Promise<void> {
@@ -93,8 +120,8 @@ export class CoreEngine extends EventEmitter {
       summary = await this.openaiManager.generateTaskSummary(
         request.description
       );
-    } catch (error) {
-      logger.warn(`Failed to generate task summary: ${error}`);
+    } catch (error: unknown) {
+      logger.warn(`Failed to generate task summary: ${toMessage(error)}`);
       // Continue without summary - will fallback in UI
       summary = undefined;
     }
@@ -112,13 +139,7 @@ export class CoreEngine extends EventEmitter {
     const taskId = this.db.createTask(task);
     logger.info(`Task created: ${request.title} ${taskId.toString()}`);
 
-    this.db.addTaskLog({
-      task_id: taskId,
-      level: 'info',
-      message: `Task created: ${request.title}`,
-    });
-
-    // Emit task update event
+    this.dbLog(taskId, 'info', `Task created: ${request.title}`);
     this.emitTaskUpdate(taskId, 'pending');
 
     return taskId;
@@ -130,19 +151,11 @@ export class CoreEngine extends EventEmitter {
       throw new Error('Task not found');
     }
 
-    this.db.updateTask(taskId, {
-      status: 'cancelled',
-      current_stage: 'cancelled',
+    this.setTaskStatus(taskId, 'cancelled', 'cancelled', {
       completed_at: new Date().toISOString(),
     });
 
-    this.db.addTaskLog({
-      task_id: taskId,
-      level: 'info',
-      message: 'Task cancelled by user',
-    });
-
-    this.emitTaskUpdate(taskId, 'cancelled');
+    this.dbLog(taskId, 'info', 'Task cancelled by user');
   }
 
   async retryTask(taskId: number): Promise<void> {
@@ -159,11 +172,11 @@ export class CoreEngine extends EventEmitter {
     if (this.jiraManager.isJiraTicket(task)) {
       const jiraKey = this.jiraManager.getJiraKey(task);
       if (jiraKey) {
-        this.db.addTaskLog({
-          task_id: taskId,
-          level: 'info',
-          message: `Refetching Jira ticket ${jiraKey} before retry...`,
-        });
+        this.dbLog(
+          taskId,
+          'info',
+          `Refetching Jira ticket ${jiraKey} before retry...`
+        );
 
         try {
           const updatedTicket = await this.jiraManager.getTicketByKey(jiraKey);
@@ -172,43 +185,37 @@ export class CoreEngine extends EventEmitter {
             this.db.updateTask(taskId, {
               description: updatedDescription,
             });
-            this.db.addTaskLog({
-              task_id: taskId,
-              level: 'info',
-              message: `Updated task with latest Jira ticket information. Status: ${updatedTicket.status}, Updated: ${updatedTicket.updated}`,
-            });
+            this.dbLog(
+              taskId,
+              'info',
+              `Updated task with latest Jira ticket information. Status: ${updatedTicket.status}, Updated: ${updatedTicket.updated}`
+            );
             logger.info(
               `Updated task ${taskId} with latest Jira ticket ${jiraKey} information`
             );
           } else {
-            this.db.addTaskLog({
-              task_id: taskId,
-              level: 'warn',
-              message: `Could not refetch Jira ticket ${jiraKey} - proceeding with retry using existing information`,
-            });
+            this.dbLog(
+              taskId,
+              'warn',
+              `Could not refetch Jira ticket ${jiraKey} - proceeding with retry using existing information`
+            );
           }
-        } catch (error) {
-          this.db.addTaskLog({
-            task_id: taskId,
-            level: 'warn',
-            message: `Failed to refetch Jira ticket ${jiraKey}: ${error} - proceeding with retry using existing information`,
-          });
+        } catch (error: unknown) {
+          this.dbLog(
+            taskId,
+            'warn',
+            `Failed to refetch Jira ticket ${jiraKey}: ${toMessage(error)} - proceeding with retry using existing information`
+          );
         }
       }
     }
 
     // Reset task to pending state and clear completion timestamp
-    this.db.updateTask(taskId, {
-      status: 'pending',
-      current_stage: undefined,
+    this.setTaskStatus(taskId, 'pending', undefined, {
       completed_at: undefined,
     });
 
-    this.db.addTaskLog({
-      task_id: taskId,
-      level: 'info',
-      message: `Task retry requested (was ${task.status})`,
-    });
+    this.dbLog(taskId, 'info', `Task retry requested (was ${task.status})`);
 
     // Task will be picked up by periodic processing
 
@@ -232,8 +239,8 @@ export class CoreEngine extends EventEmitter {
       try {
         await this.processReviews();
         await this.processPendingTasks();
-      } catch (error) {
-        logger.error(`Error in processing cycle: ${error}`);
+      } catch (error: unknown) {
+        logger.error(`Error in processing cycle: ${toMessage(error)}`);
       } finally {
         this.isProcessing = false;
       }
@@ -246,8 +253,8 @@ export class CoreEngine extends EventEmitter {
       await this.jiraManager.getLatestTasksForProcessing((request) =>
         this.createTask(request)
       );
-    } catch (error) {
-      logger.warn(`Failed to check for latest Jira tasks: ${error}`);
+    } catch (error: unknown) {
+      logger.warn(`Failed to check for latest Jira tasks: ${toMessage(error)}`);
     }
 
     // Process pending and in_progress tasks (in case server was interrupted)
@@ -261,9 +268,12 @@ export class CoreEngine extends EventEmitter {
 
   private async processReviews(): Promise<void> {
     const awaitingReviewTasks = this.db.getTasks({ status: 'awaiting-review' });
+    const addressingReviewTasks = this.db.getTasks({
+      status: 'addressing-review',
+    });
 
     // Single pass: for each task, check for new reviews, address them, and update status
-    for (const task of [...awaitingReviewTasks]) {
+    for (const task of [...awaitingReviewTasks, ...addressingReviewTasks]) {
       if (!task.pr_number || !task.branch_name) {
         continue;
       }
@@ -296,11 +306,11 @@ export class CoreEngine extends EventEmitter {
         if (result.comments.length > 0) {
           const concatenatedComments = result.comments.join('\n\n---\n\n');
 
-          this.db.addTaskLog({
-            task_id: task.id,
-            level: 'info',
-            message: `💬 Processing ${result.comments.length} PR review comment(s)...`,
-          });
+          this.dbLog(
+            task.id,
+            'info',
+            `💬 Processing ${result.comments.length} PR review comment(s)...`
+          );
 
           await this.handleAllPRComments(
             task.id,
@@ -308,12 +318,12 @@ export class CoreEngine extends EventEmitter {
             result.threadIds
           );
         }
-      } catch (error: any) {
-        this.db.addTaskLog({
-          task_id: task.id,
-          level: 'error',
-          message: `❌ Error processing reviews: ${error.message}`,
-        });
+      } catch (error: unknown) {
+        this.dbLog(
+          task.id,
+          'error',
+          `❌ Error processing reviews: ${toMessage(error)}`
+        );
       }
     }
   }
@@ -335,22 +345,18 @@ export class CoreEngine extends EventEmitter {
       execute: async () => {
         try {
           // Log which repository we're working on
-          this.db.addTaskLog({
-            task_id: taskId,
-            level: 'info',
-            message: `🏠 Working on repository: ${task.repository_path}`,
-          });
+          this.dbLog(
+            taskId,
+            'info',
+            `🏠 Working on repository: ${task.repository_path}`
+          );
           // Update status to in progress
-          this.db.addTaskLog({
-            task_id: taskId,
-            level: 'info',
-            message: '🎯 Task started - transitioning to in-progress status',
-          });
-          this.db.updateTask(taskId, {
-            status: 'in-progress',
-            current_stage: 'creating_branch',
-          });
-          this.emitTaskUpdate(taskId, 'in-progress');
+          this.dbLog(
+            taskId,
+            'info',
+            '🎯 Task started - transitioning to in-progress status'
+          );
+          this.setTaskStatus(taskId, 'in-progress', 'creating_branch');
 
           // Step 1: Create branch
           const generatedBranchName = await withTaskLogMessages(
@@ -367,11 +373,7 @@ export class CoreEngine extends EventEmitter {
                 taskId
               );
               // Update the completion message with the actual name
-              this.db.addTaskLog({
-                task_id: taskId,
-                level: 'info',
-                message: `✅ Branch name generated: ${name}`,
-              });
+              this.dbLog(taskId, 'info', `✅ Branch name generated: ${name}`);
               return name;
             }
           );
@@ -390,11 +392,11 @@ export class CoreEngine extends EventEmitter {
                 taskId
               );
               this.db.updateTask(taskId, { branch_name: name });
-              this.db.addTaskLog({
-                task_id: taskId,
-                level: 'info',
-                message: `✅ Branch created and checked out: ${name}`,
-              });
+              this.dbLog(
+                taskId,
+                'info',
+                `✅ Branch created and checked out: ${name}`
+              );
               // Emit update to notify UI of branch name
               this.emitTaskUpdate(taskId, 'in-progress');
               return name;
@@ -402,8 +404,7 @@ export class CoreEngine extends EventEmitter {
           );
 
           // Step 2: Generate code
-          this.db.updateTask(taskId, { current_stage: 'generating_code' });
-          this.emitTaskUpdate(taskId, 'in-progress');
+          this.setTaskStatus(taskId, 'in-progress', 'generating_code');
 
           await withTaskLogMessages(
             this.db,
@@ -421,19 +422,16 @@ export class CoreEngine extends EventEmitter {
               );
 
               // Log the actual output to task logs
-              this.db.addTaskLog({
-                task_id: taskId,
-                level: 'info',
-                message: `📝 Code generation output:\n${output}`,
-              });
+              this.dbLog(
+                taskId,
+                'info',
+                `📝 Code generation output:\n${output}`
+              );
             }
           );
 
           // Step 3: Run precommit checks
-          this.db.updateTask(taskId, {
-            current_stage: 'running_precommit_checks',
-          });
-          this.emitTaskUpdate(taskId, 'in-progress');
+          this.setTaskStatus(taskId, 'in-progress', 'running_precommit_checks');
 
           await withTaskLogMessages(
             this.db,
@@ -479,16 +477,15 @@ export class CoreEngine extends EventEmitter {
           );
 
           // Wait for GitHub to process the push
-          this.db.addTaskLog({
-            task_id: taskId,
-            level: 'info',
-            message: '⏳ Waiting 10 seconds for GitHub to process the push...',
-          });
+          this.dbLog(
+            taskId,
+            'info',
+            '⏳ Waiting 10 seconds for GitHub to process the push...'
+          );
           await new Promise((resolve) => setTimeout(resolve, 10000));
 
           // Step 5: Create PR
-          this.db.updateTask(taskId, { current_stage: 'creating_pr' });
-          this.emitTaskUpdate(taskId, 'in-progress');
+          this.setTaskStatus(taskId, 'in-progress', 'creating_pr');
 
           await withTaskLogMessages(
             this.db,
@@ -502,22 +499,14 @@ export class CoreEngine extends EventEmitter {
               await this.createPR(taskId, task, branchName);
             }
           );
-        } catch (error: any) {
-          this.db.addTaskLog({
-            task_id: taskId,
-            level: 'error',
-            message: '❌ Task failed - transitioning to failed status',
-          });
-          this.db.updateTask(taskId, {
-            status: 'failed',
-            current_stage: 'failed',
-          });
-          this.db.addTaskLog({
-            task_id: taskId,
-            level: 'error',
-            message: `💥 Task failed: ${error.message}`,
-          });
-          this.emitTaskUpdate(taskId, 'failed');
+        } catch (error: unknown) {
+          this.dbLog(
+            taskId,
+            'error',
+            '❌ Task failed - transitioning to failed status'
+          );
+          this.setTaskStatus(taskId, 'failed', 'failed');
+          this.dbLog(taskId, 'error', `💥 Task failed: ${toMessage(error)}`);
           throw error;
         }
       },
@@ -528,11 +517,7 @@ export class CoreEngine extends EventEmitter {
     const task = this.db.getTask(taskId);
     if (!task) throw new Error('Task not found');
 
-    this.db.addTaskLog({
-      task_id: taskId,
-      level: 'info',
-      message: '🧪 Running initial precommit checks...',
-    });
+    this.dbLog(taskId, 'info', '🧪 Running initial precommit checks...');
 
     await this.precommitManager.runChecks(taskId, task.repository_path);
   }
@@ -573,11 +558,11 @@ export class CoreEngine extends EventEmitter {
       this.emitTaskUpdate(taskId, 'awaiting-review');
 
       // PR comments will be polled by periodic processing
-    } catch (error) {
+    } catch (error: unknown) {
       this.db.addTaskLog({
         task_id: taskId,
         level: 'error',
-        message: `Failed to create PR: ${error}`,
+        message: `Failed to create PR: ${toMessage(error)}`,
       });
       // Update task to failed since we can't create PR
       this.db.updateTask(taskId, {
@@ -598,7 +583,7 @@ export class CoreEngine extends EventEmitter {
   }> {
     logger.info(`Collecting PR comments for task: ${taskId} ${prNumber}`);
     const task = this.db.getTask(taskId);
-    if (!task || task.status !== 'awaiting-review') {
+    if (!task) {
       return { comments: [], threadIds: [] };
     }
 
@@ -615,10 +600,10 @@ export class CoreEngine extends EventEmitter {
         logger.info(
           `Last commit timestamp for branch ${task.branch_name}: ${lastCommitTimestamp}`
         );
-      } catch (error) {
+      } catch (error: unknown) {
         logger.warn(
           `Could not get last commit timestamp for branch ${task.branch_name}:`,
-          String(error)
+          toMessage(error)
         );
       }
     }
@@ -750,11 +735,11 @@ export class CoreEngine extends EventEmitter {
             current_stage: 'awaiting_review',
           });
           this.emitTaskUpdate(taskId, 'awaiting-review');
-        } catch (error: any) {
+        } catch (error: unknown) {
           this.db.addTaskLog({
             task_id: taskId,
             level: 'error',
-            message: `❌ Error handling PR comments: ${error.message}`,
+            message: `❌ Error handling PR comments: ${toMessage(error)}`,
           });
           throw error;
         }
@@ -765,7 +750,7 @@ export class CoreEngine extends EventEmitter {
   private emitTaskUpdate(
     taskId: number,
     status: TaskStatus,
-    metadata?: any
+    metadata?: Record<string, unknown>
   ): void {
     // Get the full task data to include in the update
     const task = this.db.getTask(taskId);

@@ -1,3 +1,5 @@
+import { toMessage } from './error-utils';
+
 export async function withRetry<T>(
   operation: () => Promise<T>,
   context: string,
@@ -8,7 +10,7 @@ export async function withRetry<T>(
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       return await operation();
-    } catch (error) {
+    } catch (error: unknown) {
       lastError = error as Error;
       console.log(
         `${context} failed (attempt ${attempt}/${maxRetries}):`,
@@ -17,7 +19,7 @@ export async function withRetry<T>(
 
       if (attempt === maxRetries) {
         throw new Error(
-          `${context} failed after ${maxRetries} attempts: ${lastError.message}`
+          `${context} failed after ${maxRetries} attempts: ${toMessage(lastError)}`
         );
       }
 

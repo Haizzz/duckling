@@ -8,6 +8,14 @@ import type { Database } from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
 
+interface ColumnInfo {
+  name: string;
+  type: string;
+  notnull: number;
+  dflt_value: unknown;
+  pk: number;
+}
+
 export function runMultiRepositoryMigration(
   db: Database,
   currentWorkingDirectory: string
@@ -15,8 +23,8 @@ export function runMultiRepositoryMigration(
   console.log('Running database migrations...');
 
   // Get current columns in tasks table
-  const columns = db.prepare('PRAGMA table_info(tasks)').all();
-  const columnNames = columns.map((col: any) => col.name);
+  const columns = db.prepare('PRAGMA table_info(tasks)').all() as ColumnInfo[];
+  const columnNames = columns.map((col) => col.name);
 
   // Add missing columns to tasks table
   const columnsToAdd = [
@@ -55,14 +63,16 @@ export function runMultiRepositoryMigration(
         );
       }
     }
-  } catch (error) {
+  } catch (error: unknown) {
     console.warn('Could not migrate existing repository data:', error);
   }
 
   // Remove category column from settings table if it exists
   try {
-    const settingsColumns = db.prepare('PRAGMA table_info(settings)').all();
-    const settingsColumnNames = settingsColumns.map((col: any) => col.name);
+    const settingsColumns = db
+      .prepare('PRAGMA table_info(settings)')
+      .all() as ColumnInfo[];
+    const settingsColumnNames = settingsColumns.map((col) => col.name);
 
     if (settingsColumnNames.includes('category')) {
       console.log('Removing category column from settings table...');
@@ -93,7 +103,7 @@ export function runMultiRepositoryMigration(
     } else {
       console.log('Category column not found in settings table, skipping');
     }
-  } catch (error) {
+  } catch (error: unknown) {
     console.error(
       'Failed to remove category column from settings table:',
       error

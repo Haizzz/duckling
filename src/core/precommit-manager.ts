@@ -2,6 +2,7 @@ import { PrecommitCheck } from '../types';
 import { logger } from '../utils/logger';
 import { execShellCommand } from '../utils/exec';
 import { DatabaseManager } from './database';
+import { toMessage } from '../utils/error-utils';
 
 export class PrecommitManager {
   private db: DatabaseManager;
@@ -14,7 +15,7 @@ export class PrecommitManager {
     taskId: number,
     repositoryPath: string
   ): Promise<{ passed: boolean; errors: string[] }> {
-    const checks = this.db.getEnabledPrecommitChecks();
+    const checks = this.db.getPrecommitChecks();
     const errors: string[] = [];
 
     logger.info(`Running ${checks.length} precommit checks`, taskId.toString());
@@ -23,10 +24,10 @@ export class PrecommitManager {
       try {
         await this.runSingleCheck(check, taskId, repositoryPath);
         this.logCheckResult(taskId, check.name, true, null);
-      } catch (error: any) {
-        const errorMessage = `${check.name}: ${error.message}`;
+      } catch (error: unknown) {
+        const errorMessage = `${check.name}: ${toMessage(error)}`;
         errors.push(errorMessage);
-        this.logCheckResult(taskId, check.name, false, error.message);
+        this.logCheckResult(taskId, check.name, false, toMessage(error));
       }
     }
 
@@ -100,6 +101,6 @@ export class PrecommitManager {
   }
 
   getAllChecks(): PrecommitCheck[] {
-    return this.db.getAllPrecommitChecks();
+    return this.db.getPrecommitChecks();
   }
 }
