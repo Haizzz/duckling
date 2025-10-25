@@ -58,6 +58,12 @@ export interface Repository {
   created_at: string;
 }
 
+export interface SettingsHook {
+  id: number;
+  setting_name: string;
+  command: string;
+}
+
 export interface TaskUpdateEvent {
   taskId: number;
   status: TaskStatus;

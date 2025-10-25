@@ -1,6 +1,13 @@
 import Database from 'better-sqlite3';
 import fs from 'fs';
-import { Task, TaskLog, Setting, PrecommitCheck, Repository } from '../types';
+import {
+  Task,
+  TaskLog,
+  Setting,
+  PrecommitCheck,
+  Repository,
+  SettingsHook,
+} from '../types';
 import {
   DUCKLING_DIR,
   DATABASE_PATH,
@@ -164,7 +171,7 @@ export class DatabaseManager {
     if (fields.length === 0) return;
 
     const setClause = fields.map((field) => `${field} = ?`).join(', ');
-    const values = fields.map((field) => (updates as any)[field]);
+    const values = fields.map((field) => updates[field as keyof Task]);
 
     const stmt = this.db.prepare(`
       UPDATE tasks 
@@ -184,7 +191,7 @@ export class DatabaseManager {
     filters: { status?: string; limit?: number; offset?: number } = {}
   ): Task[] {
     let query = 'SELECT * FROM tasks';
-    const params: any[] = [];
+    const params: (string | number)[] = [];
 
     if (filters.status && filters.status !== 'all') {
       query += ' WHERE status = ?';
@@ -236,7 +243,7 @@ export class DatabaseManager {
     } = {}
   ): TaskLog[] {
     let query = 'SELECT * FROM task_logs WHERE task_id = ?';
-    const params: any[] = [taskId];
+    const params: (string | number)[] = [taskId];
 
     if (filters.level && filters.level !== 'all') {
       query += ' AND level = ?';
@@ -304,7 +311,9 @@ export class DatabaseManager {
     if (fields.length === 0) return;
 
     const setClause = fields.map((field) => `${field} = ?`).join(', ');
-    const values = fields.map((field) => (updates as any)[field]);
+    const values = fields.map(
+      (field) => updates[field as keyof PrecommitCheck]
+    );
 
     const stmt = this.db.prepare(`
       UPDATE precommit_checks 
@@ -375,24 +384,18 @@ export class DatabaseManager {
     stmt.run(settingName, command);
   }
 
-  getSettingsHook(
-    settingName: string
-  ): { id: number; setting_name: string; command: string } | null {
+  getSettingsHook(settingName: string): SettingsHook | null {
     const stmt = this.db.prepare(
       'SELECT * FROM settings_hooks WHERE setting_name = ?'
     );
-    return stmt.get(settingName) as any;
+    return (stmt.get(settingName) as SettingsHook | undefined) || null;
   }
 
-  getAllSettingsHooks(): Array<{
-    id: number;
-    setting_name: string;
-    command: string;
-  }> {
+  getAllSettingsHooks(): SettingsHook[] {
     const stmt = this.db.prepare(
       'SELECT * FROM settings_hooks ORDER BY setting_name ASC'
     );
-    return stmt.all() as any[];
+    return stmt.all() as SettingsHook[];
   }
 
   deleteSettingsHook(settingName: string): void {
