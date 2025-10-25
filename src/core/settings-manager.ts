@@ -2,6 +2,7 @@ import { CodingTool } from '../types';
 import { DatabaseManager } from './database';
 import { DEFAULT_CODING_PROMPT } from './prompts';
 import { execShellCommand } from '../utils/exec';
+import { toMessage } from '../utils/error-utils';
 
 interface SettingsDefaults {
   defaultCodingTool: CodingTool;
@@ -70,25 +71,25 @@ export class SettingsManager {
     const hook = this.db.getSettingsHook(settingName);
     if (hook) {
       try {
-        const command = `${hook.command} "${value}"`;
+        const command = `${hook.command} ${JSON.stringify(value)}`;
         await execShellCommand(command);
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error(
           `Failed to execute hook for ${settingName}:`,
-          error.message
+          toMessage(error)
         );
       }
     }
   }
 
   getAll(): SettingsDefaults {
-    const settings: Record<string, any> = {};
+    const settings: Record<string, string | number | boolean> = {};
     for (const key of Object.keys(SettingsManager.DEFAULTS) as Array<
       keyof SettingsDefaults
     >) {
       settings[key] = this.get(key);
     }
-    return settings as SettingsDefaults;
+    return settings as unknown as SettingsDefaults;
   }
 
   static getDefaults(): SettingsDefaults {

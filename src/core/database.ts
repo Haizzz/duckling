@@ -53,9 +53,11 @@ export class DatabaseManager {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL,
         description TEXT NOT NULL,
+        summary TEXT,
         status TEXT NOT NULL,
         coding_tool TEXT NOT NULL,
         repository_path TEXT NOT NULL DEFAULT '',
+        current_stage TEXT,
         branch_name TEXT,
         pr_number INTEGER,
         pr_url TEXT,
@@ -167,11 +169,13 @@ export class DatabaseManager {
   }
 
   updateTask(id: number, updates: Partial<Task>): void {
-    const fields = Object.keys(updates).filter((key) => key !== 'id');
-    if (fields.length === 0) return;
+    const entries = Object.entries(updates).filter(
+      ([key, value]) => key !== 'id' && value !== undefined
+    );
+    if (entries.length === 0) return;
 
-    const setClause = fields.map((field) => `${field} = ?`).join(', ');
-    const values = fields.map((field) => updates[field as keyof Task]);
+    const setClause = entries.map(([key]) => `${key} = ?`).join(', ');
+    const values = entries.map(([, value]) => value);
 
     const stmt = this.db.prepare(`
       UPDATE tasks 
@@ -198,8 +202,8 @@ export class DatabaseManager {
       params.push(filters.status);
     }
 
-    // Order by newest first
-    query += ' ORDER BY created_at DESC';
+    // Order by most recently updated first
+    query += ' ORDER BY updated_at DESC';
 
     if (filters.limit) {
       query += ' LIMIT ?';
@@ -329,16 +333,7 @@ export class DatabaseManager {
     stmt.run(id);
   }
 
-  getEnabledPrecommitChecks(): PrecommitCheck[] {
-    const stmt = this.db.prepare(`
-      SELECT * FROM precommit_checks 
-      ORDER BY order_index ASC
-    `);
-
-    return stmt.all() as PrecommitCheck[];
-  }
-
-  getAllPrecommitChecks(): PrecommitCheck[] {
+  getPrecommitChecks(): PrecommitCheck[] {
     const stmt = this.db.prepare(`
       SELECT * FROM precommit_checks 
       ORDER BY order_index ASC

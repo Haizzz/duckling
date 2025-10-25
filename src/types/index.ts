@@ -68,11 +68,11 @@ export interface TaskUpdateEvent {
   taskId: number;
   status: TaskStatus;
   progress?: number;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   logEntry?: TaskLog;
 }
 
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;

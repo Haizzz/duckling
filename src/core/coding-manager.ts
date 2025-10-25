@@ -6,6 +6,7 @@ import {
 } from '../utils/exec';
 import { createCodingPrompt } from './prompts';
 import { SettingsManager } from './settings-manager';
+import { isENOENT } from '../utils/error-utils';
 
 interface CodingContext {
   taskId: number;
@@ -71,8 +72,8 @@ export class CodingManager {
       }
 
       return result.stdout;
-    } catch (error: any) {
-      if (error.code === 'ENOENT') {
+    } catch (error: unknown) {
+      if (isENOENT(error)) {
         throw new Error(
           "Amp CLI not found. Please install amp and ensure it's in your PATH. Requires Node.js v22+."
         );
@@ -121,8 +122,8 @@ export class CodingManager {
       }
 
       return result.stdout;
-    } catch (error: any) {
-      if (error.code === 'ENOENT') {
+    } catch (error: unknown) {
+      if (isENOENT(error)) {
         throw new Error(
           "Codex CLI not found. Please install codex and ensure it's in your PATH."
         );
@@ -159,8 +160,8 @@ export class CodingManager {
       }
 
       return result.stdout;
-    } catch (error: any) {
-      if (error.code === 'ENOENT') {
+    } catch (error: unknown) {
+      if (isENOENT(error)) {
         throw new Error(
           "Claude CLI not found. Please install claude and ensure it's in your PATH."
         );

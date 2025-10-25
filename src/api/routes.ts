@@ -5,8 +5,9 @@ import { execSync } from 'child_process';
 import { DatabaseManager } from '../core/database';
 import { CoreEngine } from '../core/engine';
 import { SettingsManager } from '../core/settings-manager';
-import { ApiResponse, CreateTaskRequest } from '../types';
+import { ApiResponse, CreateTaskRequest, TaskUpdateEvent } from '../types';
 import { LOGS_DIR } from '../utils/constants';
+import { toMessage } from '../utils/error-utils';
 
 export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
   const router = Router();
@@ -52,10 +53,10 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
       };
 
       res.json(response);
-    } catch (error: any) {
+    } catch (error: unknown) {
       res.status(500).json({
         success: false,
-        error: error.message,
+        error: toMessage(error),
       });
     }
   });
@@ -107,10 +108,10 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
       };
 
       res.json(response);
-    } catch (error: any) {
+    } catch (error: unknown) {
       res.status(500).json({
         success: false,
-        error: error.message,
+        error: toMessage(error),
       });
     }
   });
@@ -132,10 +133,10 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
       };
 
       res.json(response);
-    } catch (error: any) {
+    } catch (error: unknown) {
       res.status(500).json({
         success: false,
-        error: error.message,
+        error: toMessage(error),
       });
     }
   });
@@ -159,10 +160,10 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
       };
 
       res.json(response);
-    } catch (error: any) {
+    } catch (error: unknown) {
       res.status(500).json({
         success: false,
-        error: error.message,
+        error: toMessage(error),
       });
     }
   });
@@ -186,10 +187,10 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
       };
 
       res.json(response);
-    } catch (error: any) {
+    } catch (error: unknown) {
       res.status(500).json({
         success: false,
-        error: error.message,
+        error: toMessage(error),
       });
     }
   });
@@ -225,10 +226,10 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
       };
 
       res.json(response);
-    } catch (error: any) {
+    } catch (error: unknown) {
       res.status(500).json({
         success: false,
-        error: error.message,
+        error: toMessage(error),
       });
     }
   });
@@ -242,10 +243,10 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
       };
 
       res.json(response);
-    } catch (error: any) {
+    } catch (error: unknown) {
       res.status(500).json({
         success: false,
-        error: error.message,
+        error: toMessage(error),
       });
     }
   });
@@ -270,10 +271,10 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
       };
 
       res.json(response);
-    } catch (error: any) {
+    } catch (error: unknown) {
       res.status(500).json({
         success: false,
-        error: error.message,
+        error: toMessage(error),
       });
     }
   });
@@ -288,10 +289,10 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
       };
 
       res.json(response);
-    } catch (error: any) {
+    } catch (error: unknown) {
       res.status(400).json({
         success: false,
-        error: error.message,
+        error: toMessage(error),
       });
     }
   });
@@ -328,10 +329,10 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
       // Stream the file
       const stream = fs.createReadStream(logFilePath);
       stream.pipe(res);
-    } catch (error: any) {
+    } catch (error: unknown) {
       res.status(500).json({
         success: false,
-        error: error.message,
+        error: toMessage(error),
       });
     }
   });
@@ -343,7 +344,7 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
 
       // For password fields, return a special indicator if value exists
       const secureFields = ['openaiApiKey', 'ampApiKey', 'jiraApiKey'];
-      const sanitizedSettings: Record<string, any> = {};
+      const sanitizedSettings: Record<string, string> = {};
 
       for (const [key, value] of Object.entries(settingsObj)) {
         if (secureFields.includes(key)) {
@@ -359,17 +360,20 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
       };
 
       res.json(response);
-    } catch (error: any) {
+    } catch (error: unknown) {
       res.status(500).json({
         success: false,
-        error: error.message,
+        error: toMessage(error),
       });
     }
   });
 
   router.put('/settings', async (req: Request, res: Response) => {
     try {
-      const settingsData = req.body;
+      const settingsData = req.body as Record<
+        string,
+        string | number | boolean
+      >;
       // Update each setting
       for (const [key, value] of Object.entries(settingsData)) {
         // Skip empty API keys/tokens (means don't change the existing value)
@@ -381,7 +385,8 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
           continue;
         }
 
-        settings.set(key as any, value);
+        const settingKey = key as keyof ReturnType<typeof settings.getAll>;
+        settings.set(settingKey, value as never);
       }
 
       const response: ApiResponse = {
@@ -390,10 +395,10 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
       };
 
       res.json(response);
-    } catch (error: any) {
+    } catch (error: unknown) {
       res.status(500).json({
         success: false,
-        error: error.message,
+        error: toMessage(error),
       });
     }
   });
@@ -407,10 +412,10 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
         data: hooks,
       };
       res.json(response);
-    } catch (error: any) {
+    } catch (error: unknown) {
       res.status(500).json({
         success: false,
-        error: error.message,
+        error: toMessage(error),
       });
     }
   });
@@ -418,7 +423,7 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
   // Precommit checks endpoints
   router.get('/precommit-checks', async (req: Request, res: Response) => {
     try {
-      const checks = db.getAllPrecommitChecks();
+      const checks = db.getPrecommitChecks();
 
       const response: ApiResponse = {
         success: true,
@@ -426,10 +431,10 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
       };
 
       res.json(response);
-    } catch (error: any) {
+    } catch (error: unknown) {
       res.status(500).json({
         success: false,
-        error: error.message,
+        error: toMessage(error),
       });
     }
   });
@@ -457,10 +462,10 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
       };
 
       res.json(response);
-    } catch (error: any) {
+    } catch (error: unknown) {
       res.status(500).json({
         success: false,
-        error: error.message,
+        error: toMessage(error),
       });
     }
   });
@@ -478,10 +483,10 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
       };
 
       res.json(response);
-    } catch (error: any) {
+    } catch (error: unknown) {
       res.status(500).json({
         success: false,
-        error: error.message,
+        error: toMessage(error),
       });
     }
   });
@@ -500,10 +505,10 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
         };
 
         res.json(response);
-      } catch (error: any) {
+      } catch (error: unknown) {
         res.status(500).json({
           success: false,
-          error: error.message,
+          error: toMessage(error),
         });
       }
     }
@@ -526,7 +531,7 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
     );
 
     // Listen for task updates from engine
-    const handleTaskUpdate = (event: any) => {
+    const handleTaskUpdate = (event: TaskUpdateEvent) => {
       res.write(
         `data: ${JSON.stringify({ type: 'task-update', ...event })}\n\n`
       );
@@ -557,10 +562,10 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
         data: repositories,
       };
       res.json(response);
-    } catch (error) {
+    } catch (error: unknown) {
       const response: ApiResponse = {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: toMessage(error),
       };
       res.status(500).json(response);
     }
@@ -646,10 +651,10 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
         };
         res.status(400).json(response);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       const response: ApiResponse = {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: toMessage(error),
       };
       res.status(500).json(response);
     }
@@ -674,10 +679,10 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
         data: { message: 'Repository removed successfully' },
       };
       res.json(response);
-    } catch (error) {
+    } catch (error: unknown) {
       const response: ApiResponse = {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: toMessage(error),
       };
       res.status(500).json(response);
     }

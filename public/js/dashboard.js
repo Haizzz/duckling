@@ -282,10 +282,10 @@ class Dashboard {
     // Load only first page of completed tasks
     await this.loadCompletedTasks();
 
-    // Sort all tasks by created_at DESC (newest first)
+    // Sort all tasks by updated_at DESC (most recently updated first)
     this.loadedTasks.sort(
       (a, b) =>
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
     );
 
     this.renderTasks();

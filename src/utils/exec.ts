@@ -1,4 +1,4 @@
-import { execa } from 'execa';
+import { execa, ExecaError } from 'execa';
 import type { Options as ExecaOptions } from 'execa';
 import { logger } from './logger';
 
@@ -39,13 +39,14 @@ export async function execCommand(
       stderr: result.stderr,
       exitCode: result.exitCode,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Log the error
+    const execError = error as ExecaError;
     logger.logCommandResult(
       command,
-      error.exitCode || 1,
-      error.stdout,
-      error.stderr,
+      execError.exitCode ?? 1,
+      execError.stdout ?? '',
+      execError.stderr ?? '',
       taskId
     );
 
@@ -111,13 +112,14 @@ export async function execCommandWithInputStreaming(
       stderr,
       exitCode: result.exitCode,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Log the error
+    const execError = error as ExecaError;
     logger.logCommandResult(
       command,
-      error.exitCode || 1,
-      error.stdout,
-      error.stderr,
+      execError.exitCode ?? 1,
+      execError.stdout ?? '',
+      execError.stderr ?? '',
       taskId
     );
 
@@ -181,13 +183,14 @@ export async function execCommandStreaming(
       stderr,
       exitCode: result.exitCode,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Log the error
+    const execError = error as ExecaError;
     logger.logCommandResult(
       command,
-      error.exitCode || 1,
-      error.stdout,
-      error.stderr,
+      execError.exitCode ?? 1,
+      execError.stdout ?? '',
+      execError.stderr ?? '',
       taskId
     );
 

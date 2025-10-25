@@ -4,12 +4,13 @@ import path from 'path';
 import { DatabaseManager } from '../core/database';
 import { CoreEngine } from '../core/engine';
 import { createRoutes } from './routes';
+import type { Server } from 'http';
 
 export class APIServer {
   private app: express.Application;
   private db: DatabaseManager;
   private engine: CoreEngine;
-  private server: any;
+  private server: Server | null = null;
 
   constructor(db: DatabaseManager, engine: CoreEngine) {
     this.db = db;
@@ -93,32 +94,36 @@ export class APIServer {
 
   async stop(): Promise<void> {
     return new Promise((resolve, reject) => {
-      if (this.server) {
-        console.log('🔄 Stopping API server...');
-
-        // Set a timeout for server close
-        const timeout = setTimeout(() => {
-          console.log('⚠️  Server close timeout, forcing shutdown');
-          this.server.destroy();
-          resolve();
-        }, 5000);
-
-        this.server.close((err: any) => {
-          clearTimeout(timeout);
-          if (err) {
-            console.error('Error stopping server:', err);
-            reject(err);
-          } else {
-            console.log('✅ API server stopped');
-            resolve();
-          }
-        });
-
-        // Close all active connections
-        this.server.closeAllConnections();
-      } else {
+      if (!this.server) {
         resolve();
+        return;
       }
+
+      console.log('🔄 Stopping API server...');
+
+      const server = this.server;
+
+      // Set a timeout for server close
+      const timeout = setTimeout(() => {
+        console.log('⚠️  Server close timeout, forcing shutdown');
+        // Note: destroy() is not part of the standard Server type
+        // but may be available in some implementations
+        resolve();
+      }, 5000);
+
+      server.close((err?: Error) => {
+        clearTimeout(timeout);
+        if (err) {
+          console.error('Error stopping server:', err);
+          reject(err);
+        } else {
+          console.log('✅ API server stopped');
+          resolve();
+        }
+      });
+
+      // Close all active connections
+      server.closeAllConnections();
     });
   }
 }

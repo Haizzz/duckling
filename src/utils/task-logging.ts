@@ -1,4 +1,5 @@
 import { DatabaseManager } from '../core/database';
+import { toMessage } from './error-utils';
 
 interface TaskLoggingOptions {
   taskId: number;
@@ -36,13 +37,12 @@ export async function withTaskLogMessages<T>(
     });
 
     return result;
-  } catch (error) {
+  } catch (error: unknown) {
     // Log failure message
-    const errorMessage = error instanceof Error ? error.message : String(error);
     db.addTaskLog({
       task_id: taskId,
       level: 'error',
-      message: `${failureMessage}: ${errorMessage}`,
+      message: `${failureMessage}: ${toMessage(error)}`,
     });
 
     throw error;

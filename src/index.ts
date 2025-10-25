@@ -7,6 +7,7 @@ import { PrecommitManager } from './core/precommit-manager';
 import { OpenAIManager } from './core/openai-manager';
 import { JiraManager } from './core/jira-manager';
 import { CoreEngine } from './core/engine';
+import { toMessage } from './utils/error-utils';
 
 export async function startDuckling(port: number = 5050): Promise<void> {
   console.log('🚀 Starting Duckling...');
@@ -49,8 +50,8 @@ export async function startDuckling(port: number = 5050): Promise<void> {
       process.exit(1);
     }
     console.log('🔑 GitHub CLI: Ready');
-  } catch (error) {
-    console.error('❌ Failed to check GitHub CLI status:', error);
+  } catch (error: unknown) {
+    console.error('❌ Failed to check GitHub CLI status:', toMessage(error));
     process.exit(1);
   }
 
@@ -77,8 +78,8 @@ export async function startDuckling(port: number = 5050): Promise<void> {
 // If this file is run directly, start the server
 if (require.main === module) {
   const port = process.env.PORT ? parseInt(process.env.PORT) : 5050;
-  startDuckling(port).catch((error) => {
-    console.error('❌ Failed to start Duckling:', error);
+  startDuckling(port).catch((error: unknown) => {
+    console.error('❌ Failed to start Duckling:', toMessage(error));
     process.exit(1);
   });
 }

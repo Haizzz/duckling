@@ -16,19 +16,22 @@ export class GitManager {
   private openaiManager: OpenAIManager;
   private jiraManager: JiraManager;
   private repoPath: string;
+  private githubProvider: GitHubCLIProvider;
 
   constructor(
     db: DatabaseManager,
     repoPath: string,
     openaiManager: OpenAIManager,
     settings: SettingsManager,
-    jiraManager: JiraManager
+    jiraManager: JiraManager,
+    githubProvider: GitHubCLIProvider
   ) {
     this.db = db;
     this.settings = settings;
     this.openaiManager = openaiManager;
     this.jiraManager = jiraManager;
     this.repoPath = repoPath;
+    this.githubProvider = githubProvider;
 
     // Validate git repository before initializing SimpleGit
     this.validateGitRepo();
@@ -80,13 +83,9 @@ export class GitManager {
   ): Promise<string> {
     return await withRetry(async () => {
       const branchPrefix = this.settings.get('branchPrefix');
-      const githubManager = new GitHubCLIProvider(
-        this.db,
-        this.openaiManager,
-        this.settings,
-        this.jiraManager
+      const defaultBranch = await this.githubProvider.getDefaultBranch(
+        this.repoPath
       );
-      const defaultBranch = await githubManager.getDefaultBranch(this.repoPath);
 
       logger.info(
         `Updating to latest ${defaultBranch} and creating new branch`,
@@ -159,7 +158,7 @@ export class GitManager {
     try {
       const branches = await this.git.branchLocal();
       return branches.all.includes(branchName);
-    } catch (error) {
+    } catch (error: unknown) {
       return false;
     }
   }
@@ -293,10 +292,12 @@ export class GitManager {
 
   async getDiff(branchName?: string): Promise<string> {
     if (branchName) {
-      return await this.git.diff([`origin/main...${branchName}`]);
-    } else {
-      return await this.git.diff();
+      const defaultBranch = await this.githubProvider.getDefaultBranch(
+        this.repoPath
+      );
+      return await this.git.diff([`origin/${defaultBranch}...${branchName}`]);
     }
+    return await this.git.diff();
   }
 
   async pullLatest(

@@ -11,6 +11,7 @@ import { OpenAIManager } from '../core/openai-manager';
 import { JiraManager } from '../core/jira-manager';
 import { CoreEngine } from '../core/engine';
 import * as readline from 'readline';
+import { toMessage } from '../utils/error-utils';
 
 const program = new Command();
 
@@ -61,8 +62,8 @@ program
     try {
       const port = parseInt(options.port);
       await startDuckling(port);
-    } catch (error: any) {
-      console.error('❌ Failed to start Duckling:', error.message);
+    } catch (error: unknown) {
+      console.error('❌ Failed to start Duckling:', toMessage(error));
       process.exit(1);
     }
   });
@@ -74,14 +75,17 @@ const settingsCmd = program.command('settings').description('Manage settings');
 settingsCmd
   .command('set <key> <value>')
   .description('Set a settings value')
-  .action(async (key, value) => {
+  .action(async (key: string, value: string) => {
     try {
       const services = createServices();
-      services.settings.set(key as any, value as any);
+      const settingKey = key as keyof ReturnType<
+        typeof services.settings.getAll
+      >;
+      services.settings.set(settingKey, value as never);
       console.log(`✅ Set ${key} = ${value}`);
       services.db.close();
-    } catch (error: any) {
-      console.error('❌ Failed to set settings:', error.message);
+    } catch (error: unknown) {
+      console.error('❌ Failed to set settings:', toMessage(error));
       process.exit(1);
     }
   });
@@ -93,7 +97,7 @@ settingsCmd
   .action(async (command) => {
     try {
       const services = createServices();
-      const checks = services.db.getAllPrecommitChecks();
+      const checks = services.db.getPrecommitChecks();
 
       // Check if command already exists
       if (checks.some((c) => c.command === command)) {
@@ -113,8 +117,8 @@ settingsCmd
       });
       console.log(`✅ Added precommit check: ${command}`);
       services.db.close();
-    } catch (error: any) {
-      console.error('❌ Failed to add precommit check:', error.message);
+    } catch (error: unknown) {
+      console.error('❌ Failed to add precommit check:', toMessage(error));
       process.exit(1);
     }
   });
@@ -183,8 +187,8 @@ taskCmd
 
       services.engine.shutdown();
       services.db.close();
-    } catch (error: any) {
-      console.error('❌ Failed to create task:', error.message);
+    } catch (error: unknown) {
+      console.error('❌ Failed to create task:', toMessage(error));
       process.exit(1);
     }
   });
@@ -202,7 +206,7 @@ taskCmd
     try {
       const services = createServices();
 
-      const filters: any = {
+      const filters: { limit: number; status?: string } = {
         limit: parseInt(options.limit),
       };
 
@@ -220,7 +224,7 @@ taskCmd
 
       console.log(`📋 Found ${tasks.length} task(s):\n`);
 
-      tasks.forEach((task: any) => {
+      tasks.forEach((task) => {
         const statusEmojis: Record<string, string> = {
           pending: '⏳',
           'in-progress': '🔄',
@@ -245,8 +249,8 @@ taskCmd
       });
 
       services.db.close();
-    } catch (error: any) {
-      console.error('❌ Failed to list tasks:', error.message);
+    } catch (error: unknown) {
+      console.error('❌ Failed to list tasks:', toMessage(error));
       process.exit(1);
     }
   });
@@ -281,8 +285,8 @@ taskCmd
 
       services.engine.shutdown();
       services.db.close();
-    } catch (error: any) {
-      console.error('❌ Failed to cancel task:', error.message);
+    } catch (error: unknown) {
+      console.error('❌ Failed to cancel task:', toMessage(error));
       process.exit(1);
     }
   });
@@ -322,8 +326,8 @@ taskCmd
 
       services.engine.shutdown();
       services.db.close();
-    } catch (error: any) {
-      console.error('❌ Failed to retry task:', error.message);
+    } catch (error: unknown) {
+      console.error('❌ Failed to retry task:', toMessage(error));
       process.exit(1);
     }
   });
@@ -356,8 +360,8 @@ program
 
       console.log(`✅ Added: ${repoInfo.owner}/${repoInfo.name}`);
       services.db.close();
-    } catch (error: any) {
-      console.error('❌ Failed to add repository:', error.message);
+    } catch (error: unknown) {
+      console.error('❌ Failed to add repository:', toMessage(error));
       process.exit(1);
     }
   });
@@ -380,8 +384,8 @@ settingsHookCmd
       console.log(`✅ Set hook for ${settingName}`);
       console.log(`   Command: ${command} <value>`);
       services.db.close();
-    } catch (error: any) {
-      console.error('❌ Failed to set hook:', error.message);
+    } catch (error: unknown) {
+      console.error('❌ Failed to set hook:', toMessage(error));
       process.exit(1);
     }
   });
@@ -409,8 +413,8 @@ settingsHookCmd
       });
 
       services.db.close();
-    } catch (error: any) {
-      console.error('❌ Failed to list hooks:', error.message);
+    } catch (error: unknown) {
+      console.error('❌ Failed to list hooks:', toMessage(error));
       process.exit(1);
     }
   });
@@ -433,8 +437,8 @@ settingsHookCmd
       services.db.deleteSettingsHook(settingName);
       console.log(`✅ Deleted hook for: ${settingName}`);
       services.db.close();
-    } catch (error: any) {
-      console.error('❌ Failed to delete hook:', error.message);
+    } catch (error: unknown) {
+      console.error('❌ Failed to delete hook:', toMessage(error));
       process.exit(1);
     }
   });
@@ -485,8 +489,8 @@ program
       }
 
       services.db.close();
-    } catch (error: any) {
-      console.error('❌ Failed to get status:', error.message);
+    } catch (error: unknown) {
+      console.error('❌ Failed to get status:', toMessage(error));
       process.exit(1);
     }
   });

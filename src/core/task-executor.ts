@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events';
 import { logger } from '../utils/logger';
+import { toMessage } from '../utils/error-utils';
 
 interface TaskOperation {
   taskId: number;
@@ -28,7 +29,7 @@ class TaskExecutor extends EventEmitter {
           try {
             await operation.execute();
             resolve();
-          } catch (error) {
+          } catch (error: unknown) {
             reject(error);
           }
         },
@@ -63,9 +64,9 @@ class TaskExecutor extends EventEmitter {
           operation.taskId.toString()
         );
         this.emit('operation-complete', operation);
-      } catch (error) {
+      } catch (error: unknown) {
         logger.error(
-          `Failed task operation: ${operation.operation} - ${error}`,
+          `Failed task operation: ${operation.operation} - ${toMessage(error)}`,
           operation.taskId.toString()
         );
         this.emit('operation-error', operation, error);

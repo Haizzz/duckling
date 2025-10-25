@@ -56,6 +56,15 @@ interface GitHubReviewBody {
   createdAt: string;
 }
 
+interface PRNode {
+  number: number;
+  title: string;
+  url: string;
+  body: string;
+  createdAt: string;
+  headRefName: string;
+}
+
 export class GitHubCLIProvider {
   private db: DatabaseManager;
   private openaiManager: OpenAIManager;
@@ -86,7 +95,7 @@ export class GitHubCLIProvider {
       this.repoOwner = repoInfo.owner;
       this.repoName = repoInfo.name;
       this.currentRepoPath = repositoryPath;
-    } catch (error) {
+    } catch (error: unknown) {
       throw new Error(`Failed to get repository information: ${error}`);
     }
   }
@@ -106,7 +115,7 @@ export class GitHubCLIProvider {
         }
         const data = JSON.parse(result.stdout);
         return data.defaultBranchRef.name;
-      } catch (error) {
+      } catch (error: unknown) {
         logger.warn(
           'Could not get default branch from GitHub CLI, falling back to "main"',
           String(error)
@@ -260,22 +269,22 @@ export class GitHubCLIProvider {
     try {
       const result = repositoryPath
         ? await execCommand(
-            'gh',
-            [
-              'pr',
-              'list',
-              '--head',
-              branchName,
-              '--json',
-              'number,url,title',
-              '--state',
-              'open',
-            ],
-            { cwd: repositoryPath }
-          )
+          'gh',
+          [
+            'pr',
+            'list',
+            '--head',
+            branchName,
+            '--json',
+            'number,url,title',
+            '--state',
+            'open',
+          ],
+          { cwd: repositoryPath }
+        )
         : await executeGitHubCLI(
-            `pr list --head ${branchName} --repo ${this.repoOwner}/${this.repoName} --json number,url,title --state open`
-          );
+          `pr list --head ${branchName} --repo ${this.repoOwner}/${this.repoName} --json number,url,title --state open`
+        );
 
       if (repositoryPath && 'exitCode' in result && result.exitCode !== 0) {
         throw new Error(`GitHub CLI command failed: ${result.stderr}`);
@@ -283,7 +292,7 @@ export class GitHubCLIProvider {
 
       const prs = JSON.parse(result.stdout);
       return prs.length > 0 ? prs[0] : null;
-    } catch (error) {
+    } catch (error: unknown) {
       logger.debug('Failed to find PR by branch:', String(error));
       return null;
     }
@@ -307,10 +316,19 @@ export class GitHubCLIProvider {
       // Get unresolved review threads from GraphQL
       const { reviewThreads, reviewBodies } =
         await this.getUnresolvedReviewThreads(prNumber, repositoryPath);
+      const lastCommitDate = lastCommitTimestamp
+        ? new Date(lastCommitTimestamp)
+        : null;
+
       const reviewCommentData: CommentData[] = [
         // Add review bodies (overall review summaries) - these don't have threads
         ...reviewBodies
-          .filter((review) => review.body && review.body.trim())
+          .filter((review) => {
+            if (!review.body || !review.body.trim()) return false;
+            if (!lastCommitDate) return true;
+            const reviewDate = new Date(review.createdAt);
+            return reviewDate > lastCommitDate;
+          })
           .map((review) => ({
             id: review.databaseId,
             user: { login: review.author.login },
@@ -354,7 +372,7 @@ export class GitHubCLIProvider {
       const threadIds = reviewThreads.map((thread) => thread.id);
 
       return { comments, threadIds };
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error(
         'Failed to fetch PR comments via GitHub CLI:',
         String(error)
@@ -477,7 +495,7 @@ export class GitHubCLIProvider {
         response.data?.repository?.pullRequest?.reviews?.nodes || [];
 
       return { reviewThreads, reviewBodies };
-    } catch (error) {
+    } catch (error: unknown) {
       logger.warn(`Failed to fetch review threads: ${error}`);
       return { reviewThreads: [], reviewBodies: [] };
     }
@@ -553,7 +571,7 @@ export class GitHubCLIProvider {
       }
 
       return true;
-    } catch (error) {
+    } catch (error: unknown) {
       logger.warn(`Failed to resolve review thread ${threadId}: ${error}`);
       if (taskId) {
         this.db.addTaskLog({
@@ -616,7 +634,7 @@ export class GitHubCLIProvider {
             throw new Error(`GitHub CLI command failed: ${result.stderr}`);
           }
           return result.stdout.trim();
-        } catch (error) {
+        } catch (error: unknown) {
           logger.warn(
             'Could not get current user from GitHub CLI:',
             String(error)
@@ -698,14 +716,14 @@ export class GitHubCLIProvider {
       const graphqlResponse = JSON.parse(result.stdout);
 
       // Filter out PRs created by this tool (those with the prefix)
-      const allPRs = graphqlResponse.data.viewer.pullRequests.nodes;
+      const allPRs = graphqlResponse.data.viewer.pullRequests.nodes as PRNode[];
       const recentPRs = allPRs.filter(
-        (pr: any) => !pr.title.startsWith(prTitlePrefix)
+        (pr) => !pr.title.startsWith(prTitlePrefix)
       );
 
       // For each PR, try to get the diff as well
       const prsWithDiff = await Promise.all(
-        recentPRs.map(async (pr: any) => {
+        recentPRs.map(async (pr) => {
           try {
             const diffResult = await execCommand(
               'gh',
@@ -719,7 +737,7 @@ export class GitHubCLIProvider {
               body: pr.body || '',
               diff: diffResult.exitCode === 0 ? diffResult.stdout : undefined,
             };
-          } catch (error) {
+          } catch (error: unknown) {
             return {
               title: pr.title,
               body: pr.body || '',
@@ -732,7 +750,7 @@ export class GitHubCLIProvider {
         `Found ${prsWithDiff.length} recent user PRs as examples (excluding tool-generated PRs)`
       );
       return prsWithDiff;
-    } catch (error) {
+    } catch (error: unknown) {
       logger.warn(`Failed to fetch recent PRs: ${error}`);
       return [];
     }
@@ -759,7 +777,7 @@ export class GitHubCLIProvider {
       }
 
       return result.stdout;
-    } catch (error) {
+    } catch (error: unknown) {
       logger.warn(`Failed to get branch diff: ${error}`);
       return '';
     }

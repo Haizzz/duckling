@@ -129,7 +129,7 @@ export class OpenAIManager {
         }
         return cleanBranchName;
       }
-    } catch (error) {
+    } catch (error: unknown) {
       logger.warn(
         `Failed to generate branch name via OpenAI: ${error}. Using fallback.`
       );
@@ -181,7 +181,7 @@ export class OpenAIManager {
         logger.info(`Generated PR title via OpenAI: ${fullTitle}`);
         return fullTitle;
       }
-    } catch (error) {
+    } catch (error: unknown) {
       logger.warn(
         `Failed to generate PR title via OpenAI: ${error}. Using fallback.`
       );
@@ -217,7 +217,7 @@ export class OpenAIManager {
         logger.info(`Generated PR description via OpenAI`);
         return description;
       }
-    } catch (error) {
+    } catch (error: unknown) {
       logger.warn(
         `Failed to generate PR description via OpenAI: ${error}. Using fallback.`
       );
@@ -248,7 +248,7 @@ export class OpenAIManager {
         logger.info(`Generated task summary via OpenAI: ${cleanSummary}`);
         return cleanSummary;
       }
-    } catch (error) {
+    } catch (error: unknown) {
       logger.warn(
         `Failed to generate task summary via OpenAI: ${error}. Using fallback.`
       );
@@ -309,7 +309,7 @@ export class OpenAIManager {
         }
         return cleanMessage;
       }
-    } catch (error) {
+    } catch (error: unknown) {
       logger.warn(
         `Failed to generate commit message via OpenAI: ${error}. Using fallback.`
       );
