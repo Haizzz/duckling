@@ -103,6 +103,8 @@ class Settings {
     document.getElementById('max-retries').value = settings.maxRetries ?? 3;
     document.getElementById('skip-username-check').checked =
       settings.skipUsernameCheck ?? false;
+    document.getElementById('auto-watch-prs').checked =
+      settings.autoWatchPRs ?? false;
 
     // Show configuration status
     this.showConfigurationStatus(settings);
@@ -128,6 +130,7 @@ class Settings {
 
     // Convert bool
     settings.skipUsernameCheck = settings.skipUsernameCheck === 'on';
+    settings.autoWatchPRs = settings.autoWatchPRs === 'on';
 
     // Convert numeric fields
     settings.maxRetries = parseInt(settings.maxRetries);

@@ -20,6 +20,7 @@ interface SettingsDefaults {
   jiraRepository: string;
   customPrompt: string;
   skipUsernameCheck: boolean;
+  autoWatchPRs: boolean;
 }
 
 export class SettingsManager {
@@ -39,6 +40,7 @@ export class SettingsManager {
     jiraRepository: '',
     customPrompt: DEFAULT_CODING_PROMPT,
     skipUsernameCheck: false,
+    autoWatchPRs: false,
   };
 
   constructor(private db: DatabaseManager) {}

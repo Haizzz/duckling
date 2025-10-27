@@ -237,6 +237,7 @@ export class CoreEngine extends EventEmitter {
 
       this.isProcessing = true;
       try {
+        await this.checkForNewPRs();
         await this.processReviews();
         await this.processPendingTasks();
       } catch (error: unknown) {
@@ -245,6 +246,61 @@ export class CoreEngine extends EventEmitter {
         this.isProcessing = false;
       }
     }, 60000); // 1 minute
+  }
+
+  private async checkForNewPRs(): Promise<void> {
+    if (!this.settings.get('autoWatchPRs')) {
+      return;
+    }
+
+    try {
+      const repositories = this.db.getRepositories();
+      const githubProvider = this.getGitHubManager();
+
+      for (const repo of repositories) {
+        try {
+          const openPRs = await githubProvider.getUserOpenPRs(repo.path);
+
+          for (const pr of openPRs) {
+            const existingTask = this.db
+              .getTasks({})
+              .find((t) => t.pr_url === pr.url);
+
+            if (!existingTask) {
+              const codingTool = this.settings.get('defaultCodingTool');
+              const taskId = this.db.createTask({
+                title: pr.title,
+                summary: pr.title,
+                description: pr.body || '',
+                status: 'awaiting-review',
+                coding_tool: codingTool,
+                repository_path: repo.path,
+                branch_name: pr.branchName,
+                pr_url: pr.url,
+                pr_number: pr.number,
+              });
+
+              this.dbLog(
+                taskId,
+                'info',
+                `🔍 Auto-watching PR #${pr.number}: ${pr.title}`
+              );
+
+              logger.info(
+                `Auto-created task ${taskId} for PR #${pr.number} in ${repo.name}`
+              );
+              this.emitTaskUpdate(taskId, 'awaiting-review');
+            }
+          }
+        } catch (error: unknown) {
+          logger.warn(
+            `Failed to check PRs for ${repo.name}: ${toMessage(error)}`
+          );
+        }
+      }
+    } catch (error: unknown) {
+      logger.warn(`Failed to check for new PRs: ${toMessage(error)}`);
+    }
   }
 
   private async processPendingTasks(): Promise<void> {

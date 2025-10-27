@@ -783,6 +783,60 @@ export class GitHubCLIProvider {
     }
   }
 
+  async getUserOpenPRs(repositoryPath: string): Promise<
+    Array<{
+      number: number;
+      title: string;
+      url: string;
+      branchName: string;
+      body: string;
+    }>
+  > {
+    await this.ensureInitialized(repositoryPath);
+
+    return await withRetry(
+      async () => {
+        const result = await execCommand(
+          'gh',
+          [
+            'pr',
+            'list',
+            '--author',
+            '@me',
+            '--state',
+            'open',
+            '--json',
+            'number,title,url,headRefName,body',
+          ],
+          { cwd: repositoryPath }
+        );
+
+        if (result.exitCode !== 0) {
+          throw new Error(`GitHub CLI command failed: ${result.stderr}`);
+        }
+
+        const prs = JSON.parse(result.stdout);
+        return prs.map(
+          (pr: {
+            number: number;
+            title: string;
+            url: string;
+            headRefName: string;
+            body: string;
+          }) => ({
+            number: pr.number,
+            title: pr.title,
+            url: pr.url,
+            branchName: pr.headRefName,
+            body: pr.body || '',
+          })
+        );
+      },
+      'Get user open PRs via GitHub CLI',
+      2
+    );
+  }
+
   private logPREvent(taskId: number, message: string): void {
     this.db.addTaskLog({
       task_id: taskId,
