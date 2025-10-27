@@ -234,6 +234,43 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
     }
   });
 
+  router.post('/tasks/:id/followup', async (req: Request, res: Response) => {
+    try {
+      const taskId = parseInt(req.params.id);
+      const { content } = req.body;
+
+      if (!content) {
+        return res.status(400).json({
+          success: false,
+          error: 'Missing required field: content',
+        });
+      }
+
+      const task = db.getTask(taskId);
+      if (!task) {
+        return res.status(404).json({
+          success: false,
+          error: 'Task not found',
+        });
+      }
+
+      // Handle the followup asynchronously (will be queued if task is busy)
+      engine.handleFollowup(taskId, content);
+
+      const response: ApiResponse = {
+        success: true,
+        data: { message: 'Followup received' },
+      };
+
+      res.json(response);
+    } catch (error: unknown) {
+      res.status(500).json({
+        success: false,
+        error: toMessage(error),
+      });
+    }
+  });
+
   router.get('/tasks/:id/commits', async (req: Request, res: Response) => {
     try {
       // For now, return empty array as commits aren't tracked yet

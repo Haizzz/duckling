@@ -647,104 +647,121 @@ export class CoreEngine extends EventEmitter {
       taskId: taskId,
       operation: 'handle-pr-comments',
       execute: async () => {
-        try {
-          // Update status to addressing-review
-          this.db.updateTask(taskId, {
-            status: 'addressing-review',
-            current_stage: 'addressing_review',
-          });
-          this.emitTaskUpdate(taskId, 'addressing-review');
+        // Update status to addressing-review
+        this.db.updateTask(taskId, {
+          status: 'addressing-review',
+          current_stage: 'addressing_review',
+        });
+        this.emitTaskUpdate(taskId, 'addressing-review');
 
-          // Log the review comments first
+        // Log the review comments first
+        this.db.addTaskLog({
+          task_id: taskId,
+          level: 'info',
+          message: `💬 PR review comments received:\n${concatenatedComments}`,
+        });
+
+        // Switch to the task branch before generating fixes (also pulls latest and discards local changes)
+        if (task.branch_name) {
           this.db.addTaskLog({
             task_id: taskId,
             level: 'info',
-            message: `💬 PR review comments received:\n${concatenatedComments}`,
+            message: `🔄 Switching to branch: ${task.branch_name}`,
           });
-
-          // Switch to the task branch before generating fixes
-          if (task.branch_name) {
-            this.db.addTaskLog({
-              task_id: taskId,
-              level: 'info',
-              message: `🔄 Switching to branch: ${task.branch_name}`,
-            });
-            const gitManager = this.getGitManager(task.repository_path);
-            await gitManager.switchToBranch(task.branch_name, taskId);
-          }
-
-          this.db.addTaskLog({
-            task_id: taskId,
-            level: 'info',
-            message: '🛠️ Generating fixes for all PR review comments...',
-          });
-
-          // Generate response/fixes based on all comments at once
-          const output = await this.codingManager.generateCode(
-            task.coding_tool,
-            `Original task: ${task.description}\n\nPR review comments to address:\n\n${concatenatedComments}\n\nAddress all the feedback above. Make all necessary code changes based on the review comments. Do not ask for clarification - analyze the available context and make the best decisions to resolve each comment. If a comment is ambiguous, choose the most logical interpretation based on the codebase patterns and the original task requirements.`,
-            { taskId, repositoryPath: task.repository_path }
-          );
-
-          // Log the code generation output
-          this.db.addTaskLog({
-            task_id: taskId,
-            level: 'info',
-            message: `📝 Review fix output:\n${output}`,
-          });
-
-          this.db.addTaskLog({
-            task_id: taskId,
-            level: 'info',
-            message: '✅ Code changes generated, running precommit checks...',
-          });
-
-          // Apply changes and run checks
-          await this.runPrecommitChecks(taskId);
-
-          this.db.addTaskLog({
-            task_id: taskId,
-            level: 'info',
-            message: '📝 Committing and pushing fixes...',
-          });
-
-          // Commit and push changes
           const gitManager = this.getGitManager(task.repository_path);
-          await gitManager.commitChanges(`Address PR feedback`, taskId);
-          if (task.branch_name) {
-            await gitManager.pushBranch(task.branch_name, taskId);
-          }
-
-          this.db.addTaskLog({
-            task_id: taskId,
-            level: 'info',
-            message: '✅ All PR feedback addressed and changes pushed',
-          });
-
-          // Mark the review threads as resolved
-          const githubManager = this.getGitHubManager();
-          await githubManager.resolveThreadsByIds(
-            threadIds,
-            task.repository_path,
-            taskId
-          );
-
-          // Update status back to awaiting-review
-          this.db.updateTask(taskId, {
-            status: 'awaiting-review',
-            current_stage: 'awaiting_review',
-          });
-          this.emitTaskUpdate(taskId, 'awaiting-review');
-        } catch (error: unknown) {
-          this.db.addTaskLog({
-            task_id: taskId,
-            level: 'error',
-            message: `❌ Error handling PR comments: ${toMessage(error)}`,
-          });
-          throw error;
+          await gitManager.switchToBranch(task.branch_name, taskId);
         }
+
+        this.db.addTaskLog({
+          task_id: taskId,
+          level: 'info',
+          message: '🛠️ Generating fixes for all PR review comments...',
+        });
+
+        // Generate response/fixes based on all comments at once
+        const output = await this.codingManager.generateCode(
+          task.coding_tool,
+          `Original task: ${task.description}\n\nPR review comments to address:\n\n${concatenatedComments}\n\nAddress all the feedback above. Make all necessary code changes based on the review comments. Do not ask for clarification - analyze the available context and make the best decisions to resolve each comment. If a comment is ambiguous, choose the most logical interpretation based on the codebase patterns and the original task requirements.`,
+          { taskId, repositoryPath: task.repository_path }
+        );
+
+        // Log the code generation output
+        this.db.addTaskLog({
+          task_id: taskId,
+          level: 'info',
+          message: `📝 Review fix output:\n${output}`,
+        });
+
+        this.db.addTaskLog({
+          task_id: taskId,
+          level: 'info',
+          message: '✅ Code changes generated, running precommit checks...',
+        });
+
+        // Apply changes and run checks
+        await this.runPrecommitChecks(taskId);
+
+        this.db.addTaskLog({
+          task_id: taskId,
+          level: 'info',
+          message: '📝 Committing and pushing fixes...',
+        });
+
+        // Commit and push changes
+        const gitManager = this.getGitManager(task.repository_path);
+        await gitManager.commitChanges(`Address PR feedback`, taskId);
+        if (task.branch_name) {
+          await gitManager.pushBranch(task.branch_name, taskId);
+        }
+
+        this.db.addTaskLog({
+          task_id: taskId,
+          level: 'info',
+          message: '✅ All PR feedback addressed and changes pushed',
+        });
+
+        // Mark the review threads as resolved
+        const githubManager = this.getGitHubManager();
+        await githubManager.resolveThreadsByIds(
+          threadIds,
+          task.repository_path,
+          taskId
+        );
+
+        // Update status back to awaiting-review
+        this.db.updateTask(taskId, {
+          status: 'awaiting-review',
+          current_stage: 'awaiting_review',
+        });
+        this.emitTaskUpdate(taskId, 'awaiting-review');
       },
     });
+  }
+
+  public async handleFollowup(taskId: number, comment: string): Promise<void> {
+    logger.info(`Handling followup for task: ${taskId}`);
+
+    // Log the followup
+    this.db.addTaskLog({
+      task_id: taskId,
+      level: 'info',
+      message: `💬 Followup received: ${comment}`,
+    });
+
+    try {
+      // Handle it like a PR comment (without thread IDs) - will be queued if task is busy
+      await this.handleAllPRComments(taskId, comment, []);
+    } catch (error: unknown) {
+      // Catch errors to prevent unhandled promise rejections since this is called without await
+      logger.error(
+        `Error handling followup for task ${taskId}: ${toMessage(error)}`
+      );
+      this.db.addTaskLog({
+        task_id: taskId,
+        level: 'error',
+        message: `❌ Error: ${toMessage(error)}`,
+      });
+    }
   }
 
   private emitTaskUpdate(

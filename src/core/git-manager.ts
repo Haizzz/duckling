@@ -258,12 +258,12 @@ export class GitManager {
       // Fetch the specific branch first to ensure we have latest changes
       await this.git.fetch('origin', branchName);
 
+      // Switch to the branch
+      await this.git.checkout(branchName);
+
       // Reset hard to origin branch to discard any local changes
       await this.git.reset(['--hard', `origin/${branchName}`]);
       await this.git.clean('f', ['-d']);
-
-      // Switch to the branch
-      await this.git.checkout(branchName);
     }, 'Switch to branch');
   }
 
