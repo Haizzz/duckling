@@ -142,7 +142,7 @@ export class CodingManager {
       const result = await execCommandWithInputStreaming(
         'claude',
         prompt,
-        ['--print'],
+        ['--print', '--dangerously-skip-permissions'],
         {
           taskId: taskId.toString(),
           cwd: repositoryPath,

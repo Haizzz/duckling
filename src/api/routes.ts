@@ -457,6 +457,115 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
     }
   });
 
+  // Custom settings endpoints
+  router.post('/settings/custom', async (req: Request, res: Response) => {
+    try {
+      const { key, value } = req.body;
+
+      if (!key || typeof key !== 'string') {
+        return res.status(400).json({
+          success: false,
+          error: 'Setting key is required',
+        });
+      }
+
+      if (value === undefined || value === null) {
+        return res.status(400).json({
+          success: false,
+          error: 'Setting value is required',
+        });
+      }
+
+      db.setSetting(key, String(value));
+
+      const response: ApiResponse = {
+        success: true,
+        data: { key, value: String(value) },
+      };
+
+      res.json(response);
+    } catch (error: unknown) {
+      res.status(500).json({
+        success: false,
+        error: toMessage(error),
+      });
+    }
+  });
+
+  router.put('/settings/custom/:key', async (req: Request, res: Response) => {
+    try {
+      const { key } = req.params;
+      const { newKey, value } = req.body;
+
+      if (!key) {
+        return res.status(400).json({
+          success: false,
+          error: 'Setting key is required',
+        });
+      }
+
+      // If renaming the key
+      if (newKey && newKey !== key) {
+        // Delete old key
+        db.deleteCustomSetting(key);
+        // Add new key
+        db.setSetting(newKey, String(value));
+
+        return res.json({
+          success: true,
+          data: { key: newKey, value: String(value) },
+        });
+      }
+
+      // Just updating value
+      if (value !== undefined && value !== null) {
+        db.setSetting(key, String(value));
+      }
+
+      const response: ApiResponse = {
+        success: true,
+        data: { key, value: String(value) },
+      };
+
+      res.json(response);
+    } catch (error: unknown) {
+      res.status(500).json({
+        success: false,
+        error: toMessage(error),
+      });
+    }
+  });
+
+  router.delete(
+    '/settings/custom/:key',
+    async (req: Request, res: Response) => {
+      try {
+        const { key } = req.params;
+
+        if (!key) {
+          return res.status(400).json({
+            success: false,
+            error: 'Setting key is required',
+          });
+        }
+
+        db.deleteCustomSetting(key);
+
+        const response: ApiResponse = {
+          success: true,
+          data: { key },
+        };
+
+        res.json(response);
+      } catch (error: unknown) {
+        res.status(500).json({
+          success: false,
+          error: toMessage(error),
+        });
+      }
+    }
+  );
+
   // Precommit checks endpoints
   router.get('/precommit-checks', async (req: Request, res: Response) => {
     try {

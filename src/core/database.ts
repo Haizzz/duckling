@@ -400,6 +400,13 @@ export class DatabaseManager {
     stmt.run(settingName);
   }
 
+  // Custom settings operations (for arbitrary key-value pairs)
+  deleteCustomSetting(key: string): void {
+    // Delete from settings table
+    const stmt = this.db.prepare('DELETE FROM settings WHERE key = ?');
+    stmt.run(key);
+  }
+
   private runMigrations(): void {
     runMultiRepositoryMigration(this.db, process.cwd());
   }

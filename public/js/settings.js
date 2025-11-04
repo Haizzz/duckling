@@ -3,6 +3,25 @@ class Settings {
   constructor() {
     this.precommitChecks = [];
     this.repositories = [];
+    this.customSettings = [];
+    this.defaultSettings = [
+      'defaultCodingTool',
+      'branchPrefix',
+      'prTitlePrefix',
+      'commitSuffix',
+      'maxRetries',
+      'customPrompt',
+      'ampApiKey',
+      'openaiApiKey',
+      'jiraEmail',
+      'jiraApiKey',
+      'jiraBaseUrl',
+      'jiraJqlQuery',
+      'jiraRepository',
+      'commentPrefix',
+      'skipUsernameCheck',
+      'autoWatchPRs',
+    ];
     this.init();
   }
 
@@ -48,6 +67,30 @@ class Settings {
         this.addRepository();
       }
     });
+
+    // Add custom setting button
+    document
+      .getElementById('add-custom-setting-btn')
+      .addEventListener('click', () => {
+        this.addCustomSetting();
+      });
+
+    // Enter key in custom setting inputs
+    document.getElementById('custom-key').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        this.addCustomSetting();
+      }
+    });
+
+    document
+      .getElementById('custom-value')
+      .addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          this.addCustomSetting();
+        }
+      });
   }
 
   async loadSettings() {
@@ -115,8 +158,20 @@ class Settings {
     // Load settings hooks
     this.loadSettingsHooks();
 
+    // Load custom settings
+    this.loadCustomSettings(settings);
+
     // The Jira repository dropdown will be updated when repositories are loaded
     // in the sequential loading process
+  }
+
+  loadCustomSettings(settings) {
+    // Filter out default settings to get custom ones
+    this.customSettings = Object.entries(settings)
+      .filter(([key]) => !this.defaultSettings.includes(key))
+      .map(([key, value]) => ({ key, value }));
+
+    this.renderCustomSettings();
   }
 
   async saveSettings() {
@@ -604,6 +659,135 @@ class Settings {
     } catch (error) {
       this.showError('Failed to remove repository: ' + error.message);
     }
+  }
+
+  async addCustomSetting() {
+    const keyInput = document.getElementById('custom-key');
+    const valueInput = document.getElementById('custom-value');
+    const key = keyInput.value.trim();
+    const value = valueInput.value.trim();
+
+    if (!key) {
+      this.showError('Please enter a setting key');
+      return;
+    }
+
+    if (!value) {
+      this.showError('Please enter a setting value');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/settings/custom', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, value }),
+      });
+
+      if (response.ok) {
+        this.showSuccess('Custom setting added successfully');
+        keyInput.value = '';
+        valueInput.value = '';
+        // Reload settings to refresh custom settings list
+        this.loadSettings();
+      } else {
+        const result = await response.json();
+        this.showError(result.error || 'Failed to add custom setting');
+      }
+    } catch (error) {
+      this.showError('Failed to add custom setting: ' + error.message);
+    }
+  }
+
+  async updateCustomSetting(oldKey, newKey, newValue) {
+    try {
+      const response = await fetch(
+        `/api/settings/custom/${encodeURIComponent(oldKey)}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ newKey, value: newValue }),
+        }
+      );
+
+      if (response.ok) {
+        this.showSuccess('Custom setting updated successfully');
+        this.loadSettings();
+      } else {
+        const result = await response.json();
+        this.showError(result.error || 'Failed to update custom setting');
+      }
+    } catch (error) {
+      this.showError('Failed to update custom setting: ' + error.message);
+    }
+  }
+
+  async removeCustomSetting(key) {
+    if (!confirm(`Are you sure you want to remove the setting "${key}"?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `/api/settings/custom/${encodeURIComponent(key)}`,
+        {
+          method: 'DELETE',
+        }
+      );
+
+      if (response.ok) {
+        this.showSuccess('Custom setting removed successfully');
+        this.loadSettings();
+      } else {
+        const result = await response.json();
+        this.showError(result.error || 'Failed to remove custom setting');
+      }
+    } catch (error) {
+      this.showError('Failed to remove custom setting: ' + error.message);
+    }
+  }
+
+  renderCustomSettings() {
+    const container = document.getElementById('custom-settings-list');
+
+    if (this.customSettings.length === 0) {
+      container.innerHTML =
+        '<p class="text-sm text-gray-500 italic">No custom settings configured</p>';
+      return;
+    }
+
+    container.innerHTML = this.customSettings
+      .map(
+        (setting) => `
+      <div class="flex items-center space-x-2 p-3 bg-gray-50 rounded-md">
+        <input type="text" 
+          id="custom-key-${this.escapeHtml(setting.key)}"
+          value="${this.escapeHtml(setting.key)}"
+          class="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm font-mono"
+          placeholder="Key">
+        <input type="text" 
+          id="custom-value-${this.escapeHtml(setting.key)}"
+          value="${this.escapeHtml(setting.value)}"
+          class="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
+          placeholder="Value">
+        <button 
+          onclick="settings.updateCustomSetting('${this.escapeHtml(setting.key)}', document.getElementById('custom-key-${this.escapeHtml(setting.key)}').value, document.getElementById('custom-value-${this.escapeHtml(setting.key)}').value)"
+          class="px-3 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
+          title="Update">
+          Update
+        </button>
+        <button 
+          onclick="settings.removeCustomSetting('${this.escapeHtml(setting.key)}')"
+          class="px-3 py-2 text-red-600 hover:text-red-800"
+          title="Remove">
+          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+          </svg>
+        </button>
+      </div>
+    `
+      )
+      .join('');
   }
 }
 
