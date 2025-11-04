@@ -98,10 +98,7 @@ export class CodingManager {
       const result = await execCommandStreaming(
         'codex',
         [
-          '--disable-response-storage',
-          '--auto-edit',
-          '--quiet',
-          '--full-stdout',
+          "--full-auto",
           prompt,
         ],
         {
