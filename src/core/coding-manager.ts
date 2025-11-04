@@ -97,7 +97,7 @@ export class CodingManager {
 
       const result = await execCommandStreaming(
         'codex',
-        ['--full-auto', prompt],
+        ['exec', '--full-auto', prompt],
         {
           taskId: taskId.toString(),
           cwd: repositoryPath,
