@@ -293,13 +293,16 @@ class TaskDetail {
           <div class="flex gap-3">
             <textarea 
               id="followup-input"
-              class="flex-1 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              class="flex-1 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none ${task.status !== 'awaiting-review' ? 'bg-gray-100 cursor-not-allowed' : ''}"
               rows="1"
+              ${task.status !== 'awaiting-review' ? 'disabled' : ''}
+              placeholder="${task.status === 'awaiting-review' ? 'Enter follow-up comment...' : 'Follow-up only available when awaiting review'}"
             ></textarea>
             <button 
               onclick="TaskDetailInstance.sendFollowup()"
-              class="px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors disabled:bg-gray-200 disabled:cursor-not-allowed self-start"
+              class="px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed self-start"
               id="send-followup-btn"
+              ${task.status !== 'awaiting-review' ? 'disabled title="Follow-up is only available when task is awaiting review"' : ''}
             >
               Send follow up
             </button>
