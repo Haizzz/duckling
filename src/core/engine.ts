@@ -811,32 +811,6 @@ export class CoreEngine extends EventEmitter {
     });
   }
 
-  public async handleFollowup(taskId: number, comment: string): Promise<void> {
-    logger.info(`Handling followup for task: ${taskId}`);
-
-    // Log the followup
-    this.db.addTaskLog({
-      task_id: taskId,
-      level: 'info',
-      message: `💬 Followup received: ${comment}`,
-    });
-
-    try {
-      // Handle it like a PR comment (without thread IDs) - will be queued if task is busy
-      await this.handleAllPRComments(taskId, comment, []);
-    } catch (error: unknown) {
-      // Catch errors to prevent unhandled promise rejections since this is called without await
-      logger.error(
-        `Error handling followup for task ${taskId}: ${toMessage(error)}`
-      );
-      this.db.addTaskLog({
-        task_id: taskId,
-        level: 'error',
-        message: `❌ Error: ${toMessage(error)}`,
-      });
-    }
-  }
-
   private emitTaskUpdate(
     taskId: number,
     status: TaskStatus,

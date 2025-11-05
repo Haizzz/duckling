@@ -288,25 +288,6 @@ class TaskDetail {
               </div>
             </div>
           </div>
-
-          <!-- Followup Input -->
-          <div class="flex gap-3">
-            <textarea 
-              id="followup-input"
-              class="flex-1 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none ${task.status !== 'awaiting-review' ? 'bg-gray-100 cursor-not-allowed' : ''}"
-              rows="1"
-              ${task.status !== 'awaiting-review' ? 'disabled' : ''}
-              placeholder="${task.status === 'awaiting-review' ? 'Enter follow-up comment...' : 'Follow-up only available when awaiting review'}"
-            ></textarea>
-            <button 
-              onclick="TaskDetailInstance.sendFollowup()"
-              class="px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed self-start"
-              id="send-followup-btn"
-              ${task.status !== 'awaiting-review' ? 'disabled title="Follow-up is only available when task is awaiting review"' : ''}
-            >
-              Send follow up
-            </button>
-          </div>
         </div>
       </div>
     `;
@@ -655,47 +636,6 @@ class TaskDetail {
         <span>${repositoryDisplay}</span>
       </div>
     `;
-  }
-
-  async sendFollowup() {
-    const textarea = document.getElementById('followup-input');
-    const button = document.getElementById('send-followup-btn');
-    const content = textarea.value.trim();
-
-    if (!content) {
-      alert('Please enter a followup');
-      return;
-    }
-
-    try {
-      // Disable UI
-      button.disabled = true;
-      button.textContent = 'Sending...';
-      textarea.disabled = true;
-
-      const response = await fetch(`/api/tasks/${this.taskId}/followup`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content }),
-      });
-
-      const result = await response.json();
-
-      if (response.ok && result.success) {
-        // Clear textarea
-        textarea.value = '';
-      } else {
-        throw new Error(result.error || 'Failed to send followup');
-      }
-    } catch (error) {
-      console.error('Error sending followup:', error);
-      alert('Failed to send followup: ' + error.message);
-    } finally {
-      // Re-enable UI
-      button.disabled = false;
-      button.textContent = 'Send Followup';
-      textarea.disabled = false;
-    }
   }
 }
 
