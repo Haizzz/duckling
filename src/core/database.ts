@@ -259,7 +259,7 @@ export class DatabaseManager {
       params.push(filters.after);
     }
 
-    query += ' ORDER BY timestamp DESC';
+    query += ' ORDER BY timestamp DESC, id ASC';
 
     if (filters.limit) {
       query += ' LIMIT ?';

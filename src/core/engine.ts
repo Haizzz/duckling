@@ -336,7 +336,24 @@ export class CoreEngine extends EventEmitter {
 
       try {
         const gitManager = this.getGitManager(task.repository_path);
-        await gitManager.switchToBranch(task.branch_name, task.id);
+        try {
+          await gitManager.switchToBranch(task.branch_name, task.id);
+        } catch (error: unknown) {
+          const errorMessage = toMessage(error);
+          this.dbLog(
+            task.id,
+            'error',
+            `❌ Failed to switch to branch ${task.branch_name}: ${errorMessage}`
+          );
+          this.setTaskStatus(task.id, 'failed', 'failed');
+          this.dbLog(
+            task.id,
+            'error',
+            `💥 Task failed: Unable to switch to branch`
+          );
+          continue;
+        }
+
         const result = await this.collectPRComments(task.id, task.pr_number);
 
         // Handle status updates first (completed/cancelled)

@@ -281,7 +281,7 @@ class TaskDetail {
                 Download Full Log
               </a>
             </div>
-            <div id="task-logs" class="bg-gray-900 rounded-lg p-4 max-h-96 overflow-y-auto">
+            <div id="task-logs" class="bg-gray-900 rounded-lg p-4 max-h-96 overflow-y-auto overscroll-contain">
               <div class="text-center py-4">
                 <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-400 mx-auto mb-2"></div>
                 <p class="text-gray-400 text-sm">Loading logs...</p>
@@ -331,8 +331,11 @@ class TaskDetail {
           // Append new logs to existing ones
           this.appendLogs(result.data);
         } else {
-          // Full refresh - cache all logs (reverse for chronological order)
-          this.logs = result.data.reverse();
+          // Full refresh - sort logs chronologically (timestamp ASC, id ASC)
+          this.logs = result.data.sort((a, b) => {
+            const timeDiff = new Date(a.timestamp) - new Date(b.timestamp);
+            return timeDiff !== 0 ? timeDiff : a.id - b.id;
+          });
           this.renderLogs(this.logs);
         }
 
@@ -389,11 +392,15 @@ class TaskDetail {
     if (newLogs.length === 0) return;
 
     const container = document.getElementById('task-logs');
-    // Reverse new logs to maintain chronological order (newest logs come from API in DESC order)
-    this.logs = [...this.logs, ...newLogs.reverse()];
+    // Sort new logs chronologically (timestamp ASC, id ASC) and append
+    const sortedNewLogs = newLogs.sort((a, b) => {
+      const timeDiff = new Date(a.timestamp) - new Date(b.timestamp);
+      return timeDiff !== 0 ? timeDiff : a.id - b.id;
+    });
+    this.logs = [...this.logs, ...sortedNewLogs];
 
     // Only append new logs instead of re-rendering everything
-    const newLogsHTML = newLogs
+    const newLogsHTML = sortedNewLogs
       .map(
         (log) => `
       <div class="flex items-start space-x-2 mb-2 text-sm font-mono">
