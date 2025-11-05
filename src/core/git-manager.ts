@@ -258,6 +258,10 @@ export class GitManager {
       // Fetch the specific branch first to ensure we have latest changes
       await this.git.fetch('origin', branchName);
 
+      // reset before checkout
+      await this.git.reset(['--hard', `${branchName}`]);
+      await this.git.clean('f', ['-d']);
+
       // Switch to the branch
       await this.git.checkout(branchName);
 
