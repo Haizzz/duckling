@@ -259,7 +259,7 @@ export class GitManager {
       await this.git.fetch('origin', branchName);
 
       // reset before checkout
-      await this.git.reset(['--hard', `${branchName}`]);
+      await this.git.reset(['--hard', `origin/${branchName}`]);
       await this.git.clean('f', ['-d']);
 
       // Switch to the branch
