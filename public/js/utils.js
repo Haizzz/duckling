@@ -209,4 +209,11 @@ window.Utils = {
       ...options,
     });
   },
+
+  async watchTask(taskId, options = {}) {
+    return this.performTaskAction(taskId, 'watch', {
+      // No confirmation required
+      ...options,
+    });
+  },
 };

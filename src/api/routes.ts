@@ -279,6 +279,26 @@ export function createRoutes(db: DatabaseManager, engine: CoreEngine): Router {
     }
   });
 
+  router.post('/tasks/:id/watch', async (req: Request, res: Response) => {
+    try {
+      await engine.watchTask(parseInt(req.params.id));
+
+      const response: ApiResponse = {
+        success: true,
+        data: { message: 'Task moved to awaiting review' },
+      };
+
+      res.json(response);
+    } catch (error: unknown) {
+      const response: ApiResponse = {
+        success: false,
+        error: toMessage(error),
+      };
+
+      res.status(500).json(response);
+    }
+  });
+
   router.post('/tasks/:id/retry', async (req: Request, res: Response) => {
     try {
       await engine.retryTask(parseInt(req.params.id));

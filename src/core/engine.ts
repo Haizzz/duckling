@@ -158,6 +158,27 @@ export class CoreEngine extends EventEmitter {
     this.dbLog(taskId, 'info', 'Task cancelled by user');
   }
 
+  async watchTask(taskId: number): Promise<void> {
+    const task = this.db.getTask(taskId);
+    if (!task) {
+      throw new Error('Task not found');
+    }
+
+    if (!task.pr_url) {
+      throw new Error('Can only watch tasks with a linked PR');
+    }
+
+    this.db.updateTask(taskId, {
+      status: 'awaiting-review',
+    });
+
+    this.dbLog(
+      taskId,
+      'info',
+      'Task moved to awaiting review for PR monitoring'
+    );
+  }
+
   async retryTask(taskId: number): Promise<void> {
     const task = this.db.getTask(taskId);
     if (!task) {

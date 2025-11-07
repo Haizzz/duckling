@@ -72,6 +72,12 @@ window.API = {
     });
   },
 
+  async watchTask(id) {
+    return this.request(`/tasks/${id}/watch`, {
+      method: 'POST',
+    });
+  },
+
   async retryTask(id) {
     return this.request(`/tasks/${id}/retry`, {
       method: 'POST',

@@ -466,6 +466,7 @@ class Dashboard {
       task.status !== 'cancelled' &&
       task.status !== 'failed';
     const canRetry = task.status === 'failed' || task.status === 'cancelled';
+    const canWatch = task.pr_url && task.status !== 'awaiting-review';
 
     // Add pulsing border based on status
     let borderClass = '';
@@ -516,7 +517,7 @@ class Dashboard {
             <span>Updated ${updatedDate}</span>
           </div>
           ${
-            canCancel || canComplete || canRetry
+            canCancel || canComplete || canRetry || canWatch
               ? `
             <div class="relative inline-block text-left">
               <button 
@@ -542,6 +543,18 @@ class Dashboard {
                       class="block w-full text-left px-4 py-2 text-sm text-blue-700 hover:bg-blue-50 hover:text-blue-800"
                     >
                       Retry Task
+                    </button>
+                  `
+                      : ''
+                  }
+                  ${
+                    canWatch
+                      ? `
+                    <button 
+                      onclick="window.Dashboard.watchTask('${task.id}')"
+                      class="block w-full text-left px-4 py-2 text-sm text-purple-700 hover:bg-purple-50 hover:text-purple-800"
+                    >
+                      Watch PR
                     </button>
                   `
                       : ''
@@ -717,6 +730,12 @@ class Dashboard {
 
   async retryTask(taskId) {
     await Utils.retryTask(taskId, {
+      hideDropdown: () => this.hideTaskDropdown(taskId),
+    });
+  }
+
+  async watchTask(taskId) {
+    await Utils.watchTask(taskId, {
       hideDropdown: () => this.hideTaskDropdown(taskId),
     });
   }
