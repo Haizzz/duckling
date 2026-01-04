@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "@octokit/rest": "^20.0.2",
-    "better-sqlite3": "^9.2.2",
+    "better-sqlite3": "^12.5.0",
     "commander": "^11.1.0",
     "cors": "^2.8.5",
     "execa": "^8.0.1",
