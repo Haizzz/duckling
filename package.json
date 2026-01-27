@@ -52,7 +52,7 @@
     "cli"
   ],
   "author": "Anh Le",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "pnpm": {
     "onlyBuiltDependencies": ["better-sqlite3"]
   }
