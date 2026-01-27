@@ -52,5 +52,8 @@
     "cli"
   ],
   "author": "Anh Le",
-  "license": "UNLICENSED"
+  "license": "UNLICENSED",
+  "pnpm": {
+    "onlyBuiltDependencies": ["better-sqlite3"]
+  }
 }
